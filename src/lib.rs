@@ -2,220 +2,190 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::cmp;
+use std::io::{self, Write};
 
-fn rects_intersect(rect_a: (usize, usize, usize, usize), rect_b: (usize, usize, usize, usize)) -> bool {
+
+fn write(towrite: &[u8]) -> io::Result<()> {
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+
+    handle.write(towrite)?;
+    Ok(())
+}
+
+pub struct BleepsBox {
+    boxes: Vec<BleepsBox>,
+    box_positions: Vec<(isize, isize)>,
+    width: usize,
+    height: usize,
+    grid: Vec<Vec<char>>,
+    parent: Option<u32>,
+    recache_flag: bool
+}
+
+
+impl BleepsBox {
+    fn new(width: usize, height: usize) -> BleepsBox {
+        let mut newgrid = Vec::new();
+        let mut newrow: Vec<Option<char>>;
+        for y in (0 .. height) {
+            newrow = Vec::new();
+            for x in (0 .. width) {
+                newrow.push(None)
+            }
+            newgrid.push(newrow);
+        }
+        BleepsBox {
+            boxes: Vec::new(),
+            box_positions: Vec::new(),
+            width: width,
+            height: height,
+            grid: Vec::new(),
+            parent: None,
+            recache_flag: true
+        }
+    }
+    fn set(&mut self, x: usize, y: usize, c: char) {
+        while (self.grid.len() <= y) {
+            self.grid.push(Vec::new());
+        }
+        match self.grid.get_mut(y) {
+            Some(row) => {
+                while (row.len() <= x) {
+                    row.push(' ');
+                }
+                row[x] = c;
+            }
+            None => ()
+        };
+    }
+
+    fn get(&self, x: usize, y: usize) -> char {
+        self.grid[y][x]
+    }
+
+    fn get_display(&self) -> Vec<((isize, isize),(char, u16))> {
+        let mut disp: Vec<((isize, isize), (char, u16))> = Vec::new();
+
+        let mut used_coords: HashMap<(isize, isize), bool> = HashMap::new();
+
+        for i in 0..self.boxes.len() {
+            let mut subbox = &self.boxes[i];
+            let mut subbox_pos = self.box_positions[i];
+            let mut subdisp = subbox.get_display();
+            for j in 0..subdisp.len() {
+                let mut entry = subdisp[j];
+                let pos = entry.0;
+                let val = entry.1;
+                let new_pos = (pos.0 + subbox_pos.0, pos.1 + subbox_pos.1);
+                used_coords.insert(new_pos, true);
+                disp.push((new_pos, val));
+            }
+        }
+
+        // TODO: Check if this box is on the screen
+
+
+        // TODO: Check if coordinate is on screen
+        for y in 0..self.height {
+            for x in 0..self.width {
+                match used_coords.get(&(x as isize, y as isize)) {
+                    Some(found) => (),
+                    None => {
+                        disp.push(((x as isize, y as isize), (self.grid[y][x], 0)));
+                    }
+                };
+            }
+        }
+
+        disp
+
+    }
+
+}
+
+
+fn rects_intersect(rect_a: (isize, isize, isize, isize), rect_b: (isize, isize, isize, isize)) -> bool {
     // TODO: implement. this is for testing, and will be slow to render every box
     (! (rect_a.0 + rect_a.2 < rect_b.0 || rect_a.0 > rect_b.0 + rect_b.2) && ! (rect_a.1 + rect_a.3 < rect_b.1 || rect_a.1 > rect_b.1 + rect_b.3))
 }
 
-struct globals {
-    asciibox_id: u32,
-    asciiboxes: Box<HashMap<u32, AsciiBox>>
-}
-
-struct AsciiBox {
-    id: u32,
-    children: Box<HashMap<u32, AsciiBox>>,
-    child_positions: Box<HashMap<u32, (usize, usize)>>,
-    width: usize,
-    height: usize,
-    grid: Box<Vec<Vec<char>>>
-}
-
-impl AsciiBox {
-    fn new(new_width: usize, new_height: usize) -> AsciiBox {
-
-        let children: HashMap<u32, AsciiBox> = HashMap::new();
-        let child_positions: HashMap<u32, (usize, usize)> = HashMap::new();
-
-        let mut rows = Vec::new();
-
-        for y in 0..new_height {
-            rows.push(Vec::new());
-            match rows.last_mut() {
-                Some(v) => {
-                    for x in 0..new_width {
-                        v.push('\x00')
-                    }
-                },
-                None => ()
-            }
-        }
-
-        let mut new_id: u32;
-        unsafe {
-            new_id = ASCII_ID;
-            ASCII_ID += 1;
-        }
-
-        let mut newbox = AsciiBox {
-            children: Box::new(children),
-            child_positions: Box::new(child_positions),
-            id: new_id,
-            width: new_width,
-            height: new_height,
-            grid: Box::new(rows)
-        };
-
-        unsafe {
-            ASCIIBOXES.insert(new_id, &newbox);
-        }
-        newbox
-    }
-
-    fn new_child(&mut self, x: usize, y: usize, width: usize, height: usize) -> u32 {
-        let mut child = AsciiBox::new(width, height);
-        let child_id = child.get_id();
-        child.set_id(child_id);
-        self.children.insert(child_id, child);
-        self.child_positions.insert(child_id, (x, y));
-        child_id
-
-    }
-
-    fn get_child(&mut self, cid: u32) -> Option<&mut AsciiBox> {
-        self.children.get_mut(&cid)
-    }
-
-    fn get_id(&self) -> u32 {
-        self.id
-    }
-
-    fn get_cell(self, x: usize, y: usize) -> char {
-        self.grid[y][x]
-    }
-
-    fn get_height(&self) -> usize {
-        self.height
-    }
-
-    fn get_width(&self) -> usize {
-        self.width
-    }
-
-    fn set_id(&mut self, id: u32) {
-        self.id = id;
-    }
-    fn set_cell(&mut self, x: usize, y: usize, val: char) {
-        self.grid[y][x] = val;
-    }
-
-    fn get_visible_grid(&self, offset: (usize, usize), bounds: (usize, usize, usize, usize)) -> Vec<(usize, usize, char)> {
-        // bound_x & bound_y may be negative values, and effectly be unbound
-
-        let mut output: Vec<(usize, usize, char)> =  Vec::new();
-        let real_x = offset.0;
-        let real_y = offset.1;
-
-        let width = self.width;
-        let height = self.height;
-
-        let mut subgrid: Vec<(usize, usize, char)>;
-        let mut sub_x: usize;
-        let mut sub_y: usize;
-
-
-        let mut ny: usize;
-        let mut nx: usize;
-        for y in 0 .. height {
-            ny = real_y + y;
-            if ny < bounds.1 || ny > bounds.3 {
-                continue;
-            }
-            for x in 0 .. width {
-                nx = x + real_x;
-                if nx < bounds.0 || nx > bounds.2 {
-                    continue
-                }
-                if self.grid[y][x] != '\x00' {
-                    output.push((nx, ny, self.grid[y][x]));
-                }
-            }
-        }
-
-        for (child_id, child) in self.children.iter() {
-            sub_x = real_x + self.child_positions[child_id].0;
-            sub_y = real_y + self.child_positions[child_id].1;
-            if (rects_intersect((sub_x, sub_y, child.width, child.height), bounds)) {
-                subgrid = child.get_visible_grid((sub_x, sub_y), bounds);
-                for sub in subgrid.iter() {
-                    output.push(*sub);
-                }
-            }
-        }
-
-
-
-        output
-    }
-
-    fn display(&self) {
-        print!("\x1b[0;0H");
-
-        let width = self.width;
-        let height = self.height;
-        let cells = self.get_visible_grid((0,0), (0, 0, width, height));
-        let mut grid: Vec<Vec<char>> = Vec::new();
-
-        for y in 0..height {
-            grid.push(Vec::new());
-            for x in 0..width {
-                grid[y].push(' ');
-            }
-        }
-
-        for (x, y, c) in cells {
-            grid[y][x] = c;
-        }
-
-        for y in 0..height {
-            for x in 0..width {
-                print!("{}", grid[y][x]);
-            }
-            print!("\n");
-        }
-    }
-
-}
-
-static mut ASCII_ID: u32 = 0;
-static mut ASCIIBOXES: HashMap<u32, &AsciiBox> = HashMap::new();
-
-
+// printc for testing only
 #[no_mangle]
-pub extern fn init() {
-    unsafe {
-        static mut ASCII_ID: u32 = 0;
-        static mut ASCIIBOXES: HashMap<u32, AsciiBox> = HashMap::new();
-    }
-}
-
-#[no_mangle]
-pub extern fn testfunc() {
-    let mut ab = AsciiBox::new(20, 20);
-    let mut height = ab.get_height() - 1;
-    let mut width = ab.get_width();
-    for y in 0..20 {
-        for x in 0..20 {
-            ab.set_cell(x, y, 'X');
+pub extern "C" fn printc(ptr: *mut Vec<BleepsBox>, box_id: u32, x: u32, y: u32) {
+    let mut boxes = unsafe { Box::from_raw(ptr) };
+    match boxes.get(box_id as usize) {
+        Some(bleepsbox) => {
+            println!("{}", bleepsbox.get(x as usize, y as usize));
         }
-    }
-
-    let cid = ab.new_child(10, 10, 5, 5);
-
-    match ab.get_child(cid) {
-        Some(cc) => {
-            for y in 0..5 {
-                for x in 0..5 {
-                    if x != y {
-                        cc.set_cell(x, y, '-');
-                    }
-                }
-            }
-        },
         None => ()
     };
 
-    ab.display();
+    Box::into_raw(boxes); // Prevent Release
+}
+
+
+//fn draw_screen(boxes: Vec<BleepsBox>) {
+//    let top = boxes[0];
+//}
+
+
+//#[no_mangle]
+//pub extern "C" fn flag_recache(ptr: *mut Vec<BleepsBox>, box_id: u32) {
+//    let mut boxes = unsafe { Box::from_raw(ptr) };
+//    let mut bleepsbox = boxes[box_id as usize];
+//    bleepsbox.flag_recache();
+//
+//    Box::into_raw(boxes); // Prevent Release
+//}
+
+#[no_mangle]
+pub extern "C" fn setc(ptr: *mut Vec<BleepsBox>, box_id: u32, x: u32, y: u32, c: *const c_char) {
+    assert!(!c.is_null());
+
+    let c_str = unsafe { CStr::from_ptr(c) };
+    let string = c_str.to_str().expect("Not a valid UTF-8 string");
+    let use_c = string.chars().next().unwrap();
+    println!("{}", use_c);
+
+    let mut boxes = unsafe { Box::from_raw(ptr) };
+    match boxes.get_mut(box_id as usize) {
+        Some(bleepsbox) => {
+            bleepsbox.set(x as usize, y as usize, use_c);
+        }
+        None => ()
+    };
+
+    Box::into_raw(boxes); // Prevent Release
+}
+
+#[no_mangle]
+pub extern "C" fn newbox(ptr: *mut Vec<BleepsBox>, parent_id: u32) -> u32 {
+    let mut boxes = unsafe { Box::from_raw(ptr) };
+    let id: u32 = boxes.len() as u32;
+    let mut bleepsbox = BleepsBox::new(10, 10);
+
+    match boxes.get_mut(parent_id as usize) {
+        Some(parent) => {
+            parent.box_positions.push((0, 0));
+            bleepsbox.parent = Some(id);
+        }
+        None => ()
+    }
+    boxes.push(bleepsbox);
+
+    Box::into_raw(boxes); // Prevent Release
+
+    id
+}
+
+
+#[no_mangle]
+pub extern "C" fn init() -> *mut Vec<BleepsBox> {
+    let mut boxes: Vec<BleepsBox> = Vec::new();
+    let top: BleepsBox = BleepsBox::new(10, 10);
+    boxes.push(top);
+
+    Box::into_raw(Box::new(boxes))
 }
 
