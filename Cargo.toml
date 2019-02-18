@@ -8,5 +8,4 @@ name = "asciibox"
 crate-type = ["dylib"]
 
 [dependencies]
-ansi_term = "0.11"
 
