@@ -50,6 +50,22 @@ impl BleepsBox {
     fn flag_recache(&mut self) {
         self.recache_flag = true;
     }
+
+    fn fill(&mut self, c: &[u8]) {
+        let mut new_c: [u8; 4] = [0; 4];
+        for i in 0..c.len() {
+            new_c[(4 - c.len()) + i] = c[i]; // Put the 0 offset first
+        }
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                self.grid.entry((x, y))
+                    .and_modify(|e| { *e = new_c })
+                    .or_insert(new_c);
+            }
+        }
+    }
+
     fn set(&mut self, x: usize, y: usize, c: &[u8]) {
         let mut new_c: [u8; 4] = [0; 4];
         for i in 0..c.len() {
@@ -137,9 +153,12 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
         for (subbox_offset, subbox_id) in subboxes.iter() {
             subbox_output = get_display(boxes, *subbox_id, (offset.0 + subbox_offset.0, subbox_offset.1 + offset.1), frame);
             for (subpos, value) in subbox_output.iter() {
-                *output.entry((subpos.0 + subbox_offset.0, subpos.1 + subbox_offset.1)).or_insert(*value) = *value;
+                output.entry((subpos.0 + subbox_offset.0, subpos.1 + subbox_offset.1))
+                    .and_modify(|e| { *e = *value })
+                    .or_insert(*value);
             }
         }
+
         match boxes.get_mut(&box_id) {
             Some(bleepsbox) => {
                 bleepsbox.set_cached(&output);
@@ -335,6 +354,28 @@ pub extern "C" fn set_bg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
     Box::into_raw(boxhandler); // Prevent Release
 }
 
+#[no_mangle]
+pub extern "C" fn fillc(ptr: *mut BoxHandler, box_id: usize, c: *const c_char) {
+    assert!(!c.is_null());
+
+    let c_str = unsafe { CStr::from_ptr(c) };
+    let string_bytes = c_str.to_str().expect("Not a valid UTF-8 string").as_bytes();
+
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        match boxes.get_mut(&(box_id as usize)) {
+            Some(bleepsbox) => {
+                bleepsbox.fill(string_bytes);
+            }
+            None => ()
+        };
+
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
 
 #[no_mangle]
 pub extern "C" fn setc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize, c: *const c_char) {
