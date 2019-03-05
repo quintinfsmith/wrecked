@@ -25,7 +25,7 @@ pub struct BleepsBox {
     width: usize,
     height: usize,
     grid: HashMap<(usize, usize), [u8; 4]>,
-    cached: Vec<((isize, isize), ([u8; 4], u16))>,
+    cached: HashMap<(isize, isize), ([u8; 4], u16)>,
     parent: Option<usize>,
 
     recache_flag: bool,
@@ -40,7 +40,7 @@ impl BleepsBox {
             width: width,
             height: height,
             grid: HashMap::new(),
-            cached: Vec::new(),
+            cached: HashMap::new(),
             parent: None,
             recache_flag: true,
             color: 0
@@ -78,11 +78,11 @@ impl BleepsBox {
         self.grid.get(&(x, y))
     }
 
-    fn get_cached(&self) -> Vec<((isize, isize), ([u8; 4], u16))> {
-        self.cached.clone()
+    fn get_cached(&self) -> &HashMap<(isize, isize), ([u8; 4], u16)> {
+        &self.cached
     }
 
-    fn set_cached(&mut self, tocache: &Vec<((isize, isize), ([u8; 4], u16))>) {
+    fn set_cached(&mut self, tocache: &HashMap<(isize, isize), ([u8; 4], u16)>) {
         self.cached = (*tocache).clone();
         self.recache_flag = false;
     }
@@ -95,129 +95,55 @@ fn rects_intersect(rect_a: (isize, isize, isize, isize), rect_b: (isize, isize, 
 }
 
 
-fn get_display(box_handler: &mut Vec<BleepsBox>) -> Vec<((isize, isize),([u8; 4], u16))> {
+fn get_display(boxes: &mut Vec<BleepsBox>, box_id: usize, offset: (isize, isize), frame: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+    let mut output: HashMap<(isize, isize), ([u8; 4], u16)>;
+    let mut subboxes: Vec<((isize, isize), usize)> = Vec::new();
 
-	// Used to check if a box is visible
-    let main_rect: (isize, isize) = (box_handler[0].width as isize, box_handler[0].height as isize);
+    let mut descend = false;
 
-    // box id, xoffset, yoffset
-    let mut process_stack: Vec<(usize, (isize, isize))> = Vec::new();
-    process_stack.push((0, (0, 0)));
-    let mut render_stack: Vec<(usize, (isize, isize))> = Vec::new();
+    output = HashMap::new();
 
-    let mut stacked_to_process: HashMap<usize, bool> = HashMap::new();
-    let mut stacked_to_render: HashMap<usize, bool> = HashMap::new();
+    match boxes.get(box_id) {
+        Some(bleepsbox) => {
+            if (rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize))) {
+                if (bleepsbox.recache_flag) {
+                    descend = true;
 
-    // Temporary variables
-    //let mut current_bleepsbox: &mut BleepsBox;
-    let mut pos: (isize, isize);
-    let mut current_tuple: (usize, (isize, isize));
-    let mut current_id: usize;
-    let mut current_offset: (isize, isize);
-
-    // Stack the boxes in the order to be rendered
-    while process_stack.len() > 0 {
-        current_tuple = process_stack.pop().unwrap();
-        current_id = current_tuple.0;
-        current_offset = current_tuple.1;
-        match box_handler.get_mut(current_id) {
-            Some(current_bleepsbox) => {
-
-                // If the display is offscreen, don't descend
-               // if (! rects_intersect((current_offset.0, current_offset.1, current_bleepsbox.width as isize, current_bleepsbox.height as isize), (0, 0, main_rect.0, main_rect.1))) {
-               //     continue;
-               // }
-
-                // Only Descend on Boxes that need to be recached
-                if (current_bleepsbox.recache_flag) {
-                    for i in 0..current_bleepsbox.boxes.len() {
-                        let mut child_id = current_bleepsbox.boxes[i];
-                        if ! stacked_to_process.contains_key(&child_id) {
-                            // Reinsert id to stack
-                            process_stack.push(current_tuple);
-
-                            // Add Single Child And break (depth first)
-                            pos = (
-                                current_offset.0 + current_bleepsbox.box_positions[&child_id].0,
-                                current_offset.1 + current_bleepsbox.box_positions[&child_id].1
-                            );
-                            process_stack.push((child_id, pos));
-                            stacked_to_process.insert(child_id, true);
-                            break;
-                        }
+                    for (position, character) in bleepsbox.grid.iter() {
+                        output.insert((position.0 as isize, position.1 as isize), (*character, bleepsbox.color));
                     }
-                }
-                if ! stacked_to_render.contains_key(&current_id) {
-                    render_stack.push(current_tuple);
-                    stacked_to_render.insert(current_id, true);
-                }
-            }
-            None => ()
-        };
-    }
 
-
-    // Amalgamation of BleepsBoxes
-    let mut main_disp: Vec<((isize, isize), ([u8; 4], u16))>;
-    main_disp = Vec::new();
-
-    // Content displayed within 'current' BleepsBox
-    let mut tmp_disp: Vec<((isize, isize), ([u8; 4], u16))>;
-
-    // Loop Control variables
-    let mut used_coords: HashMap<(isize, isize), ([u8; 4], u16)> = HashMap::new();
-
-    // Temporary Variables
-    let mut pos_unsigned: (usize, usize);
-    let mut val: ([u8; 4], u16);
-    let mut new_position: (isize, isize);
-
-    while render_stack.len() > 0 {
-        current_tuple = render_stack.pop().unwrap();
-        current_id = current_tuple.0;
-        current_offset = current_tuple.1;
-        match box_handler.get_mut(current_id) {
-            Some(current_bleepsbox) => {
-
-                if (current_bleepsbox.recache_flag) {
-                    tmp_disp = Vec::new();
-                    for y in 0..current_bleepsbox.height {
-                        for x in 0..current_bleepsbox.width {
-                            let mut real_pos = ((x as isize + current_offset.0), (y as isize + current_offset.1));
-                            match used_coords.get(&real_pos) {
-                                Some(_found) => {
-                                    tmp_disp.push(((x as isize, y as isize), (_found.0, _found.1)));
-                                }
-                                None => {
-                                    match current_bleepsbox.get(x, y) {
-                                        Some(value) => {
-                                            tmp_disp.push(((x as isize, y as isize), (*value, current_bleepsbox.color as u16)));
-                                        }
-                                        None => ()
-                                    };
-                                }
-                            };
-                        }
+                    let mut subbox_offset: (isize, isize);
+                    for subbox_id in bleepsbox.boxes.iter() {
+                        //TODO: Don't use unwrap
+                        subbox_offset = *bleepsbox.box_positions.get(&subbox_id).unwrap();
+                        subboxes.push((subbox_offset, *subbox_id));
                     }
-                    current_bleepsbox.set_cached(&tmp_disp);
-                }
 
-                for i in 0..current_bleepsbox.cached.len() {
-                    pos = current_bleepsbox.cached[i].0;
-                    val = current_bleepsbox.cached[i].1;
-                    new_position = ((pos.0 + current_offset.0), (pos.1 + current_offset.1));
-                    if ! used_coords.contains_key(&new_position) {
-                        used_coords.insert(new_position, (val.0, val.1));
-                        if new_position.0 < main_rect.0 && new_position.1 < main_rect.1 && new_position.0 >= 0 && new_position.1 >= 0 {
-                            main_disp.push((new_position, (val.0,  val.1)));
-                        }
+                } else {
+                    for (pos, val) in bleepsbox.cached.iter() {
+                        output.insert(*pos, *val);
                     }
                 }
             }
-            None => ()
-        };
+        }
+        None => ()
+    };
+
+    if (descend) {
+        let mut subbox_output: HashMap<(isize, isize), ([u8; 4], u16)>;
+        let mut tmp_value: &([u8; 4], u16);
+        for (subbox_offset, subbox_id) in subboxes.iter() {
+            subbox_output = get_display(boxes, *subbox_id, (offset.0 + subbox_offset.0, subbox_offset.1 + offset.1), frame);
+            for (subpos, value) in subbox_output.iter() {
+                *output.entry((subpos.0 + subbox_offset.0, subpos.1 + subbox_offset.1)).or_insert(*value) = *value;
+            }
+        }
+        boxes[box_id].set_cached(&output);
     }
-    main_disp
+
+
+    output
 }
 
 
@@ -225,8 +151,9 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
 
     let mut boxes = &mut boxhandler.boxes;
     {
-        let top_disp = get_display(boxes);
-        let mut pos: (isize, isize);
+        let mut width = boxes[0].width as isize;
+        let mut height = boxes[0].height as isize;
+        let top_disp = get_display(boxes, 0, (0, 0), (0, 0, width, height));
         let mut val_a: &[u8];
         let mut val_b: u16;
         let mut s;
@@ -236,10 +163,10 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
         // TODO: This is a **very** shit display algorithm
         // Should first sort, then display in as few print calls
         // as possible
-        for i in 0..top_disp.len() {
-            pos = top_disp[i].0;
-            val_a = &((top_disp[i].1).0);
-            val_b = (top_disp[i].1).1;
+        for (pos, val) in top_disp.iter() {
+
+            val_a = &val.0;
+            val_b = val.1;
             s = format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             print!("{}", s);
 
@@ -275,10 +202,9 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
             s = format!("{}\x1B[0m", str::from_utf8(utf_char).unwrap());
             print!("{}", s);
         }
-        println!("");
+        print!("\r");
     }
 }
-
 
 fn _flag_recache(boxes: &mut Vec<BleepsBox>, box_id: usize) {
     let mut next_box_id: usize = box_id as usize;
@@ -433,7 +359,6 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
             };
             match boxes.get_mut(parent_id) {
                 Some(parent) => {
-                    parent.flag_recache();
                     if let Some(pos) = parent.box_positions.get_mut(&box_id) {
                         *pos = (x, y);
                     }
@@ -442,6 +367,7 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
             }
         }
     }
+    _flag_recache(&mut boxhandler.boxes, box_id);
 
     Box::into_raw(boxhandler); // Prevent Release
 }
