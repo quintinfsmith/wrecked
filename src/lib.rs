@@ -15,7 +15,8 @@ fn write(towrite: &[u8]) -> io::Result<()> {
 }
 
 pub struct BoxHandler {
-    boxes: Vec<BleepsBox>,
+    keygen: usize,
+    boxes: HashMap<usize, BleepsBox>,
     cached_display: Vec<((usize, usize), ([u8; 4], u16))>
 }
 
@@ -95,7 +96,7 @@ fn rects_intersect(rect_a: (isize, isize, isize, isize), rect_b: (isize, isize, 
 }
 
 
-fn get_display(boxes: &mut Vec<BleepsBox>, box_id: usize, offset: (isize, isize), frame: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (isize, isize), frame: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
     let mut output: HashMap<(isize, isize), ([u8; 4], u16)>;
     let mut subboxes: Vec<((isize, isize), usize)> = Vec::new();
 
@@ -103,7 +104,7 @@ fn get_display(boxes: &mut Vec<BleepsBox>, box_id: usize, offset: (isize, isize)
 
     output = HashMap::new();
 
-    match boxes.get(box_id) {
+    match boxes.get(&box_id) {
         Some(bleepsbox) => {
             if (rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize))) {
                 if (bleepsbox.recache_flag) {
@@ -139,7 +140,12 @@ fn get_display(boxes: &mut Vec<BleepsBox>, box_id: usize, offset: (isize, isize)
                 *output.entry((subpos.0 + subbox_offset.0, subpos.1 + subbox_offset.1)).or_insert(*value) = *value;
             }
         }
-        boxes[box_id].set_cached(&output);
+        match boxes.get_mut(&box_id) {
+            Some(bleepsbox) => {
+                bleepsbox.set_cached(&output);
+            }
+            None => ()
+        };
     }
 
 
@@ -151,8 +157,8 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
 
     let mut boxes = &mut boxhandler.boxes;
     {
-        let mut width = boxes[0].width as isize;
-        let mut height = boxes[0].height as isize;
+        let mut width = boxes[&0].width as isize;
+        let mut height = boxes[&0].height as isize;
         let top_disp = get_display(boxes, 0, (0, 0), (0, 0, width, height));
         let mut val_a: &[u8];
         let mut val_b: u16;
@@ -206,14 +212,14 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
     }
 }
 
-fn _flag_recache(boxes: &mut Vec<BleepsBox>, box_id: usize) {
+fn _flag_recache(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) {
     let mut next_box_id: usize = box_id as usize;
     let mut prev_box_id: usize = 0;
 
     let mut do_next = true;
     while do_next {
         prev_box_id = next_box_id;
-        match boxes.get_mut(next_box_id) {
+        match boxes.get_mut(&next_box_id) {
             Some(bleepsbox) => {
                 bleepsbox.flag_recache();
                 match bleepsbox.parent {
@@ -232,7 +238,48 @@ fn _flag_recache(boxes: &mut Vec<BleepsBox>, box_id: usize) {
     }
 }
 
+fn _remove_box(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) {
+    let mut subboxes: Vec<usize> = Vec::new();
+    let mut parent_id: usize = 0;
 
+    match boxes.get(&box_id) {
+        Some(bleepsbox) => {
+            for subbox_id in bleepsbox.boxes.iter() {
+                subboxes.push(*subbox_id);
+            }
+            match bleepsbox.parent {
+                Some(parent) => {
+                    parent_id = parent;
+                }
+                None => ()
+            };
+        }
+        None => ()
+    };
+
+    for subbox_id in subboxes.iter() {
+        _remove_box(boxes, *subbox_id);
+    }
+
+    match boxes.get_mut(&parent_id) {
+        Some(bleepsbox) => {
+            let mut to_remove: isize = -1;
+            for i in 0..bleepsbox.boxes.len() {
+                if bleepsbox.boxes[i] == box_id {
+                    to_remove = i as isize;
+                }
+            }
+            if (to_remove > -1) {
+                bleepsbox.boxes.remove(to_remove as usize);
+            }
+
+            bleepsbox.box_positions.remove(&box_id);
+        }
+        None => ()
+    };
+
+    boxes.remove(&box_id);
+}
 #[no_mangle]
 pub extern "C" fn draw(ptr: *mut BoxHandler) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
@@ -257,7 +304,7 @@ pub extern "C" fn set_fg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     {
         let mut boxes = &mut boxhandler.boxes;
-        match boxes.get_mut(box_id as usize) {
+        match boxes.get_mut(&(box_id as usize)) {
             Some(bleepsbox) => {
                 bleepsbox.set_fg_color(col);
             }
@@ -275,7 +322,7 @@ pub extern "C" fn set_bg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     {
         let mut boxes = &mut boxhandler.boxes;
-        match boxes.get_mut(box_id as usize) {
+        match boxes.get_mut(&(box_id as usize)) {
             Some(bleepsbox) => {
                 bleepsbox.set_bg_color(col);
             }
@@ -299,7 +346,7 @@ pub extern "C" fn setc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize, 
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     {
         let mut boxes = &mut boxhandler.boxes;
-        match boxes.get_mut(box_id as usize) {
+        match boxes.get_mut(&(box_id as usize)) {
             Some(bleepsbox) => {
                 bleepsbox.set(x as usize, y as usize, string_bytes);
             }
@@ -313,22 +360,35 @@ pub extern "C" fn setc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize, 
 }
 
 #[no_mangle]
+pub extern "C" fn removebox(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        _remove_box(boxes, box_id);
+    }
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+#[no_mangle]
 pub extern "C" fn newbox(ptr: *mut BoxHandler, parent_id: usize, width: usize, height: usize) -> usize {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     let id: usize;
+    id = boxhandler.keygen;
+    boxhandler.keygen += 1;
     {
         let mut boxes = &mut boxhandler.boxes;
-        id = boxes.len();
         let mut bleepsbox = BleepsBox::new(width, height);
 
         if boxes.len() > parent_id {
-            {
-                let mut parent = &mut boxes[parent_id as usize];
-                parent.box_positions.insert(id, (0, 0));
-                parent.boxes.push(id);
-                bleepsbox.parent = Some(parent_id);
-            }
-            boxes.push(bleepsbox);
+            match boxes.get_mut(&(parent_id as usize)) {
+                Some(parent) => {
+                    parent.box_positions.insert(id, (0, 0));
+                    parent.boxes.push(id);
+                    bleepsbox.parent = Some(parent_id);
+                }
+                None => ()
+            };
+            boxes.insert(id, bleepsbox);
         }
 
     }
@@ -349,7 +409,7 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
         let parent_id: usize;
 
         if boxes.len() > box_id  && box_id > 0 {
-            match boxes.get(box_id) {
+            match boxes.get(&box_id) {
                 Some(_found) => {
                     parent_id = _found.parent.unwrap();
                 }
@@ -357,7 +417,7 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
                     parent_id = 0;
                 }
             };
-            match boxes.get_mut(parent_id) {
+            match boxes.get_mut(&parent_id) {
                 Some(parent) => {
                     if let Some(pos) = parent.box_positions.get_mut(&box_id) {
                         *pos = (x, y);
@@ -376,12 +436,13 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
 #[no_mangle]
 pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {
     let mut boxhandler = BoxHandler {
-        boxes: Vec::new(),
+        keygen: 1,
+        boxes: HashMap::new(),
         cached_display: Vec::new()
     };
 
     let top: BleepsBox = BleepsBox::new(width, height);
-    boxhandler.boxes.push(top);
+    boxhandler.boxes.insert(0, top);
 
     println!("\x1B[?1049h"); // New screen
     println!("\x1B[?25l"); // Hide Cursor
