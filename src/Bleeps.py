@@ -36,7 +36,7 @@ class BleepsScreen(object):
 
         self.lib = ffi.dlopen(self.SO_PATH)
         self.width, self.height = get_terminal_size()
-        self.box_vector = self.lib.init(self.width - 1, self.height - 1)
+        self.box_vector = self.lib.init(self.width, self.height)
 
     def box_setc(self, box_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
