@@ -17,7 +17,7 @@ fn write(towrite: &[u8]) -> io::Result<()> {
 pub struct BoxHandler {
     keygen: usize,
     boxes: HashMap<usize, BleepsBox>,
-    cached_display: Vec<((usize, usize), ([u8; 4], u16))>
+    cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
 }
 
 pub struct BleepsBox {
@@ -66,6 +66,10 @@ impl BleepsBox {
         }
     }
 
+    fn unset(&mut self, x: usize, y: usize) {
+        self.grid.remove(&(x, y));
+    }
+
     fn set(&mut self, x: usize, y: usize, c: &[u8]) {
         let mut new_c: [u8; 4] = [0; 4];
         for i in 0..c.len() {
@@ -75,6 +79,18 @@ impl BleepsBox {
         self.grid.entry((x, y))
             .and_modify(|e| { *e = new_c })
             .or_insert(new_c);
+    }
+
+    fn unset_bg_color(&mut self) {
+        self.color &= 0b1111111111100000;
+    }
+
+    fn unset_fg_color(&mut self) {
+        self.color &= 0b1111110000000000;
+    }
+
+    fn unset_color(&mut self) {
+        self.color &= 0;
     }
 
     fn set_bg_color(&mut self, n: u8) {
@@ -117,7 +133,6 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
     let mut subboxes: Vec<((isize, isize), usize)> = Vec::new();
 
     let mut descend = false;
-
     output = HashMap::new();
 
     match boxes.get(&box_id) {
@@ -167,7 +182,6 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
         };
     }
 
-
     output
 }
 
@@ -181,37 +195,46 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
         let top_disp = get_display(boxes, 0, (0, 0), (0, 0, width, height));
         let mut val_a: &[u8];
         let mut val_b: u16;
-        let mut s;
+        let mut s: String;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
+        let mut change_char: bool;
 
-        // TODO: This is a **very** shit display algorithm
-        // Should first sort, then display in as few print calls
-        // as possible
+        s = "".to_string();
         for (pos, val) in top_disp.iter() {
+            change_char = false;
+            match boxhandler.cached_display.get(pos) {
+                Some(found) => {
+                    change_char = (*found != *val);
+                }
+                None => {
+                    change_char = true;
+                }
+            };
+            if ! change_char {
+                continue;
+            }
+            boxhandler.cached_display.entry(*pos).and_modify(|e| { *e = *val });
 
             val_a = &val.0;
             val_b = val.1;
-            s = format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
-            print!("{}", s);
+            s += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
 
             if (val_b >> 5) & 16 == 16 {
                 if (val_b >> 5) & 8 == 8 {
-                    s = format!("\x1B[9{}m", ((val_b >> 5) & 7));
+                    s += &format!("\x1B[9{}m", ((val_b >> 5) & 7));
                 } else {
-                    s = format!("\x1B[3{}m", ((val_b >> 5) & 7));
+                    s += &format!("\x1B[3{}m", ((val_b >> 5) & 7));
                 }
             }
-            print!("{}", s);
 
             if val_b & 16 == 16 {
                 if (val_b & 8 == 8) {
-                    s = format!("\x1B[10{}m", (val_b & 7));
+                    s += &format!("\x1B[10{}m", (val_b & 7));
                 } else {
-                    s = format!("\x1B[4{}m", (val_b & 7));
+                    s += &format!("\x1B[4{}m", (val_b & 7));
                 }
             }
-            print!("{}", s);
 
 
             utf_char_split_index = 0;
@@ -224,10 +247,9 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
 
             utf_char = val_a.split_at(utf_char_split_index).1;
 
-            s = format!("{}\x1B[0m", str::from_utf8(utf_char).unwrap());
-            print!("{}", s);
+            s += &format!("{}\x1B[0m", str::from_utf8(utf_char).unwrap());
         }
-        print!("\r");
+        print!("{}", s);
     }
 }
 
@@ -299,6 +321,7 @@ fn _remove_box(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) {
 
     boxes.remove(&box_id);
 }
+
 #[no_mangle]
 pub extern "C" fn draw(ptr: *mut BoxHandler) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
@@ -355,6 +378,60 @@ pub extern "C" fn set_bg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
 }
 
 #[no_mangle]
+pub extern "C" fn unset_bg_color(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        match boxes.get_mut(&(box_id as usize)) {
+            Some(bleepsbox) => {
+                bleepsbox.unset_bg_color();
+            }
+            None => ()
+        };
+
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+#[no_mangle]
+pub extern "C" fn unset_fg_color(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        match boxes.get_mut(&(box_id as usize)) {
+            Some(bleepsbox) => {
+                bleepsbox.unset_fg_color();
+            }
+            None => ()
+        };
+
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+#[no_mangle]
+pub extern "C" fn unset_color(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        match boxes.get_mut(&(box_id as usize)) {
+            Some(bleepsbox) => {
+                bleepsbox.unset_color();
+            }
+            None => ()
+        };
+
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+#[no_mangle]
 pub extern "C" fn fillc(ptr: *mut BoxHandler, box_id: usize, c: *const c_char) {
     assert!(!c.is_null());
 
@@ -390,6 +467,24 @@ pub extern "C" fn setc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize, 
         match boxes.get_mut(&(box_id as usize)) {
             Some(bleepsbox) => {
                 bleepsbox.set(x as usize, y as usize, string_bytes);
+            }
+            None => ()
+        };
+
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+#[no_mangle]
+pub extern "C" fn unsetc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        let mut boxes = &mut boxhandler.boxes;
+        match boxes.get_mut(&(box_id as usize)) {
+            Some(bleepsbox) => {
+                bleepsbox.unset(x as usize, y as usize);
             }
             None => ()
         };
@@ -479,11 +574,14 @@ pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {
     let mut boxhandler = BoxHandler {
         keygen: 1,
         boxes: HashMap::new(),
-        cached_display: Vec::new()
+        cached_display: HashMap::new()
     };
 
-    let top: BleepsBox = BleepsBox::new(width, height);
+    let mut top: BleepsBox = BleepsBox::new(width, height);
+    top.fill(&[0,0,0,65]);
     boxhandler.boxes.insert(0, top);
+
+
 
     println!("\x1B[?1049h"); // New screen
     println!("\x1B[?25l"); // Hide Cursor
@@ -498,5 +596,7 @@ pub extern "C" fn kill(ptr: *mut BoxHandler) {
     println!("\x1B[?25h"); // Show Cursor
     println!("\x1B[?1049l"); // Return to previous screen
 
+    // TODO: Figure out why releasing causes segfault
+    Box::into_raw(boxhandler); // Prevent Release
     // Releases boxes
 }
