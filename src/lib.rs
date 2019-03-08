@@ -202,6 +202,10 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
 
         s = "".to_string();
         for (pos, val) in top_disp.iter() {
+            if (pos.0 < 0 || pos.0 >= width || pos.1 < 0 || pos.1 >= height) {
+                continue;
+            }
+
             change_char = false;
             match boxhandler.cached_display.get(pos) {
                 Some(found) => {
@@ -214,6 +218,7 @@ fn _draw_boxes(boxhandler: &mut BoxHandler) {
             if ! change_char {
                 continue;
             }
+
             boxhandler.cached_display.entry(*pos).and_modify(|e| { *e = *val });
 
             val_a = &val.0;
