@@ -6,6 +6,21 @@ use std::io::{self, Write};
 use std::slice;
 use std::str;
 
+//#[cfg(test)]
+//mod tests {
+//    #[test]
+//    fn exploration() {
+//        assert_eq!(2 + 2, 4);
+//    }
+//
+//    /* TODO
+//        box_gets_removed
+//        box_id_gets_reused
+//        cant_place_character_out_of_bounds
+//        displays_get_cached
+//
+//    */
+//}
 
 pub enum BleepsError {
     BadPosition,
