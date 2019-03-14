@@ -37,6 +37,7 @@ pub struct BoxHandler {
 }
 
 pub struct BleepsBox {
+    enabled: bool,
     boxes: Vec<usize>,
     box_positions: HashMap<usize, (isize, isize)>,
     width: usize,
@@ -52,6 +53,7 @@ pub struct BleepsBox {
 impl BleepsBox {
     fn new(width: usize, height: usize) -> BleepsBox {
         BleepsBox {
+            enabled: true,
             boxes: Vec::new(),
             box_positions: HashMap::new(),
             width: width,
@@ -162,6 +164,70 @@ impl BleepsBox {
     }
 }
 
+fn _disable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
+    let mut boxes = &mut boxhandler.boxes;
+    {
+        // Check that box exists before proceeding
+        try!(
+            match boxes.get(&box_id) {
+                Some(found) => Ok(()),
+                None => Err(BleepsError::NotFound)
+            }
+        );
+
+        match boxes.get_mut(&box_id) {
+            Some(found) => {
+                found.enabled = false;
+            }
+            None => ()
+        };
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn disable_box(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        _disable_box(&mut boxhandler, box_id);
+    }
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+fn _enable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
+    // Check that box exists before proceeding
+    let mut boxes = &mut boxhandler.boxes;
+    {
+        try!(
+            match boxes.get(&box_id) {
+                Some(found) => Ok(()),
+                None => Err(BleepsError::NotFound)
+            }
+        );
+
+        match boxes.get_mut(&box_id) {
+            Some(found) => {
+                found.enabled = true;
+            }
+            None => ()
+        };
+        _flag_recache(&mut boxes, box_id);
+    }
+
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn enable_box(ptr: *mut BoxHandler, box_id: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        _enable_box(&mut boxhandler, box_id);
+    }
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
 fn _removebox_from_boxes(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<Vec<usize>, BleepsError> {
     // Check that box exists before proceeding
     try!(
@@ -250,7 +316,7 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 
     match boxes.get(&box_id) {
         Some(bleepsbox) => {
-            if (rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize))) {
+            if (bleepsbox.enabled && rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize))) {
                 if (bleepsbox.recache_flag) {
                     descend = true;
 

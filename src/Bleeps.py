@@ -28,6 +28,9 @@ class BleepsScreen(object):
             void unset_bg_color(BleepsBoxes, uint32_t);
             void unset_fg_color(BleepsBoxes, uint32_t);
 
+            void disable_box(BleepsBoxes, uint32_t);
+            void enable_box(BleepsBoxes, uint32_t);
+
             void setc(BleepsBoxes, uint32_t, uint32_t, uint32_t, const char*);
             void unsetc(BleepsBoxes, uint32_t, uint32_t, uint32_t);
             void draw(BleepsBoxes);
