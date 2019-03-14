@@ -326,9 +326,12 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 
                     let mut subbox_offset: (isize, isize);
                     for subbox_id in bleepsbox.boxes.iter() {
-                        //TODO: Don't use unwrap
-                        subbox_offset = *bleepsbox.box_positions.get(&subbox_id).unwrap();
-                        subboxes.push((subbox_offset, *subbox_id));
+                        match *bleepsbox.box_positions.get(&subbox_id) {
+                            Some(subbox_offset) => {
+                                subboxes.push((subbox_offset, *subbox_id));
+                            }
+                            None => ()
+                        };
                     }
 
                 } else {
@@ -880,7 +883,12 @@ fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: i
     if boxes.len() > box_id  && box_id > 0 {
         match boxes.get(&box_id) {
             Some(_found) => {
-                parent_id = _found.parent.unwrap();
+                match _found.parent {
+                    Some(pid) => {
+                        parent_id = pid;
+                    }
+                    None => ()
+                };
             }
             None => {
                 parent_id = 0;
@@ -927,7 +935,12 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
 
         match boxes.get_mut(&box_id) {
             Some(_found) => {
-                parent_id = _found.parent.unwrap();
+                match _found.parent {
+                    Some(pid) => {
+                        parent_id = pid;
+                    }
+                    None => ()
+                };
                 _found.parent = None;
             }
             None => {
