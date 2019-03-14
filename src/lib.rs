@@ -326,9 +326,9 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 
                     let mut subbox_offset: (isize, isize);
                     for subbox_id in bleepsbox.boxes.iter() {
-                        match *bleepsbox.box_positions.get(&subbox_id) {
+                        match bleepsbox.box_positions.get(&subbox_id) {
                             Some(subbox_offset) => {
-                                subboxes.push((subbox_offset, *subbox_id));
+                                subboxes.push((*subbox_offset, *subbox_id));
                             }
                             None => ()
                         };
@@ -870,7 +870,8 @@ pub extern "C" fn newbox(ptr: *mut BoxHandler, parent_id: usize, width: usize, h
 }
 
 fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: isize) -> Result<(), BleepsError> {
-    let parent_id: usize;
+    let mut parent_id: usize = 0;
+    let mut found_parent = false;
 
     // Check that box exists before proceeding
     try!(
@@ -886,6 +887,7 @@ fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: i
                 match _found.parent {
                     Some(pid) => {
                         parent_id = pid;
+                        found_parent = true;
                     }
                     None => ()
                 };
@@ -894,14 +896,16 @@ fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: i
                 parent_id = 0;
             }
         };
-        match boxes.get_mut(&parent_id) {
-            Some(parent) => {
-                if let Some(pos) = parent.box_positions.get_mut(&box_id) {
-                    *pos = (x, y);
+        if (found_parent) {
+            match boxes.get_mut(&parent_id) {
+                Some(parent) => {
+                    if let Some(pos) = parent.box_positions.get_mut(&box_id) {
+                        *pos = (x, y);
+                    }
                 }
-            }
-            None => ()
-        };
+                None => ()
+            };
+        }
         try!(_flag_recache(boxes, box_id));
     }
     Ok(())
@@ -919,7 +923,8 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
 }
 
 fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(), BleepsError> {
-    let parent_id: usize;
+    let mut parent_id: usize = 0;
+    let mut found_parent = false;
 
     // Check that box exists before proceeding
     try!(
@@ -938,6 +943,7 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
                 match _found.parent {
                     Some(pid) => {
                         parent_id = pid;
+                        found_parent = true;
                     }
                     None => ()
                 };
@@ -948,24 +954,26 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
             }
         };
 
-        match boxes.get_mut(&parent_id) {
-            Some(parent) => {
-                parent.box_positions.remove(&box_id);
-                let mut m: usize = 0;
-                let mut found = false;
-                for i in 0..parent.boxes.len() {
-                    if (parent.boxes[i] == box_id) {
-                        m = i;
-                        found = true;
-                        break;
+        if (found_parent) {
+            match boxes.get_mut(&parent_id) {
+                Some(parent) => {
+                    parent.box_positions.remove(&box_id);
+                    let mut m: usize = 0;
+                    let mut found = false;
+                    for i in 0..parent.boxes.len() {
+                        if (parent.boxes[i] == box_id) {
+                            m = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        parent.boxes.remove(m);
                     }
                 }
-                if (found) {
-                    parent.boxes.remove(m);
-                }
-            }
-            None => ()
-        };
+                None => ()
+            };
+        }
     }
     Ok(())
 }
