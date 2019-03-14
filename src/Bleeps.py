@@ -104,14 +104,21 @@ class BleepsBox(object):
         self._screen  = screen
         self.bleeps_id = n
         self.boxes = {}
+        self.parent = None
         self.width = width
         self.height = height
         self.enabled = True
 
     def attach(self, childbox):
+        self.boxes[childbox.bleeps_id] = childbox
         self._screen.box_attach(childbox.bleeps_id, self.bleeps_id)
 
     def detach(self):
+        try:
+            del self.parent.boxes[self.bleeps_id]
+        except:
+            pass
+
         self._screen.box_detach(self.bleeps_id)
 
     def enable(self):
@@ -152,6 +159,7 @@ class BleepsBox(object):
     def new_box(self, width, height):
         box = self._screen._new_box(width, height, self.bleeps_id)
         self.boxes[box.bleeps_id] = box
+        box.parent = self
 
         return box
 
