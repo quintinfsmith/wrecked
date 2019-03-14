@@ -863,7 +863,6 @@ pub extern "C" fn newbox(ptr: *mut BoxHandler, parent_id: usize, width: usize, h
     }
 
     Box::into_raw(boxhandler); // Prevent Release
-
     id
 }
 
@@ -911,7 +910,116 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
     Box::into_raw(boxhandler); // Prevent Release
 }
 
+fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(), BleepsError> {
+    let parent_id: usize;
 
+    // Check that box exists before proceeding
+    try!(
+        match boxes.get(&box_id) {
+            Some(found) => Ok(()),
+            None => Err(BleepsError::NotFound)
+        }
+    );
+
+    if boxes.len() > box_id  && box_id > 0 {
+        // Need to flag before removing boxes
+        try!(_flag_recache(boxes, box_id));
+
+        match boxes.get_mut(&box_id) {
+            Some(_found) => {
+                parent_id = _found.parent.unwrap();
+                _found.parent = None;
+            }
+            None => {
+                parent_id = 0;
+            }
+        };
+
+        match boxes.get_mut(&parent_id) {
+            Some(parent) => {
+                parent.box_positions.remove(&box_id);
+                let mut m: usize = 0;
+                let mut found = false;
+                for i in 0..parent.boxes.len() {
+                    if (parent.boxes[i] == box_id) {
+                        m = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    parent.boxes.remove(m);
+                }
+            }
+            None => ()
+        };
+    }
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn detachbox(ptr: *mut BoxHandler, box_id: usize) {
+
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+
+    //TODO: Handle Result
+    _detachbox(&mut boxhandler.boxes, box_id);
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
+
+fn _attachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, parent_id: usize) -> Result<(), BleepsError> {
+
+    // Check that box exists before proceeding
+    try!(
+        match boxes.get(&box_id) {
+            Some(found) => Ok(()),
+            None => Err(BleepsError::NotFound)
+        }
+    );
+
+    // Check that box exists before proceeding
+    try!(
+        match boxes.get(&parent_id) {
+            Some(found) => Ok(()),
+            None => Err(BleepsError::NotFound)
+        }
+    );
+
+    // Need to flag before removing boxes
+    try!(_flag_recache(boxes, box_id));
+
+    match boxes.get_mut(&box_id) {
+        Some(_found) => {
+            _found.parent = Some(parent_id);
+        }
+        None => ()
+    };
+
+    match boxes.get_mut(&parent_id) {
+        Some(parent) => {
+            parent.box_positions.entry(box_id)
+                .and_modify(|e| { *e = (0, 0) })
+                .or_insert((0, 0));
+
+            parent.boxes.push(box_id);
+        }
+        None => ()
+    };
+
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn attachbox(ptr: *mut BoxHandler, box_id: usize, parent_id: usize) {
+
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+
+    //TODO: Handle Result
+    _attachbox(&mut boxhandler.boxes, box_id, parent_id);
+
+    Box::into_raw(boxhandler); // Prevent Release
+}
 
 #[no_mangle]
 pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {

@@ -33,6 +33,10 @@ class BleepsScreen(object):
 
             void setc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, const char*);
             void unsetc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
+
+            void attach_box(BleepsBoxHandler, uint32_t, uint32_t);
+            void detach_box(BleepsBoxHandler, uint32_t);
+
             void draw(BleepsBoxHandler);
             void kill(BleepsBoxHandler);
         """)
@@ -40,6 +44,14 @@ class BleepsScreen(object):
         self.lib = ffi.dlopen(self.SO_PATH)
         self.width, self.height = get_terminal_size()
         self.boxhandler = self.lib.init(self.width, self.height)
+
+    def box_attach(self, box_id, parent_id, position=(0,0)):
+        self.lib.attach_box(self.boxhandler, box_id, parent_id)
+        if (position != (0,0)):
+            self.box_move(box_id, *position)
+
+    def box_detach(self, box_id):
+        self.lib.detach_box(self.boxhandler, box_id)
 
     def box_disable(self, box_id):
         self.lib.disable_box(self.boxhandler, box_id)
@@ -95,6 +107,12 @@ class BleepsBox(object):
         self.width = width
         self.height = height
         self.enabled = True
+
+    def attach(self, childbox):
+        self._screen.box_attach(childbox.bleeps_id, self.bleeps_id)
+
+    def detach(self):
+        self._screen.box_detach(self.bleeps_id)
 
     def enable(self):
         self.enabled = True
