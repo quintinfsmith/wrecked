@@ -34,8 +34,8 @@ class BleepsScreen(object):
             void setc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, const char*);
             void unsetc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
 
-            void attach_box(BleepsBoxHandler, uint32_t, uint32_t);
-            void detach_box(BleepsBoxHandler, uint32_t);
+            void attachbox(BleepsBoxHandler, uint32_t, uint32_t);
+            void detachbox(BleepsBoxHandler, uint32_t);
 
             void draw(BleepsBoxHandler);
             void kill(BleepsBoxHandler);
