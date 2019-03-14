@@ -46,12 +46,12 @@ class BleepsScreen(object):
         self.boxhandler = self.lib.init(self.width, self.height)
 
     def box_attach(self, box_id, parent_id, position=(0,0)):
-        self.lib.attach_box(self.boxhandler, box_id, parent_id)
+        self.lib.attachbox(self.boxhandler, box_id, parent_id)
         if (position != (0,0)):
             self.box_move(box_id, *position)
 
     def box_detach(self, box_id):
-        self.lib.detach_box(self.boxhandler, box_id)
+        self.lib.detachbox(self.boxhandler, box_id)
 
     def box_disable(self, box_id):
         self.lib.disable_box(self.boxhandler, box_id)
