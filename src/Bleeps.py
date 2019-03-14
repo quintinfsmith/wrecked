@@ -13,72 +13,78 @@ class BleepsScreen(object):
     def __init__(self):
         ffi = FFI()
         ffi.cdef("""
-            typedef void* BleepsBoxes;
+            typedef void* BleepsBoxHandler;
 
-            BleepsBoxes init(uint32_t, uint32_t);
+            BleepsBoxHandler init(uint32_t, uint32_t);
 
-            uint32_t newbox(BleepsBoxes, uint32_t, uint32_t, uint32_t);
+            uint32_t newbox(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
 
-            void movebox(BleepsBoxes, uint32_t, int32_t, int32_t);
-            void flag_recache(BleepsBoxes, uint32_t);
+            void movebox(BleepsBoxHandler, uint32_t, int32_t, int32_t);
+            void flag_recache(BleepsBoxHandler, uint32_t);
 
-            void set_bg_color(BleepsBoxes, uint32_t, uint8_t);
-            void set_fg_color(BleepsBoxes, uint32_t, uint8_t);
-            void unset_color(BleepsBoxes, uint32_t);
-            void unset_bg_color(BleepsBoxes, uint32_t);
-            void unset_fg_color(BleepsBoxes, uint32_t);
+            void set_bg_color(BleepsBoxHandler, uint32_t, uint8_t);
+            void set_fg_color(BleepsBoxHandler, uint32_t, uint8_t);
+            void unset_color(BleepsBoxHandler, uint32_t);
+            void unset_bg_color(BleepsBoxHandler, uint32_t);
+            void unset_fg_color(BleepsBoxHandler, uint32_t);
 
-            void disable_box(BleepsBoxes, uint32_t);
-            void enable_box(BleepsBoxes, uint32_t);
+            void disable_box(BleepsBoxHandler, uint32_t);
+            void enable_box(BleepsBoxHandler, uint32_t);
 
-            void setc(BleepsBoxes, uint32_t, uint32_t, uint32_t, const char*);
-            void unsetc(BleepsBoxes, uint32_t, uint32_t, uint32_t);
-            void draw(BleepsBoxes);
-            void kill(BleepsBoxes);
+            void setc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, const char*);
+            void unsetc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
+            void draw(BleepsBoxHandler);
+            void kill(BleepsBoxHandler);
         """)
 
         self.lib = ffi.dlopen(self.SO_PATH)
         self.width, self.height = get_terminal_size()
-        self.box_vector = self.lib.init(self.width, self.height)
+        self.boxhandler = self.lib.init(self.width, self.height)
+
+    def box_disable(self, box_id):
+        self.lib.disable_box(self.boxhandler, box_id)
+
+    def box_enable(self, box_id):
+        self.lib.enable_box(self.boxhandler, box_id)
 
     def box_setc(self, box_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
-        self.lib.setc(self.box_vector, box_id, x, y, fmt_character)
+        self.lib.setc(self.boxhandler, box_id, x, y, fmt_character)
 
     def box_unsetc(self, box_id, x, y):
-        self.lib.unsetc(self.box_vector, box_id, x, y)
+        self.lib.unsetc(self.boxhandler, box_id, x, y)
 
     def box_unset_bg_color(self, box_id):
-        self.lib.unset_bg_color(self.box_vector, box_id)
+        self.lib.unset_bg_color(self.boxhandler, box_id)
 
     def box_unset_fg_color(self, box_id):
-        self.lib.unset_fg_color(self.box_vector, box_id)
+        self.lib.unset_fg_color(self.boxhandler, box_id)
 
     def box_unset_color(self, box_id):
-        self.lib.unset_color(self.box_vector, box_id)
+        self.lib.unset_color(self.boxhandler, box_id)
 
     def box_set_bg_color(self, box_id, color):
-        self.lib.set_bg_color(self.box_vector, box_id, color)
+        self.lib.set_bg_color(self.boxhandler, box_id, color)
 
     def box_set_fg_color(self, box_id, color):
-        self.lib.set_fg_color(self.box_vector, box_id, color)
+        self.lib.set_fg_color(self.boxhandler, box_id, color)
 
     def box_move(self, box_id, x, y):
-        self.lib.movebox(self.box_vector, box_id, x, y)
+        self.lib.movebox(self.boxhandler, box_id, x, y)
 
     def _new_box(self, width, height, parent=0):
 
-        new_box_id = self.lib.newbox(self.box_vector, parent, width, height)
+        new_box_id = self.lib.newbox(self.boxhandler, parent, width, height)
         return BleepsBox(new_box_id, width, height, self)
 
     def new_box(self, width, height):
         return self._new_box(width, height)
 
     def draw(self):
-        self.lib.draw(self.box_vector)
+        self.lib.draw(self.boxhandler)
 
     def kill(self):
-        self.lib.kill(self.box_vector)
+        self.lib.kill(self.boxhandler)
 
 
 class BleepsBox(object):
@@ -88,6 +94,15 @@ class BleepsBox(object):
         self.boxes = {}
         self.width = width
         self.height = height
+        self.enabled = True
+
+    def enable(self):
+        self.enabled = True
+        self._screen.box_enable(self.bleeps_id);
+
+    def disable(self):
+        self.enabled = False
+        self._screen.box_disable(self.bleeps_id);
 
     def refresh(self):
         self._screen.draw()
