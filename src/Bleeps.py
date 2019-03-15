@@ -37,7 +37,7 @@ class BleepsScreen(object):
             void attachbox(BleepsBoxHandler, uint32_t, uint32_t);
             void detachbox(BleepsBoxHandler, uint32_t);
 
-            void draw(BleepsBoxHandler);
+            void draw(BleepsBoxHandler, uint32_t);
             void kill(BleepsBoxHandler);
         """)
 
@@ -92,8 +92,11 @@ class BleepsScreen(object):
     def new_box(self, width, height):
         return self._new_box(width, height)
 
+    def box_draw(self, box_id):
+        self.lib.draw(self.boxhandler, box_id)
+
     def draw(self):
-        self.lib.draw(self.boxhandler)
+        self.lib.draw(self.boxhandler, 0)
 
     def kill(self):
         self.lib.kill(self.boxhandler)
@@ -128,6 +131,9 @@ class BleepsBox(object):
     def disable(self):
         self.enabled = False
         self._screen.box_disable(self.bleeps_id);
+
+    def draw(self):
+        self._screen.box_draw(self.bleeps_id)
 
     def refresh(self):
         self._screen.draw()

@@ -297,6 +297,52 @@ fn rects_intersect(rect_a: (isize, isize, isize, isize), rect_b: (isize, isize, 
     (! (rect_a.0 + rect_a.2 < rect_b.0 || rect_a.0 > rect_b.0 + rect_b.2) && ! (rect_a.1 + rect_a.3 < rect_b.1 || rect_a.1 > rect_b.1 + rect_b.3))
 }
 
+fn get_offset(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(isize, isize), BleepsError> {
+    // Check that box exists before proceeding
+    try!(
+        match boxes.get(&box_id) {
+            Some(found) => Ok(()),
+            None => Err(BleepsError::NotFound)
+        }
+    );
+
+    let mut offset: (isize, isize) = (0, 0);
+    let mut has_parent: bool = false;
+    let mut parent_id: usize = 0;
+
+    match boxes.get(&box_id) {
+        Some(found) => {
+            match found.parent {
+                Some(pid) => {
+                    parent_id = pid;
+                    has_parent = true;
+                }
+                None => ()
+            };
+        }
+        None => ()
+    };
+
+    if (has_parent) {
+        match boxes.get(&parent_id) {
+            Some(parent) => {
+                match parent.box_positions.get(&box_id) {
+                    Some(position) => {
+                        offset = *position;
+                    }
+                    None => ()
+                };
+            }
+            None => ()
+        };
+        let mut parent_offset = try!(get_offset(boxes, parent_id));
+        offset = (offset.0 + parent_offset.0, offset.1 + parent_offset.1);
+    }
+
+
+    Ok(offset)
+}
+
 
 fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (isize, isize), frame: (isize, isize, isize, isize)) -> Result<HashMap<(isize, isize), ([u8; 4], u16)>, BleepsError> {
     // Check that box exists before proceeding
@@ -368,12 +414,13 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 }
 
 
-fn _draw(boxhandler: &mut BoxHandler) -> Result<(), BleepsError> {
+fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
     let mut boxes = &mut boxhandler.boxes;
     {
         let mut width = boxes[&0].width as isize;
         let mut height = boxes[&0].height as isize;
-        let top_disp = try!(get_display(boxes, 0, (0, 0), (0, 0, width, height)));
+        let mut offset = try!(get_offset(boxes, box_id));
+        let top_disp = try!(get_display(boxes, box_id, offset, (0, 0, width, height)));
         let mut val_a: &[u8];
         let mut val_b: u16;
         let mut s: String;
@@ -443,9 +490,9 @@ fn _draw(boxhandler: &mut BoxHandler) -> Result<(), BleepsError> {
 
 
 #[no_mangle]
-pub extern "C" fn draw(ptr: *mut BoxHandler) {
+pub extern "C" fn draw(ptr: *mut BoxHandler, from_box: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    _draw(&mut boxhandler);
+    _draw(&mut boxhandler, from_box);
     Box::into_raw(boxhandler); // Prevent Release
 }
 
