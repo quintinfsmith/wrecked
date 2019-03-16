@@ -417,42 +417,45 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
     let mut boxes = &mut boxhandler.boxes;
     {
-        let mut width = boxes[&0].width as isize;
-        let mut height = boxes[&0].height as isize;
+        let mut width = boxes[&box_id].width as isize;
+        let mut height = boxes[&box_id].height as isize;
         let mut offset = try!(get_offset(boxes, box_id));
-        let top_disp = try!(get_display(boxes, box_id, offset, (0, 0, width, height)));
+        offset = (0, 0);
+        let top_disp = try!(get_display(boxes, box_id, offset, (offset.0, offset.1, offset.0 + width, offset.1 + height)));
         let mut val_a: &[u8];
         let mut val_b: u16;
         let mut s: String;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
         let mut change_char: bool;
+        let mut was_cached: bool;
 
         s = "".to_string();
         for (pos, val) in top_disp.iter() {
-            if (pos.0 < 0 || pos.0 >= width || pos.1 < 0 || pos.1 >= height) {
+            if (pos.0 < offset.0 || pos.0 >= offset.0 + width || pos.1 < offset.1 || pos.1 >= offset.1 + height) {
                 continue;
             }
 
-            change_char = false;
-            match boxhandler.cached_display.get(pos) {
+            change_char = true;
+            match boxhandler.cached_display.get(&(pos.0, pos.1)) {
                 Some(found) => {
-                    change_char = (*found != *val);
+                    change_char = (*found != (val.0, val.1));
                 }
-                None => {
-                    change_char = true;
-                }
+                None => ()
             };
+
             if ! change_char {
                 continue;
             }
 
-            boxhandler.cached_display.entry(*pos).and_modify(|e| { *e = *val });
+            boxhandler.cached_display.entry((pos.0, pos.1))
+                .and_modify(|e| { *e = (val.0, val.1) })
+                .or_insert((val.0, val.1));
+
+            s += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
 
             val_a = &val.0;
             val_b = val.1;
-            s += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
-
             if (val_b >> 5) & 16 == 16 {
                 if (val_b >> 5) & 8 == 8 {
                     s += &format!("\x1B[9{}m", ((val_b >> 5) & 7));
@@ -483,6 +486,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
             s += &format!("{}\x1B[0m", str::from_utf8(utf_char).unwrap());
         }
         print!("{}", s);
+        println!("\x1B[1;1H");
     }
 
     Ok(())
@@ -981,46 +985,44 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
         }
     );
 
-    if boxes.len() > box_id  && box_id > 0 {
-        // Need to flag before removing boxes
-        try!(_flag_recache(boxes, box_id));
+    // Need to flag before removing boxes
+    try!(_flag_recache(boxes, box_id));
 
-        match boxes.get_mut(&box_id) {
-            Some(_found) => {
-                match _found.parent {
-                    Some(pid) => {
-                        parent_id = pid;
-                        found_parent = true;
-                    }
-                    None => ()
-                };
-                _found.parent = None;
-            }
-            None => {
-                parent_id = 0;
-            }
-        };
-
-        if (found_parent) {
-            match boxes.get_mut(&parent_id) {
-                Some(parent) => {
-                    parent.box_positions.remove(&box_id);
-                    let mut m: usize = 0;
-                    let mut found = false;
-                    for i in 0..parent.boxes.len() {
-                        if (parent.boxes[i] == box_id) {
-                            m = i;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found) {
-                        parent.boxes.remove(m);
-                    }
+    match boxes.get_mut(&box_id) {
+        Some(_found) => {
+            match _found.parent {
+                Some(pid) => {
+                    parent_id = pid;
+                    found_parent = true;
                 }
                 None => ()
             };
+            _found.parent = None;
         }
+        None => {
+            parent_id = 0;
+        }
+    };
+
+    if (found_parent) {
+        match boxes.get_mut(&parent_id) {
+            Some(parent) => {
+                parent.box_positions.remove(&box_id);
+                let mut m: usize = 0;
+                let mut found = false;
+                for i in 0..parent.boxes.len() {
+                    if (parent.boxes[i] == box_id) {
+                        m = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    parent.boxes.remove(m);
+                }
+            }
+            None => ()
+        };
     }
     Ok(())
 }
