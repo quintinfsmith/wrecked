@@ -63,6 +63,7 @@ class BleepsScreen(object):
     def box_setc(self, box_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
         self.lib.setc(self.boxhandler, box_id, x, y, fmt_character)
+
     def box_fillc(self, box_id, character):
         fmt_character = bytes(character, 'utf-8')
         self.lib.fillc(self.boxhandler, box_id, fmt_character)
