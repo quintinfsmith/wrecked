@@ -33,6 +33,7 @@ class BleepsScreen(object):
 
             void setc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, const char*);
             void unsetc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
+            void fillc(BleepsBoxHandler, uint32_t, const char*);
 
             void attachbox(BleepsBoxHandler, uint32_t, uint32_t);
             void detachbox(BleepsBoxHandler, uint32_t);
@@ -62,6 +63,9 @@ class BleepsScreen(object):
     def box_setc(self, box_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
         self.lib.setc(self.boxhandler, box_id, x, y, fmt_character)
+    def box_fillc(self, box_id, character):
+        fmt_character = bytes(character, 'utf-8')
+        self.lib.fillc(self.boxhandler, box_id, fmt_character)
 
     def box_unsetc(self, box_id, x, y):
         self.lib.unsetc(self.boxhandler, box_id, x, y)
@@ -123,6 +127,9 @@ class BleepsBox(object):
             pass
 
         self._screen.box_detach(self.bleeps_id)
+
+    def fill(self, character):
+        self._screen.box_fillc(self.bleeps_id, character)
 
     def enable(self):
         self.enabled = True
