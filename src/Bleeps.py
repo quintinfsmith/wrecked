@@ -120,7 +120,7 @@ class BleepsBox(object):
         self.height = height
         self.enabled = True
 
-    def flag_cache(self, box_id):
+    def flag_cache(self):
         self._screen.box_flag_cache(self.bleeps_id)
 
     def attach(self, childbox):
