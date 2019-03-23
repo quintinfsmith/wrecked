@@ -10,6 +10,7 @@ def get_terminal_size():
 
 class BleepsScreen(object):
     SO_PATH = "/home/pent/Projects/AsciiBox/target/debug/libasciibox.so"
+
     def __init__(self):
         ffi = FFI()
         ffi.cdef("""
@@ -111,6 +112,24 @@ class BleepsScreen(object):
 
 
 class BleepsBox(object):
+    BLACK = 0
+    RED = 1
+    GREEN = 2
+    YELLOW = 3
+    BLUE = 4
+    MAGENTA = 5
+    CYAN = 6
+    WHITE = 7
+    BRIGHT = 0x08
+    BRIGHTBLACK = BLACK | BRIGHT
+    BRIGHTRED = RED |  BRIGHT
+    BRIGHTGREEN = GREEN | BRIGHT
+    BRIGHTYELLOW = YELLOW | BRIGHT
+    BRIGHTBLUE = BLUE | BRIGHT
+    BRIGHTMAGENTA = MAGENTA | BRIGHT
+    BRIGHTCYAN = CYAN | BRIGHT
+    BRIGHTWHITE = WHITE | BRIGHT
+
     def __init__(self, n, width, height, screen):
         self._screen  = screen
         self.bleeps_id = n

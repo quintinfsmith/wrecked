@@ -420,7 +420,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
         let mut width = boxes[&box_id].width as isize;
         let mut height = boxes[&box_id].height as isize;
         let mut offset = try!(get_offset(boxes, box_id));
-        let top_disp = try!(get_display(boxes, box_id, offset, (offset.0, offset.1, offset.0 + width, offset.1 + height)));
+        let top_disp = try!(get_display(boxes, box_id, (0, 0), (0, 0, width, height)));
         let mut val_a: &[u8];
         let mut val_b: u16;
         let mut s: String;
