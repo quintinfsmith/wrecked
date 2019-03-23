@@ -46,6 +46,9 @@ class BleepsScreen(object):
         self.width, self.height = get_terminal_size()
         self.boxhandler = self.lib.init(self.width, self.height)
 
+    def box_flag_cache(self, box_id):
+        self.lib.flag_recache(self.boxhandler, box_id)
+
     def box_attach(self, box_id, parent_id, position=(0,0)):
         self.lib.attachbox(self.boxhandler, box_id, parent_id)
         if (position != (0,0)):
@@ -116,6 +119,9 @@ class BleepsBox(object):
         self.width = width
         self.height = height
         self.enabled = True
+
+    def flag_cache(self, box_id):
+        self._screen.box_flag_cache(self.bleeps_id)
 
     def attach(self, childbox):
         self.boxes[childbox.bleeps_id] = childbox
