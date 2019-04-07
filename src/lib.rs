@@ -1,9 +1,6 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::collections::HashMap;
-use std::cmp;
-use std::io::{self, Write};
-use std::slice;
 use std::str;
 
 //#[cfg(test)]
@@ -86,7 +83,7 @@ impl BleepsBox {
     }
 
     fn unset(&mut self, x: usize, y: usize) -> Result<(), BleepsError> {
-        if x < 0 || x >= self.width || y < 0 || y >= self.height {
+        if x >= self.width || y >= self.height {
             Err(BleepsError::BadPosition)
         } else {
             self.grid.remove(&(x, y));
@@ -100,7 +97,7 @@ impl BleepsBox {
             new_c[(4 - c.len()) + i] = c[i]; // Put the 0 offset first
         }
 
-        if x < 0 || x >= self.width || y < 0 || y >= self.height {
+        if x >= self.width || y >= self.height {
             Err(BleepsError::BadPosition)
         } else {
             self.grid.entry((x, y))
@@ -141,22 +138,24 @@ impl BleepsBox {
             let mut modded_n: u16 = n as u16;
             modded_n &= 0b01111;
             modded_n |= 0b10000;
-            self.color |= (modded_n << 5);
+            self.color |= modded_n << 5;
             Ok(())
         }
     }
 
-    fn get(&self, x: usize, y: usize) -> Result<Option<&[u8; 4]>, BleepsError> {
-        if x < 0 || x >= self.width || y < 0 || y >= self.height {
-            Err(BleepsError::BadPosition)
-        } else {
-            Ok(self.grid.get(&(x, y)))
-        }
-    }
+    // Unused, but could e useful in the future
+    //fn get(&self, x: usize, y: usize) -> Result<Option<&[u8; 4]>, BleepsError> {
+    //    if x >= self.width || y >= self.height {
+    //        Err(BleepsError::BadPosition)
+    //    } else {
+    //        Ok(self.grid.get(&(x, y)))
+    //    }
+    //}
 
-    fn get_cached(&self) -> &HashMap<(isize, isize), ([u8; 4], u16)> {
-        &self.cached
-    }
+    // Unused, but may be useful in the future
+    //fn get_cached(&self) -> &HashMap<(isize, isize), ([u8; 4], u16)> {
+    //    &self.cached
+    //}
 
     fn set_cached(&mut self, tocache: &HashMap<(isize, isize), ([u8; 4], u16)>) {
         self.cached = (*tocache).clone();
@@ -170,7 +169,7 @@ fn _disable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Bleeps
         // Check that box exists before proceeding
         try!(
             match boxes.get(&box_id) {
-                Some(found) => Ok(()),
+                Some(_found) => Ok(()),
                 None => Err(BleepsError::NotFound)
             }
         );
@@ -181,7 +180,10 @@ fn _disable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Bleeps
             }
             None => ()
         };
-        _flag_recache(&mut boxes, box_id);
+        match _flag_recache(&mut boxes, box_id) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
     }
 
     Ok(())
@@ -190,9 +192,10 @@ fn _disable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Bleeps
 #[no_mangle]
 pub extern "C" fn disable_box(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        _disable_box(&mut boxhandler, box_id);
-    }
+    match  _disable_box(&mut boxhandler, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
     Box::into_raw(boxhandler); // Prevent Release
 }
 
@@ -202,7 +205,7 @@ fn _enable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsE
     {
         try!(
             match boxes.get(&box_id) {
-                Some(found) => Ok(()),
+                Some(_found) => Ok(()),
                 None => Err(BleepsError::NotFound)
             }
         );
@@ -213,7 +216,10 @@ fn _enable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsE
             }
             None => ()
         };
-        _flag_recache(&mut boxes, box_id);
+        match _flag_recache(&mut boxes, box_id) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
     }
 
     Ok(())
@@ -222,9 +228,10 @@ fn _enable_box(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsE
 #[no_mangle]
 pub extern "C" fn enable_box(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        _enable_box(&mut boxhandler, box_id);
-    }
+    match _enable_box(&mut boxhandler, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
     Box::into_raw(boxhandler); // Prevent Release
 }
 
@@ -232,7 +239,7 @@ fn _removebox_from_boxes(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -277,7 +284,7 @@ fn _removebox_from_boxes(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -
                     break;
                 }
             }
-            if (do_remove) {
+            if do_remove {
                 bleepsbox.boxes.remove(to_remove);
             }
 
@@ -301,7 +308,7 @@ fn get_offset(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(i
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -323,7 +330,7 @@ fn get_offset(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(i
         None => ()
     };
 
-    if (has_parent) {
+    if has_parent {
         match boxes.get(&parent_id) {
             Some(parent) => {
                 match parent.box_positions.get(&box_id) {
@@ -335,7 +342,7 @@ fn get_offset(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<(i
             }
             None => ()
         };
-        let mut parent_offset = try!(get_offset(boxes, parent_id));
+        let parent_offset = try!(get_offset(boxes, parent_id));
         offset = (offset.0 + parent_offset.0, offset.1 + parent_offset.1);
     }
 
@@ -348,7 +355,7 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -362,15 +369,14 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 
     match boxes.get(&box_id) {
         Some(bleepsbox) => {
-            if (bleepsbox.enabled && rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize))) {
-                if (bleepsbox.recache_flag) {
+            if bleepsbox.enabled && rects_intersect(frame, (offset.0, offset.1, bleepsbox.width as isize, bleepsbox.height as isize)) {
+                if bleepsbox.recache_flag {
                     descend = true;
 
                     for (position, character) in bleepsbox.grid.iter() {
                         output.insert((position.0 as isize, position.1 as isize), (*character, bleepsbox.color));
                     }
 
-                    let mut subbox_offset: (isize, isize);
                     for subbox_id in bleepsbox.boxes.iter() {
                         match bleepsbox.box_positions.get(&subbox_id) {
                             Some(subbox_offset) => {
@@ -390,9 +396,8 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
         None => ()
     };
 
-    if (descend) {
+    if descend {
         let mut subbox_output: HashMap<(isize, isize), ([u8; 4], u16)>;
-        let mut tmp_value: &([u8; 4], u16);
         for (subbox_offset, subbox_id) in subboxes.iter() {
             subbox_output = try!(get_display(boxes, *subbox_id, (offset.0 + subbox_offset.0, subbox_offset.1 + offset.1), frame));
             for (subpos, value) in subbox_output.iter() {
@@ -415,11 +420,11 @@ fn get_display(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, offset: (is
 
 
 fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
-    let mut boxes = &mut boxhandler.boxes;
+    let boxes = &mut boxhandler.boxes;
     {
-        let mut width = boxes[&box_id].width as isize;
-        let mut height = boxes[&box_id].height as isize;
-        let mut offset = try!(get_offset(boxes, box_id));
+        let width = boxes[&box_id].width as isize;
+        let height = boxes[&box_id].height as isize;
+        let offset = try!(get_offset(boxes, box_id));
         let top_disp = try!(get_display(boxes, box_id, (0, 0), (0, 0, width, height)));
         let mut val_a: &[u8];
         let mut val_b: u16;
@@ -427,18 +432,17 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
         let mut change_char: bool;
-        let mut was_cached: bool;
 
         s = "".to_string();
         for (pos, val) in top_disp.iter() {
-            if (pos.0 < offset.0 || pos.0 >= offset.0 + width || pos.1 < offset.1 || pos.1 >= offset.1 + height) {
+            if pos.0 < offset.0 || pos.0 >= offset.0 + width || pos.1 < offset.1 || pos.1 >= offset.1 + height {
                 continue;
             }
 
             change_char = true;
             match boxhandler.cached_display.get(&(pos.0, pos.1)) {
                 Some(found) => {
-                    change_char = (*found != (val.0, val.1));
+                    change_char = *found != (val.0, val.1);
                 }
                 None => ()
             };
@@ -464,7 +468,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
             }
 
             if val_b & 16 == 16 {
-                if (val_b & 8 == 8) {
+                if val_b & 8 == 8 {
                     s += &format!("\x1B[10{}m", (val_b & 7));
                 } else {
                     s += &format!("\x1B[4{}m", (val_b & 7));
@@ -474,7 +478,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
 
             utf_char_split_index = 0;
             for i in 0..4 {
-                if (val_a[i] != 0) {
+                if val_a[i] != 0 {
                     utf_char_split_index = i;
                     break;
                 }
@@ -495,7 +499,12 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
 #[no_mangle]
 pub extern "C" fn draw(ptr: *mut BoxHandler, from_box: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    _draw(&mut boxhandler, from_box);
+
+    match _draw(&mut boxhandler, from_box) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
+
     Box::into_raw(boxhandler); // Prevent Release
 }
 
@@ -504,19 +513,17 @@ fn _flag_recache(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
 
     let mut next_box_id: usize = box_id as usize;
-    let mut prev_box_id: usize = 0;
 
     let mut do_next = true;
 
 
     while do_next {
-        prev_box_id = next_box_id;
         match boxes.get_mut(&next_box_id) {
             Some(bleepsbox) => {
                 bleepsbox.flag_recache();
@@ -542,7 +549,10 @@ pub extern "C" fn flag_recache(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     {
         let mut boxes = &mut boxhandler.boxes;
-        _flag_recache(&mut boxes, box_id);
+        match _flag_recache(&mut boxes, box_id) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
     }
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -552,7 +562,7 @@ fn _set_fg_color(boxhandler: &mut BoxHandler, box_id: usize, col: u8) -> Result<
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -572,10 +582,11 @@ fn _set_fg_color(boxhandler: &mut BoxHandler, box_id: usize, col: u8) -> Result<
 #[no_mangle]
 pub extern "C" fn set_fg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO: handle Result
-        _set_fg_color(&mut boxhandler, box_id, col);
-    }
+
+    match _set_fg_color(&mut boxhandler, box_id, col) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -585,7 +596,7 @@ fn _set_bg_color(boxhandler: &mut BoxHandler, box_id: usize, col: u8) -> Result<
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -605,10 +616,11 @@ fn _set_bg_color(boxhandler: &mut BoxHandler, box_id: usize, col: u8) -> Result<
 #[no_mangle]
 pub extern "C" fn set_bg_color(ptr: *mut BoxHandler, box_id: usize, col: u8) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO: handle Result
-        _set_bg_color(&mut boxhandler, box_id, col);
-    }
+
+    match _set_bg_color(&mut boxhandler, box_id, col) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -618,7 +630,7 @@ fn _unset_bg_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Ble
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -639,8 +651,10 @@ fn _unset_bg_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Ble
 pub extern "C" fn unset_bg_color(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     {
-        //TODO: Handle Result
-        _unset_bg_color(&mut boxhandler, box_id);
+        match _unset_bg_color(&mut boxhandler, box_id) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
     }
 
     Box::into_raw(boxhandler); // Prevent Release
@@ -651,7 +665,7 @@ fn _unset_fg_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Ble
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -671,10 +685,10 @@ fn _unset_fg_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Ble
 #[no_mangle]
 pub extern "C" fn unset_fg_color(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        // TODO: Handle Result
-        _unset_fg_color(&mut boxhandler, box_id);
-    }
+    match _unset_fg_color(&mut boxhandler, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -684,7 +698,7 @@ fn _unset_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Bleeps
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -704,10 +718,10 @@ fn _unset_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Bleeps
 #[no_mangle]
 pub extern "C" fn unset_color(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO Handle Result
-        _unset_color(&mut boxhandler, box_id);
-    }
+    match _unset_color(&mut boxhandler, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -717,7 +731,7 @@ fn _fillc(boxhandler: &mut BoxHandler, box_id: usize, c: *const c_char) -> Resul
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -728,7 +742,7 @@ fn _fillc(boxhandler: &mut BoxHandler, box_id: usize, c: *const c_char) -> Resul
         Ok(string) => {
             string.as_bytes()
         }
-        Err(e) => return Err(BleepsError::InvalidUtf8)
+        Err(_e) => return Err(BleepsError::InvalidUtf8)
     };
 
 
@@ -762,7 +776,10 @@ pub extern "C" fn fillc(ptr: *mut BoxHandler, box_id: usize, c: *const c_char) {
             None => ()
         };
 
-        _flag_recache(&mut boxes, box_id);
+        match _flag_recache(&mut boxes, box_id) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
     }
 
     Box::into_raw(boxhandler); // Prevent Release
@@ -774,7 +791,7 @@ fn _setc(boxhandler: &mut BoxHandler, box_id: usize, x: usize, y: usize, c: *con
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -785,7 +802,7 @@ fn _setc(boxhandler: &mut BoxHandler, box_id: usize, x: usize, y: usize, c: *con
         Ok(string) => {
             string.as_bytes()
         }
-        Err(e) => return Err(BleepsError::InvalidUtf8)
+        Err(_e) => return Err(BleepsError::InvalidUtf8)
     };
 
 
@@ -804,10 +821,11 @@ fn _setc(boxhandler: &mut BoxHandler, box_id: usize, x: usize, y: usize, c: *con
 #[no_mangle]
 pub extern "C" fn setc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize, c: *const c_char) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO Handle Result
-        _setc(&mut boxhandler, box_id, x, y, c);
-    }
+
+    match _setc(&mut boxhandler, box_id, x, y, c) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -817,7 +835,7 @@ fn _unsetc(boxhandler: &mut BoxHandler, box_id: usize, x: usize, y: usize) -> Re
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -837,17 +855,18 @@ fn _unsetc(boxhandler: &mut BoxHandler, box_id: usize, x: usize, y: usize) -> Re
 #[no_mangle]
 pub extern "C" fn unsetc(ptr: *mut BoxHandler, box_id: usize, x: usize, y: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO Handle Result
-        _unsetc(&mut boxhandler, box_id, x, y);
-    }
+
+    match _unsetc(&mut boxhandler, box_id, x, y) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
 
 
 fn _removebox(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> {
-    let mut boxes = &mut boxhandler.boxes;
+    let boxes = &mut boxhandler.boxes;
     {
         let mut removed_ids = try!(_removebox_from_boxes(boxes, box_id));
         boxhandler.open_keys.append(&mut removed_ids);
@@ -859,20 +878,22 @@ fn _removebox(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsEr
 #[no_mangle]
 pub extern "C" fn removebox(ptr: *mut BoxHandler, box_id: usize) {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
-    {
-        //TODO: Handle Result
-        _removebox(&mut boxhandler, box_id);
-    }
+
+    match _removebox(&mut boxhandler, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
+
     Box::into_raw(boxhandler); // Prevent Release
 }
 
 
 fn _newbox(boxhandler: &mut BoxHandler, parent_id: usize, width: usize, height: usize) -> Result<usize, BleepsError> {
-    let mut boxes = &mut boxhandler.boxes;
+    let boxes = &mut boxhandler.boxes;
     // Check that box exists before proceeding
     try!(
         match boxes.get(&parent_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -903,17 +924,15 @@ fn _newbox(boxhandler: &mut BoxHandler, parent_id: usize, width: usize, height: 
 pub extern "C" fn newbox(ptr: *mut BoxHandler, parent_id: usize, width: usize, height: usize) -> usize {
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
     let id: usize;
-    {
-        // TODO: Handle Result
-        match _newbox(&mut boxhandler, parent_id, width, height) {
-            Ok(newid) => {
-                id = newid;
-            }
-            Err(e) => {
-                id = 0;
-            }
-        };
-    }
+
+    match _newbox(&mut boxhandler, parent_id, width, height) {
+        Ok(newid) => {
+            id = newid;
+        }
+        Err(_e) => {
+            id = 0;
+        }
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
     id
@@ -926,7 +945,7 @@ fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: i
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -946,7 +965,7 @@ fn _movebox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, x: isize, y: i
                 parent_id = 0;
             }
         };
-        if (found_parent) {
+        if found_parent {
             match boxes.get_mut(&parent_id) {
                 Some(parent) => {
                     if let Some(pos) = parent.box_positions.get_mut(&box_id) {
@@ -966,8 +985,10 @@ pub extern "C" fn movebox(ptr: *mut BoxHandler, box_id: usize, x: isize, y: isiz
 
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
 
-    //TODO: Handle Result
-    _movebox(&mut boxhandler.boxes, box_id, x, y);
+    match _movebox(&mut boxhandler.boxes, box_id, x, y) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -979,7 +1000,7 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -1003,20 +1024,20 @@ fn _detachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize) -> Result<()
         }
     };
 
-    if (found_parent) {
+    if found_parent {
         match boxes.get_mut(&parent_id) {
             Some(parent) => {
                 parent.box_positions.remove(&box_id);
                 let mut m: usize = 0;
                 let mut found = false;
                 for i in 0..parent.boxes.len() {
-                    if (parent.boxes[i] == box_id) {
+                    if parent.boxes[i] == box_id {
                         m = i;
                         found = true;
                         break;
                     }
                 }
-                if (found) {
+                if found {
                     parent.boxes.remove(m);
                 }
             }
@@ -1031,8 +1052,10 @@ pub extern "C" fn detachbox(ptr: *mut BoxHandler, box_id: usize) {
 
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
 
-    //TODO: Handle Result
-    _detachbox(&mut boxhandler.boxes, box_id);
+    match _detachbox(&mut boxhandler.boxes, box_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -1042,7 +1065,7 @@ fn _attachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, parent_id: u
     // Check that box exists before proceeding
     try!(
         match boxes.get(&box_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -1050,7 +1073,7 @@ fn _attachbox(boxes: &mut HashMap<usize, BleepsBox>, box_id: usize, parent_id: u
     // Check that box exists before proceeding
     try!(
         match boxes.get(&parent_id) {
-            Some(found) => Ok(()),
+            Some(_found) => Ok(()),
             None => Err(BleepsError::NotFound)
         }
     );
@@ -1084,8 +1107,10 @@ pub extern "C" fn attachbox(ptr: *mut BoxHandler, box_id: usize, parent_id: usiz
 
     let mut boxhandler = unsafe { Box::from_raw(ptr) };
 
-    //TODO: Handle Result
-    _attachbox(&mut boxhandler.boxes, box_id, parent_id);
+    match _attachbox(&mut boxhandler.boxes, box_id, parent_id) {
+        Ok(_) => (),
+        Err(e) => panic!(e)
+    };
 
     Box::into_raw(boxhandler); // Prevent Release
 }
@@ -1113,7 +1138,7 @@ pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {
 
 #[no_mangle]
 pub extern "C" fn kill(ptr: *mut BoxHandler) {
-    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    let boxhandler = unsafe { Box::from_raw(ptr) };
 
     println!("\x1B[?25h"); // Show Cursor
     println!("\x1B[?1049l"); // Return to previous screen
