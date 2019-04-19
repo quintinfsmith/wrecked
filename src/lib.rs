@@ -1125,7 +1125,6 @@ pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {
     };
 
     let mut top: BleepsBox = BleepsBox::new(width, height);
-    top.fill(&[0,0,0,65]);
     boxhandler.boxes.insert(0, top);
 
 
