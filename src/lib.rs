@@ -91,6 +91,24 @@ impl BleepsBox {
         }
     }
 
+    fn resize(&mut self, width: usize, height: usize) -> Result<(), BleepsError> {
+        self.width = width;
+        self.height = height;
+        let mut keys_to_remove: Vec<(usize, usize)> = Vec::new();
+
+        for ((x, y), val) in self.grid.iter() {
+            if (*x >= width || *y >= height) {
+                keys_to_remove.push((*x, *y));
+            }
+        }
+
+        for key in keys_to_remove.iter() {
+            self.grid.remove(key);
+        }
+
+        Ok(())
+    }
+
     fn set(&mut self, x: usize, y: usize, c: &[u8]) -> Result<(), BleepsError> {
         let mut new_c: [u8; 4] = [0; 4];
         for i in 0..c.len() {
@@ -645,6 +663,40 @@ fn _unset_bg_color(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), Ble
     try!(_flag_recache(&mut boxes, box_id));
 
     Ok(())
+}
+
+fn _resize(boxhandler: &mut BoxHandler, box_id: usize, new_width: usize, new_height: usize) -> Result<(), BleepsError> {
+    let mut boxes = &mut boxhandler.boxes;
+    // Check that box exists before proceeding
+    try!(
+        match boxes.get(&box_id) {
+            Some(_found) => Ok(()),
+            None => Err(BleepsError::NotFound)
+        }
+    );
+
+    match boxes.get_mut(&(box_id as usize)) {
+        Some(bleepsbox) => {
+            bleepsbox.resize(new_width, new_height);
+        }
+        None => ()
+    };
+
+    try!(_flag_recache(&mut boxes, box_id));
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn resize(ptr: *mut BoxHandler, box_id: usize, new_width: usize, new_height: usize) {
+    let mut boxhandler = unsafe { Box::from_raw(ptr) };
+    {
+        match _resize(&mut boxhandler, box_id, new_width, new_height) {
+            Ok(_) => (),
+            Err(e) => panic!(e)
+        };
+    }
+
+    Box::into_raw(boxhandler); // Prevent Release
 }
 
 #[no_mangle]

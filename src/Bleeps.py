@@ -21,6 +21,7 @@ class BleepsScreen(object):
             uint32_t newbox(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
 
             void movebox(BleepsBoxHandler, uint32_t, int32_t, int32_t);
+            void resize(BleepsBoxHandler, uint32_t, uin32_t, uint32_t);
             void flag_recache(BleepsBoxHandler, uint32_t);
 
             void set_bg_color(BleepsBoxHandler, uint32_t, uint8_t);
@@ -41,6 +42,7 @@ class BleepsScreen(object):
 
             void draw(BleepsBoxHandler, uint32_t);
             void kill(BleepsBoxHandler);
+
         """)
 
         self.lib = ffi.dlopen(self.SO_PATH)
@@ -92,6 +94,9 @@ class BleepsScreen(object):
 
     def box_move(self, box_id, x, y):
         self.lib.movebox(self.boxhandler, box_id, x, y)
+
+    def box_resize(self, box_id, width height):
+        self.lib.resize
 
     def _new_box(self, width, height, parent=0):
 
