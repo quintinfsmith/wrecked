@@ -96,7 +96,7 @@ class BleepsScreen(object):
         self.lib.movebox(self.boxhandler, box_id, x, y)
 
     def box_resize(self, box_id, width, height):
-        self.lib.resize
+        self.lib.resize(self.boxhandler, box_id, width, height)
 
     def _new_box(self, width, height, parent=0):
 
