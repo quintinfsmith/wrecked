@@ -2,6 +2,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::str;
+use std::cmp;
 
 //#[cfg(test)]
 //mod tests {
@@ -111,8 +112,8 @@ impl BleepsBox {
 
     fn set(&mut self, x: usize, y: usize, c: &[u8]) -> Result<(), BleepsError> {
         let mut new_c: [u8; 4] = [0; 4];
-        for i in 0..c.len() {
-            new_c[(4 - c.len()) + i] = c[i]; // Put the 0 offset first
+        for i in 0..cmp::min(4, c.len()) {
+            new_c[(4 - cmp::min(4, c.len())) + i] = c[i]; // Put the 0 offset first
         }
 
         if x >= self.width || y >= self.height {
@@ -130,7 +131,7 @@ impl BleepsBox {
     }
 
     fn unset_fg_color(&mut self) {
-        self.color &= 0b1111110000000000;
+        self.color &= 0b1111110000011111;
     }
 
     fn unset_color(&mut self) {
@@ -445,7 +446,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
         let offset = try!(get_offset(boxes, box_id));
         let top_disp = try!(get_display(boxes, box_id, (0, 0), (0, 0, width, height)));
         let mut val_a: &[u8];
-        let mut val_b: u16;
+        let mut color_value: u16;
         let mut s: String;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
@@ -476,20 +477,23 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
             s += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
 
             val_a = &val.0;
-            val_b = val.1;
-            if (val_b >> 5) & 16 == 16 {
-                if (val_b >> 5) & 8 == 8 {
-                    s += &format!("\x1B[9{}m", ((val_b >> 5) & 7));
+            color_value = val.1;
+
+            // ForeGround
+            if (color_value >> 5) & 16 == 16 {
+                if (color_value >> 5) & 8 == 8 {
+                    s += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
                 } else {
-                    s += &format!("\x1B[3{}m", ((val_b >> 5) & 7));
+                    s += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
                 }
             }
 
-            if val_b & 16 == 16 {
-                if val_b & 8 == 8 {
-                    s += &format!("\x1B[10{}m", (val_b & 7));
+            // BackGround
+            if color_value & 16 == 16 {
+                if color_value & 8 == 8 {
+                    s += &format!("\x1B[10{}m", (color_value & 7));
                 } else {
-                    s += &format!("\x1B[4{}m", (val_b & 7));
+                    s += &format!("\x1B[4{}m", (color_value & 7));
                 }
             }
 

@@ -3,15 +3,14 @@ from ctypes import c_bool
 import sys
 import tty, termios
 import os
+from Interactor import Interactor
+from localfuncs import get_terminal_size
 
-def get_terminal_size():
-    height, width = os.popen('stty size', 'r').read().split()
-    return (int(width), int(height))
-
-class BleepsScreen(object):
-    SO_PATH = "/home/pent/Projects/AsciiBox/target/debug/libasciibox.so"
+class BleepsScreen(Interactor):
+    SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
 
     def __init__(self):
+        super().__init__()
         ffi = FFI()
         ffi.cdef("""
             typedef void* BleepsBoxHandler;
@@ -21,7 +20,7 @@ class BleepsScreen(object):
             uint32_t newbox(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
 
             void movebox(BleepsBoxHandler, uint32_t, int32_t, int32_t);
-            void resize(BleepsBoxHandler, uint32_t, uin32_t, uint32_t);
+            void resize(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
             void flag_recache(BleepsBoxHandler, uint32_t);
 
             void set_bg_color(BleepsBoxHandler, uint32_t, uint8_t);
@@ -150,6 +149,9 @@ class BleepsBox(object):
     def attach(self, childbox):
         self.boxes[childbox.bleeps_id] = childbox
         self._screen.box_attach(childbox.bleeps_id, self.bleeps_id)
+
+    def resize(self, width, height):
+        self._screen.box_resize(self.bleeps_id, width, height)
 
     def detach(self):
         try:
