@@ -110,7 +110,7 @@ class BleepsScreen(Interactor):
         self.lib.draw(self.boxhandler, box_id)
 
     def box_remove(self, box_id):
-        self.lib.boxremove(self.boxhandler, box_id)
+        self.lib.removebox(self.boxhandler, box_id)
 
     def draw(self):
         self.lib.draw(self.boxhandler, 0)
@@ -155,6 +155,8 @@ class BleepsBox(object):
         self._screen.box_attach(childbox.bleeps_id, self.bleeps_id)
 
     def resize(self, width, height):
+        self.width = width
+        self.height = heght
         self._screen.box_resize(self.bleeps_id, width, height)
 
     def detach(self):
