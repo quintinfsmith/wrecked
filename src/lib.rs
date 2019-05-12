@@ -447,6 +447,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
         let top_disp = try!(get_display(boxes, box_id, (0, 0), (0, 0, width, height)));
         let mut val_a: &[u8];
         let mut color_value: u16;
+        let mut current_line_color_value: u16 = 0;
         let mut s: String;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
@@ -478,23 +479,25 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
 
             val_a = &val.0;
             color_value = val.1;
-
-            // ForeGround
-            if (color_value >> 5) & 16 == 16 {
-                if (color_value >> 5) & 8 == 8 {
-                    s += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
-                } else {
-                    s += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+            if (color_value != current_line_color_value) {
+                // ForeGround
+                if (color_value >> 5) & 16 == 16 {
+                    if (color_value >> 5) & 8 == 8 {
+                        s += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
+                    } else {
+                        s += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+                    }
                 }
-            }
 
-            // BackGround
-            if color_value & 16 == 16 {
-                if color_value & 8 == 8 {
-                    s += &format!("\x1B[10{}m", (color_value & 7));
-                } else {
-                    s += &format!("\x1B[4{}m", (color_value & 7));
+                // BackGround
+                if color_value & 16 == 16 {
+                    if color_value & 8 == 8 {
+                        s += &format!("\x1B[10{}m", (color_value & 7));
+                    } else {
+                        s += &format!("\x1B[4{}m", (color_value & 7));
+                    }
                 }
+                current_line_color_value = color_value;
             }
 
 
@@ -508,9 +511,9 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
 
             utf_char = val_a.split_at(utf_char_split_index).1;
 
-            s += &format!("{}\x1B[0m", str::from_utf8(utf_char).unwrap());
+            s += &format!("{}", str::from_utf8(utf_char).unwrap());
         }
-        print!("{}", s);
+        print!("{}\x1B[0m", s);
         println!("\x1B[1;1H");
     }
 
