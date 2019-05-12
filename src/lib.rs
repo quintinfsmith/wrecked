@@ -480,21 +480,29 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
             val_a = &val.0;
             color_value = val.1;
             if (color_value != current_line_color_value) {
-                // ForeGround
-                if (color_value >> 5) & 16 == 16 {
-                    if (color_value >> 5) & 8 == 8 {
-                        s += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
+                if (color_value == 0) {
+                    s += &format!("\x1B[0m");
+                } else {
+                    // ForeGround
+                    if (color_value >> 5) & 16 == 16 {
+                        if (color_value >> 5) & 8 == 8 {
+                            s += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
+                        } else {
+                            s += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+                        }
                     } else {
-                        s += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+                        s += &format!("\x1B[39m");
                     }
-                }
 
-                // BackGround
-                if color_value & 16 == 16 {
-                    if color_value & 8 == 8 {
-                        s += &format!("\x1B[10{}m", (color_value & 7));
+                    // BackGround
+                    if color_value & 16 == 16 {
+                        if color_value & 8 == 8 {
+                            s += &format!("\x1B[10{}m", (color_value & 7));
+                        } else {
+                            s += &format!("\x1B[4{}m", (color_value & 7));
+                        }
                     } else {
-                        s += &format!("\x1B[4{}m", (color_value & 7));
+                        s += &format!("\x1B[49m");
                     }
                 }
                 current_line_color_value = color_value;
