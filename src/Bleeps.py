@@ -156,7 +156,7 @@ class BleepsBox(object):
 
     def resize(self, width, height):
         self.width = width
-        self.height = heght
+        self.height = height
         self._screen.box_resize(self.bleeps_id, width, height)
 
     def detach(self):
