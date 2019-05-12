@@ -42,6 +42,7 @@ class BleepsScreen(Interactor):
             void draw(BleepsBoxHandler, uint32_t);
             void kill(BleepsBoxHandler);
 
+            void removebox(BleepsBoxHandler, uint32_t);
         """)
 
         self.lib = ffi.dlopen(self.SO_PATH)
@@ -107,6 +108,9 @@ class BleepsScreen(Interactor):
 
     def box_draw(self, box_id):
         self.lib.draw(self.boxhandler, box_id)
+
+    def box_remove(self, box_id):
+        self.lib.boxremove(self.boxhandler, box_id)
 
     def draw(self):
         self.lib.draw(self.boxhandler, 0)
@@ -177,6 +181,9 @@ class BleepsBox(object):
 
     def refresh(self):
         self._screen.draw()
+
+    def remove(self):
+        self._screen.box_remove(self.bleeps_id)
 
     def setc(self, x, y, character):
         self._screen.box_setc(self.bleeps_id, x, y, character)
