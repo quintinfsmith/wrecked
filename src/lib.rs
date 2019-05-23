@@ -444,7 +444,7 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
         let width = boxes[&box_id].width as isize;
         let height = boxes[&box_id].height as isize;
         let offset = try!(get_offset(boxes, box_id));
-        let top_disp = try!(get_display(boxes, box_id, (0, 0), (0, 0, width, height)));
+        let top_disp = try!(get_display(boxes, box_id, offset, (offset.0, offset.1, width, height)));
         let mut val_a: &[u8];
         let mut color_value: u16;
         let mut current_line_color_value: u16 = 0;
@@ -455,12 +455,12 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
 
         s = "".to_string();
         for (pos, val) in top_disp.iter() {
-            if pos.0 < offset.0 || pos.0 >= offset.0 + width || pos.1 < offset.1 || pos.1 >= offset.1 + height {
+            if (offset.0 + pos.0) < offset.0 || (offset.0 + pos.0) >= offset.0 + width || (offset.1 + pos.1) < offset.1 || (offset.1 + pos.1) >= offset.1 + height {
                 continue;
             }
 
             change_char = true;
-            match boxhandler.cached_display.get(&(pos.0, pos.1)) {
+            match boxhandler.cached_display.get(&(pos.0 + offset.0, pos.1 + offset.1)) {
                 Some(found) => {
                     change_char = *found != (val.0, val.1);
                 }
@@ -471,11 +471,11 @@ fn _draw(boxhandler: &mut BoxHandler, box_id: usize) -> Result<(), BleepsError> 
                 continue;
             }
 
-            boxhandler.cached_display.entry((pos.0, pos.1))
+            boxhandler.cached_display.entry((pos.0 + offset.0, pos.1 + offset.1))
                 .and_modify(|e| { *e = (val.0, val.1) })
                 .or_insert((val.0, val.1));
 
-            s += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
+            s += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
 
             val_a = &val.0;
             color_value = val.1;
