@@ -145,6 +145,7 @@ impl BleepsBox {
             let mut modded_n: u16 = n as u16;
             modded_n &= 0b01111;
             modded_n |= 0b10000;
+            self.color &= 0b1111111111100000;
             self.color |= modded_n;
             Ok(())
         }
@@ -157,6 +158,7 @@ impl BleepsBox {
             let mut modded_n: u16 = n as u16;
             modded_n &= 0b01111;
             modded_n |= 0b10000;
+            self.color &= 0b1111110000011111;
             self.color |= modded_n << 5;
             Ok(())
         }
