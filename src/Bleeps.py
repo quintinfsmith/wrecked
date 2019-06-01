@@ -6,7 +6,7 @@ import os
 from Interactor import Interactor
 from localfuncs import get_terminal_size
 
-class BleepsScreen(Interactor):
+class BleepsScreen(object):
     SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
 
     def __init__(self):
