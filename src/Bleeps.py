@@ -155,7 +155,7 @@ class BleepsBox(object):
             self.width = kwargs['width']
         self.height = 1
         if 'height' in kwargs.keys():
-            self.height = height
+            self.height = kwargs['height']
 
     def flag_cache(self):
         self._screen.box_flag_cache(self.bleeps_id)
