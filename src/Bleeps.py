@@ -3,10 +3,9 @@ from ctypes import c_bool
 import sys
 import tty, termios
 import os
-from Interactor import Interactor
 from localfuncs import get_terminal_size
 
-class BleepsScreen(Interactor):
+class BleepsScreen:
     SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
 
     def __init__(self):
@@ -98,13 +97,19 @@ class BleepsScreen(Interactor):
     def box_resize(self, box_id, width, height):
         self.lib.resize(self.boxhandler, box_id, width, height)
 
-    def _new_box(self, width, height, parent=0):
+    def new_box(self, **kwargs):
+        width = 1
+        if 'width' in kwargs.keys():
+            width = kwargs['width']
+        height = 1
+        if 'height' in kwargs.keys():
+            height = kwargs['height']
+        parent = 0
+        if 'parent' in kwargs.keys():
+            parent = kwargs['parent']
 
         new_box_id = self.lib.newbox(self.boxhandler, parent, width, height)
-        return BleepsBox(new_box_id, width, height, self)
-
-    def new_box(self, width, height):
-        return self._new_box(width, height)
+        return BleepsBox(new_box_id, self, width=width, height=height)
 
     def box_draw(self, box_id):
         self.lib.draw(self.boxhandler, box_id)
@@ -138,14 +143,19 @@ class BleepsBox(object):
     BRIGHTCYAN = CYAN | BRIGHT
     BRIGHTWHITE = WHITE | BRIGHT
 
-    def __init__(self, n, width, height, screen):
+    def __init__(self, n, screen, **kwargs):
         self._screen  = screen
         self.bleeps_id = n
         self.boxes = {}
         self.parent = None
-        self.width = width
-        self.height = height
         self.enabled = True
+
+        self.width = 1
+        if 'width' in kwargs.keys():
+            self.width = kwargs['width']
+        self.height = 1
+        if 'height' in kwargs.keys():
+            self.height = height
 
     def flag_cache(self):
         self._screen.box_flag_cache(self.bleeps_id)
@@ -211,8 +221,9 @@ class BleepsBox(object):
     def unset_color(self):
         self._screen.box_unset_bg_color(self.bleeps_id)
 
-    def new_box(self, width, height):
-        box = self._screen._new_box(width, height, self.bleeps_id)
+    def new_box(self, **kwargs):
+        kwargs['parent'] = self.bleeps_id
+        box = self._screen.new_box(**kwargs)
         self.boxes[box.bleeps_id] = box
         box.parent = self
 
@@ -221,7 +232,7 @@ class BleepsBox(object):
 
 if __name__ == "__main__":
     screen = BleepsScreen()
-    box = screen.new_box(10, 10)
+    box = screen.new_box(width=10, height=10)
     for y in range(box.height):
         box.setc(0, y, '|')
         box.setc(box.width - 1, y, '|')
@@ -237,3 +248,4 @@ if __name__ == "__main__":
 
     time.sleep(2)
     screen.kill()
+
