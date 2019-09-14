@@ -1,124 +1,66 @@
-from cffi import FFI
-from ctypes import c_bool
 import sys
-import tty, termios
-import os
 from localfuncs import get_terminal_size
+from poc import Rect
 
 class BleepsScreen:
-    SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
-
     def __init__(self):
-        ffi = FFI()
-        ffi.cdef("""
-            typedef void* BleepsBoxHandler;
+        self.rect = Rect()
 
-            BleepsBoxHandler init(uint32_t, uint32_t);
+        self.box_cache = {0: self}
 
-            uint32_t newbox(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
-
-            void movebox(BleepsBoxHandler, uint32_t, int32_t, int32_t);
-            void resize(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
-            void flag_recache(BleepsBoxHandler, uint32_t);
-
-            void set_bg_color(BleepsBoxHandler, uint32_t, uint8_t);
-            void set_fg_color(BleepsBoxHandler, uint32_t, uint8_t);
-            void unset_color(BleepsBoxHandler, uint32_t);
-            void unset_bg_color(BleepsBoxHandler, uint32_t);
-            void unset_fg_color(BleepsBoxHandler, uint32_t);
-
-            void disable_box(BleepsBoxHandler, uint32_t);
-            void enable_box(BleepsBoxHandler, uint32_t);
-
-            void setc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, const char*);
-            void unsetc(BleepsBoxHandler, uint32_t, uint32_t, uint32_t);
-            void fillc(BleepsBoxHandler, uint32_t, const char*);
-
-            void attachbox(BleepsBoxHandler, uint32_t, uint32_t);
-            void detachbox(BleepsBoxHandler, uint32_t);
-
-            void draw_area(BleepsBoxHandler, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-            void draw(BleepsBoxHandler, uint32_t);
-            void kill(BleepsBoxHandler);
-
-            void removebox(BleepsBoxHandler, uint32_t);
-        """)
-
-        self.lib = ffi.dlopen(self.SO_PATH)
         self.width, self.height = get_terminal_size()
-        self.boxhandler = self.lib.init(self.width, self.height)
-
-        self._serving = 0
-        self._queue_number = 0
+        self.rect.resize(self.width, self.height)
+        print(self.width, self.height)
 
     def box_flag_cache(self, box_id):
-        self.lib.flag_recache(self.boxhandler, box_id)
+        self.rect.flag_full_refresh = True
 
 
     def box_attach(self, box_id, parent_id, position=(0,0)):
+        self.box_cache[parent_id].rect.add_child(self.box_cache[box_id])
 
-        self.lib.attachbox(self.boxhandler, box_id, parent_id)
-        if (position != (0,0)):
+        if position != (0,0):
             self.box_move(box_id, *position)
 
 
     def box_detach(self, box_id):
-
-        self.lib.detachbox(self.boxhandler, box_id)
-
+        self.box_cache[box_id].rect.detach()
 
     def box_disable(self, box_id):
-
-        self.lib.disable_box(self.boxhandler, box_id)
-
+        pass
 
     def box_enable(self, box_id):
-
-        self.lib.enable_box(self.boxhandler, box_id)
-
+        pass
 
     def box_setc(self, box_id, x, y, character):
-
-        fmt_character = bytes(character, 'utf-8')
-        self.lib.setc(self.boxhandler, box_id, x, y, fmt_character)
-
+        self.box_cache[box_id].rect.set_character(x, y, character)
 
     def box_fillc(self, box_id, character):
-
-        fmt_character = bytes(character, 'utf-8')
-        self.lib.fillc(self.boxhandler, box_id, fmt_character)
-
+        self.box_cache[box_id].rect.default_character = character
 
     def box_unsetc(self, box_id, x, y):
-
-        self.lib.unsetc(self.boxhandler, box_id, x, y)
-
+        self.box_cache[box_id].rect.unset_character(x, y)
 
     def box_unset_bg_color(self, box_id):
-
-        self.lib.unset_bg_color(self.boxhandler, box_id)
-
+        pass
 
     def box_unset_fg_color(self, box_id):
-
-        self.lib.unset_fg_color(self.boxhandler, box_id)
-
+        pass
 
     def box_unset_color(self, box_id):
-
-        self.lib.unset_color(self.boxhandler, box_id)
+        pass
 
     def box_set_bg_color(self, box_id, color):
-        self.lib.set_bg_color(self.boxhandler, box_id, color)
+        pass
 
     def box_set_fg_color(self, box_id, color):
-        self.lib.set_fg_color(self.boxhandler, box_id, color)
+        pass
 
     def box_move(self, box_id, x, y):
-        self.lib.movebox(self.boxhandler, box_id, x, y)
+        self.box_cache[box_id].rect.move(x, y)
 
     def box_resize(self, box_id, width, height):
-        self.lib.resize(self.boxhandler, box_id, width, height)
+        self.box_cache[box_id].rect.resize(width, height)
 
     def new_box(self, **kwargs):
         width = 1
@@ -129,30 +71,46 @@ class BleepsScreen:
         if 'height' in kwargs.keys():
             height = kwargs['height']
 
-        parent = 0
+        new_rect = Rect()
+        new_bleepsbox = BleepsBox(new_rect.rect_id, self, **kwargs)
+        new_bleepsbox.rect = new_rect
+
+        self.box_cache[new_rect.rect_id] = new_bleepsbox
+        new_rect.resize(width, height)
+
         if 'parent' in kwargs.keys():
             parent = kwargs['parent']
+            self.box_cache[parent].rect.add_child(new_rect)
 
-        new_box_id = self.lib.newbox(self.boxhandler, parent, width, height)
+        return new_bleepsbox
 
-        return BleepsBox(new_box_id, self, width=width, height=height)
 
     def box_draw(self, box_id):
-        self.lib.draw(self.boxhandler, box_id)
+        rect = self.box_cache[box_id].rect
+        offset = rect.get_offset()
+        for (x, y), character in rect.get_display().items():
+            sys.stdout.write("\033[%d;%dH%s\n" % (y + 1, x + 1, character))
 
-    def box_draw_area(self, box_id, x, y, width, height):
-        self.lib.draw_area(self.boxhandler, box_id, x, y, width, height)
+
+    #def box_draw_area(self, box_id, x, y, width, height):
+    #    rect = self.box_cache[box_id].rect
+    #    offset = rect.get_offset()
+    #    for (xb, yb), character in rect.get_display(boundries=(x, y, x + width, y + height)).items():
+    #        sys.stdout.write("\033[%d;%dH%s" % (yb + 1, xb + 1, character))
+
 
     def box_remove(self, box_id):
-        self.lib.removebox(self.boxhandler, box_id)
+        self.box_detach(box_id)
 
     def draw(self):
-        self.lib.draw(self.boxhandler, 0)
+        self.box_draw(self.rect.rect_id)
 
     def kill(self):
-        self.lib.kill(self.boxhandler)
+        pass
 
-class BleepsBox(object):
+
+
+class BleepsBox:
     BLACK = 0
     RED = 1
     GREEN = 2
@@ -173,6 +131,7 @@ class BleepsBox(object):
 
     def __init__(self, n, screen, **kwargs):
         self._screen  = screen
+        self.rect = None
         self.bleeps_id = n
         self.boxes = {}
         self.parent = None
@@ -200,11 +159,6 @@ class BleepsBox(object):
         self._screen.box_resize(self.bleeps_id, width, height)
 
     def detach(self):
-        try:
-            del self.parent.boxes[self.bleeps_id]
-        except:
-            pass
-
         self._screen.box_detach(self.bleeps_id)
 
     def fill(self, character):
@@ -267,6 +221,7 @@ class BleepsBox(object):
 if __name__ == "__main__":
     screen = BleepsScreen()
     box = screen.new_box(width=10, height=10)
+
     for y in range(box.height):
         box.setc(0, y, '|')
         box.setc(box.width - 1, y, '|')
@@ -278,7 +233,9 @@ if __name__ == "__main__":
     box.set_bg_color(4)
 
     import time
-    box.refresh()
+    #box.draw()
+    # TODO: Why doesn't this work?
+    screen.draw()
 
     time.sleep(2)
     screen.kill()

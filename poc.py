@@ -2,6 +2,7 @@
 # * DISALLOW positional overflow, ie no children < 0 or > width/height
 # * No invisible Rects with visible children
 
+
 class Rect(object):
     rect_id = 0
     width = 0
@@ -16,7 +17,7 @@ class Rect(object):
     _inverse_child_space = {} # { child id: [(x,y)..] }
     child_positions = {} # { child id: topleft corner }
 
-    character_space = { } # { (x, y): character }
+    character_space = {} # { (x, y): character }
 
     flag_full_refresh = False
     flags_pos_refresh = set() # [(x, y) ... ]
@@ -44,12 +45,24 @@ class Rect(object):
 
         self._cached_display = {}
 
+
     def add_child(self, child):
         self.children[child.rect_id] = child
         self._inverse_child_space[child.rect_id] = []
         self.set_child_position(child.rect_id, 0, 0)
 
         child.parent = self
+
+    def detach(self):
+        self.parent.detach_child(self.rect_id)
+
+    def detach_child(self, child_id):
+        child = self.children[child_id]
+        self.clear_child_space(child_id)
+        del self.child_positions[child_id]
+        del self.children[child_id]
+        return child
+
 
     def resize(self, width, height):
         self.width = width
@@ -69,7 +82,6 @@ class Rect(object):
         self.update_child_space(child_id, (x, y, x + child.width, y + child.height))
 
 
-
     # SPOT REFRESH
     def clear_child_space(self, child_id):
         for position in self._inverse_child_space[child_id]:
@@ -85,7 +97,7 @@ class Rect(object):
 
         for y in range(corners[1], corners[3]):
             for x in range(corners[0], corners[2]):
-                if (x,y) not in self.child_space.keys():
+                if (x, y) not in self.child_space.keys():
                     self.child_space[(x, y)] = []
 
                 self.child_space[(x, y)].append(child_id)
@@ -99,6 +111,10 @@ class Rect(object):
         self.character_space[(x, y)] = character
         self.flags_pos_refresh.add((x, y))
 
+    def unset_character(self, x, y):
+        del self.character_space[(x, y)]
+        self.flags_pos_refresh.add((x, y))
+
 
     #def get_character(self, x, y):
     #    return self.character_space[(x, y)]
@@ -108,7 +124,6 @@ class Rect(object):
         '''
             Will Never update outside of 0 - width or 0 - height
         '''
-
 
         # If full refresh is requested, fill flags_pos_refresh with all potential coords
         if self.flag_full_refresh:
@@ -143,8 +158,9 @@ class Rect(object):
             for (x, y) in coords:
                 self._cached_display[(x, y)] = child._cached_display[(x - childx, y - childy)]
 
-
         self.flags_pos_refresh = set()
+
+
 
     def get_display(self, **kwargs):
         boundries = (0, 0, self.width, self.height)
@@ -158,11 +174,18 @@ class Rect(object):
         self._update_cached_display()
 
         output = {}
-        for y in range(boundries[0], boundries[2]):
-            for x in range(boundries[1], boundries[3]):
+        for y in range(boundries[1], boundries[3]):
+            for x in range(boundries[0], boundries[2]):
                 output[(x, y)] = self._cached_display[(x, y)]
 
         return output
+
+    def get_offset(self):
+        offset = (0, 0)
+        if self.parent:
+            parent_offset = self.parent.get_offset()
+            offset = (offset[0] + parent_offset[0], offset[1] + parent_offset[0])
+        return offset
 
 if __name__ == "__main__":
     import sys
@@ -174,6 +197,7 @@ if __name__ == "__main__":
 
     mainbox.resize(20, 20)
     subbox.resize(10, 10)
+    subbox.move(3, 3)
     for y in range(subbox.height):
         for x in range(subbox.width):
             subbox.set_character(x, y, 'X')
