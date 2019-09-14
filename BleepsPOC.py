@@ -10,7 +10,9 @@ class BleepsScreen:
 
         self.width, self.height = get_terminal_size()
         self.rect.resize(self.width, self.height)
-        print(self.width, self.height)
+
+        sys.stdout.write("\033[?1049h\n")
+        sys.stdout.write("\033[?25l\n")
 
     def box_flag_cache(self, box_id):
         self.rect.flag_full_refresh = True
@@ -42,19 +44,19 @@ class BleepsScreen:
         self.box_cache[box_id].rect.unset_character(x, y)
 
     def box_unset_bg_color(self, box_id):
-        pass
+        self.box_cache[box_id].rect.unset_bg_color()
 
     def box_unset_fg_color(self, box_id):
-        pass
+        self.box_cache[box_id].rect.unset_fg_color()
 
     def box_unset_color(self, box_id):
-        pass
+        self.box_cache[box_id].rect.unset_color()
 
     def box_set_bg_color(self, box_id, color):
-        pass
+        self.box_cache[box_id].rect.set_bg_color(color)
 
     def box_set_fg_color(self, box_id, color):
-        pass
+        self.box_cache[box_id].rect.set_fg_color(color)
 
     def box_move(self, box_id, x, y):
         self.box_cache[box_id].rect.move(x, y)
@@ -78,18 +80,17 @@ class BleepsScreen:
         self.box_cache[new_rect.rect_id] = new_bleepsbox
         new_rect.resize(width, height)
 
+        parent = 0
         if 'parent' in kwargs.keys():
             parent = kwargs['parent']
-            self.box_cache[parent].rect.add_child(new_rect)
+        self.box_cache[parent].rect.add_child(new_rect)
 
         return new_bleepsbox
 
 
     def box_draw(self, box_id):
         rect = self.box_cache[box_id].rect
-        offset = rect.get_offset()
-        for (x, y), character in rect.get_display().items():
-            sys.stdout.write("\033[%d;%dH%s\n" % (y + 1, x + 1, character))
+        rect.draw()
 
 
     #def box_draw_area(self, box_id, x, y, width, height):
@@ -106,7 +107,8 @@ class BleepsScreen:
         self.box_draw(self.rect.rect_id)
 
     def kill(self):
-        pass
+        sys.stdout.write("\033[?25h\n");
+        sys.stdout.write("\033[?1049l\n");
 
 
 
@@ -230,13 +232,18 @@ if __name__ == "__main__":
         box.setc(x, 0, '=')
         box.setc(x, box.height - 1, '=')
 
-    box.set_bg_color(4)
+    box.set_bg_color(BleepsBox.GREEN)
+    box.set_fg_color(BleepsBox.BLACK)
 
     import time
     #box.draw()
     # TODO: Why doesn't this work?
     screen.draw()
 
-    time.sleep(2)
+    for i in range(60):
+        c = '-\\|/'[i % 4]
+        box.setc(5, 5, c)
+        box.draw()
+        time.sleep(.1)
     screen.kill()
 

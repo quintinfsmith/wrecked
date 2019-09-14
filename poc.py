@@ -1,3 +1,4 @@
+import sys
 # NOTES
 # * DISALLOW positional overflow, ie no children < 0 or > width/height
 # * No invisible Rects with visible children
@@ -37,6 +38,7 @@ class Rect(object):
         self.child_space = {}
         self.child_positions = {}
         self._inverse_child_space = {}
+        self.color = 0
 
         self.character_space = {}
 
@@ -44,6 +46,64 @@ class Rect(object):
         self.flags_pos_refresh = set()
 
         self._cached_display = {}
+
+    def unset_bg_color(self):
+        original_color = self.color
+        self.color &= 0b1111111111100000
+
+        if self.color != original_color:
+            self.flag_full_refresh = True
+
+    def unset_bg_color(self):
+        original_color = self.color
+        self.color &= 0b1111110000011111
+
+        if self.color != original_color:
+            self.flag_full_refresh = True
+
+    def unset_color(self):
+        original_color = self.color
+        self.color &= 0
+
+        if self.color != original_color:
+            self.flag_full_refresh = True
+
+
+    def set_bg_color(self, new_color):
+        if new_color > 15: # Not a usable color
+            return
+
+        original_color = self.color
+        #Reduce new color to 5 bits
+        new_color &= 0b01111
+        new_color |= 0b10000
+
+        # clear original color
+        self.color &= 0b1111111111100000
+
+        # apply new color
+        self.color |= new_color
+
+        if self.color != original_color:
+            self.flag_full_refresh = True
+
+    def set_fg_color(self, new_color):
+        if new_color > 15: # Not a usable color
+            return
+
+        original_color = self.color
+        #Reduce new color to 5 bits
+        new_color &= 0b01111
+        new_color |= 0b10000
+
+        # clear original color
+        self.color &= 0b1111110000011111
+
+        # apply new color
+        self.color |= (new_color << 5)
+
+        if self.color != original_color:
+            self.flag_full_refresh = True
 
 
     def add_child(self, child):
@@ -142,7 +202,7 @@ class Rect(object):
                 if (x, y) not in self.character_space.keys():
                     self.character_space[(x, y)] = self.default_character
 
-                self._cached_display[(x, y)] = self.character_space[(x, y)]
+                self._cached_display[(x, y)] = (self.character_space[(x, y)], self.color)
             else:
                 child_id = self.child_space[(x, y)][-1]
                 if child_id not in child_recache.keys():
@@ -171,14 +231,22 @@ class Rect(object):
         if "offset" in kwargs.keys():
             offset = kwargs['offset']
 
+        original_cache = self._cached_display.copy()
         self._update_cached_display()
 
         output = {}
-        for y in range(boundries[1], boundries[3]):
-            for x in range(boundries[0], boundries[2]):
-                output[(x, y)] = self._cached_display[(x, y)]
+        for (x, y), new_c in self._cached_display.items():
+            if not ((x >= boundries[0] and x < boundries[2]) and (y >= boundries[1] and y < boundries[3])):
+                continue
+
+            try:
+                if original_cache[(x, y)] != new_c:
+                    output[(x, y)] = new_c
+            except KeyError:
+                output[(x,y)] = new_c
 
         return output
+
 
     def get_offset(self):
         offset = (0, 0)
@@ -187,30 +255,28 @@ class Rect(object):
             offset = (offset[0] + parent_offset[0], offset[1] + parent_offset[0])
         return offset
 
-if __name__ == "__main__":
-    import sys
-    mainbox = Rect()
-    subbox = Rect()
-    subsubbox = Rect()
-    mainbox.add_child(subbox)
-    subbox.add_child(subsubbox)
+    def draw(self):
+        offset = self.get_offset()
+        for (x, y), (character, color) in self.get_display().items():
+            if (color):
+                # ForeGround
+                if (color >> 5) & 16 == 16:
+                    if (color >> 5) & 8 == 8:
+                        sys.stdout.write("\033[9%dm\n" % ((color >> 5) & 7))
+                    else:
+                        sys.stdout.write("\033[3%dm\n" % ((color >> 5) & 7))
+                else:
+                    sys.stdout.write("\033[39m\n")
 
-    mainbox.resize(20, 20)
-    subbox.resize(10, 10)
-    subbox.move(3, 3)
-    for y in range(subbox.height):
-        for x in range(subbox.width):
-            subbox.set_character(x, y, 'X')
-
-    subsubbox.resize(10, 10)
-    subsubbox.move(5, 5)
-    for y in range(subsubbox.height):
-        for x in range(subsubbox.width):
-            subsubbox.set_character(x, y, '.')
-
-    for (x, y), c in mainbox.get_display().items():
-        sys.stdout.write("\033[%d;%dH%s" % (x + 1, y + 1, c))
+                # BackGround
+                if (color & 16 == 16):
+                    if color & 8 == 8:
+                        sys.stdout.write("\033[10%dm\n" % (color & 7))
+                    else:
+                        sys.stdout.write("\033[4%dm\n" % (color & 7))
+                else:
+                    sys.stdout.write("\033[49m\n")
 
 
-
+            sys.stdout.write("\033[%d;%dH%s\n" % (y + 1, x + 1, character))
 
