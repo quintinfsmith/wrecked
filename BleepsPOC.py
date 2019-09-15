@@ -236,8 +236,6 @@ if __name__ == "__main__":
     box.set_fg_color(BleepsBox.BLACK)
 
     import time
-    #box.draw()
-    # TODO: Why doesn't this work?
     screen.draw()
 
     for i in range(60):
