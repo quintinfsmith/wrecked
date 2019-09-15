@@ -3,6 +3,9 @@ import sys
 # * DISALLOW positional overflow, ie no children < 0 or > width/height
 # * No invisible Rects with visible children
 
+# NOTE FOR NEXT SESSION:
+# Differentiate between cached_display for individual rect and what globally was ACTUALLY displayed in the terminal
+
 
 class Rect(object):
     rect_id = 0
@@ -22,6 +25,8 @@ class Rect(object):
 
     flag_full_refresh = False
     flags_pos_refresh = set() # [(x, y) ... ]
+
+    enabled = True
 
     # cache
     _cached_display = {}
@@ -47,6 +52,20 @@ class Rect(object):
 
         self._cached_display = {}
 
+    def enable(self):
+        was_enabled = self.enabled
+        self.enabled = True
+        if self.parent and not was_enabled:
+            x, y = self.get_offset()
+            self.parent.set_child_space(self.rect_id, x, y, x + self.width, y + self.height)
+
+    def disable(self):
+        was_enabled = self.enabled
+
+        self.enabled = False
+        if self.parent and was_enabled:
+            self.parent.clear_child_space(self.rect_id)
+
     def unset_bg_color(self):
         original_color = self.color
         self.color &= 0b1111111111100000
@@ -54,12 +73,14 @@ class Rect(object):
         if self.color != original_color:
             self.flag_full_refresh = True
 
-    def unset_bg_color(self):
+
+    def unset_fg_color(self):
         original_color = self.color
         self.color &= 0b1111110000011111
 
         if self.color != original_color:
             self.flag_full_refresh = True
+
 
     def unset_color(self):
         original_color = self.color
@@ -87,6 +108,7 @@ class Rect(object):
         if self.color != original_color:
             self.flag_full_refresh = True
 
+
     def set_fg_color(self, new_color):
         if new_color > 15: # Not a usable color
             return
@@ -110,11 +132,12 @@ class Rect(object):
         self.children[child.rect_id] = child
         self._inverse_child_space[child.rect_id] = []
         self.set_child_position(child.rect_id, 0, 0)
-
         child.parent = self
+
 
     def detach(self):
         self.parent.detach_child(self.rect_id)
+
 
     def detach_child(self, child_id):
         child = self.children[child_id]
@@ -146,7 +169,7 @@ class Rect(object):
     def clear_child_space(self, child_id):
         for position in self._inverse_child_space[child_id]:
             self.child_space[position].remove(child_id)
-            self.flags_pos_refresh.add(position)
+            self.set_precise_refresh_flag(*position)
 
         self._inverse_child_space[child_id] = set()
 
@@ -157,23 +180,24 @@ class Rect(object):
 
         for y in range(corners[1], corners[3]):
             for x in range(corners[0], corners[2]):
-                if (x, y) not in self.child_space.keys():
-                    self.child_space[(x, y)] = []
+                if x >= 0 and x < self.width and y >= 0 and y < self.height:
+                    if (x, y) not in self.child_space.keys():
+                        self.child_space[(x, y)] = []
 
-                self.child_space[(x, y)].append(child_id)
-                self._inverse_child_space[child_id].add((x, y))
+                    self.child_space[(x, y)].append(child_id)
+                    self._inverse_child_space[child_id].add((x, y))
 
-                self.flags_pos_refresh.add((x, y))
+                    self.set_precise_refresh_flag(x, y)
 
 
     # SPOT REFRESH
     def set_character(self, x, y, character):
         self.character_space[(x, y)] = character
-        self.flags_pos_refresh.add((x, y))
+        self.set_precise_refresh_flag(x, y)
 
     def unset_character(self, x, y):
         del self.character_space[(x, y)]
-        self.flags_pos_refresh.add((x, y))
+        self.set_precise_refresh_flag(x, y)
 
 
     #def get_character(self, x, y):
@@ -197,12 +221,14 @@ class Rect(object):
         # Iterate through flags_pos_refresh and update any children that cover the requested positions
         # Otherwise set _cached_display
         child_recache = {}
-        for (x, y) in self.flags_pos_refresh:
+        positions_to_refresh = self.flags_pos_refresh.copy()
+        for (x, y) in positions_to_refresh:
             if (x, y) not in self.child_space.keys() or not self.child_space[(x, y)]:
                 if (x, y) not in self.character_space.keys():
                     self.character_space[(x, y)] = self.default_character
 
                 self._cached_display[(x, y)] = (self.character_space[(x, y)], self.color)
+
             else:
                 child_id = self.child_space[(x, y)][-1]
                 if child_id not in child_recache.keys():
@@ -216,11 +242,19 @@ class Rect(object):
             child._update_cached_display()
 
             for (x, y) in coords:
-                self._cached_display[(x, y)] = child._cached_display[(x - childx, y - childy)]
+                if not (x >= 0 and x < self.width and y >= 0 and y < self.height):
+                    self._cached_display[(x, y)] = child._cached_display[(x - childx, y - childy)]
 
         self.flags_pos_refresh = set()
 
+    def flag_refresh(self):
+        self.flag_full_refresh = True
 
+    def set_precise_refresh_flag(self, x, y):
+        self.flags_pos_refresh.add((x, y))
+        if self.parent:
+            offset_x, offset_y = self.get_offset()
+            self.parent.set_precise_refresh_flag(offset_x + x, offset_y + y)
 
     def get_display(self, **kwargs):
         boundries = (0, 0, self.width, self.height)
@@ -234,9 +268,10 @@ class Rect(object):
         original_cache = self._cached_display.copy()
         self._update_cached_display()
 
+
         output = {}
         for (x, y), new_c in self._cached_display.items():
-            if not ((x >= boundries[0] and x < boundries[2]) and (y >= boundries[1] and y < boundries[3])):
+            if not (x >= boundries[0] and x < boundries[2] and y >= boundries[1] and y < boundries[3]):
                 continue
 
             try:
@@ -245,38 +280,53 @@ class Rect(object):
             except KeyError:
                 output[(x,y)] = new_c
 
+
         return output
 
 
     def get_offset(self):
-        offset = (0, 0)
+        '''
+            Recursively find the absolute offset of this Rect
+        '''
+
         if self.parent:
+            offset = self.parent.child_positions[self.rect_id]
             parent_offset = self.parent.get_offset()
-            offset = (offset[0] + parent_offset[0], offset[1] + parent_offset[0])
+            offset = (offset[0] + parent_offset[0], offset[1] + parent_offset[1])
+        else:
+            offset = (0, 0)
+
         return offset
 
-    def draw(self):
+
+    def draw(self, **kwargs):
         offset = self.get_offset()
+
+        output = ""
         for (x, y), (character, color) in self.get_display().items():
+            output += "\033[%d;%dH" % (y + 1, x + 1)
             if (color):
                 # ForeGround
                 if (color >> 5) & 16 == 16:
                     if (color >> 5) & 8 == 8:
-                        sys.stdout.write("\033[9%dm\n" % ((color >> 5) & 7))
+                        output += "\033[9%dm" % ((color >> 5) & 7)
                     else:
-                        sys.stdout.write("\033[3%dm\n" % ((color >> 5) & 7))
+                        output += "\033[3%dm" % ((color >> 5) & 7)
                 else:
-                    sys.stdout.write("\033[39m\n")
+                    output += "\033[39m"
 
                 # BackGround
                 if (color & 16 == 16):
                     if color & 8 == 8:
-                        sys.stdout.write("\033[10%dm\n" % (color & 7))
+                        output += "\033[10%dm" % (color & 7)
                     else:
-                        sys.stdout.write("\033[4%dm\n" % (color & 7))
+                        output += "\033[4%dm" % (color & 7)
                 else:
-                    sys.stdout.write("\033[49m\n")
+                    output += "\033[49m"
 
 
-            sys.stdout.write("\033[%d;%dH%s\n" % (y + 1, x + 1, character))
+            output += "%s" % character
+
+        if output:
+            sys.stdout.write(output + "\n")
 

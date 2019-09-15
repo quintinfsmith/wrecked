@@ -1,6 +1,6 @@
 import sys
 from localfuncs import get_terminal_size
-from poc import Rect
+from Rect import Rect
 
 class BleepsScreen:
     def __init__(self):
@@ -29,10 +29,10 @@ class BleepsScreen:
         self.box_cache[box_id].rect.detach()
 
     def box_disable(self, box_id):
-        pass
+        self.box_cache[box_id].rect.disable()
 
     def box_enable(self, box_id):
-        pass
+        self.box_cache[box_id].rect.enable()
 
     def box_setc(self, box_id, x, y, character):
         self.box_cache[box_id].rect.set_character(x, y, character)
@@ -93,15 +93,9 @@ class BleepsScreen:
         rect.draw()
 
 
-    #def box_draw_area(self, box_id, x, y, width, height):
-    #    rect = self.box_cache[box_id].rect
-    #    offset = rect.get_offset()
-    #    for (xb, yb), character in rect.get_display(boundries=(x, y, x + width, y + height)).items():
-    #        sys.stdout.write("\033[%d;%dH%s" % (yb + 1, xb + 1, character))
-
-
-    def box_remove(self, box_id):
-        self.box_detach(box_id)
+    def box_draw_area(self, box_id, x, y, width, height):
+        rect = self.box_cache[box_id].rect
+        rect.draw(boundries=(x, y, x + width, y + height))
 
     def draw(self):
         self.box_draw(self.rect.rect_id)
