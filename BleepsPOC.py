@@ -215,8 +215,12 @@ class BleepsBox:
         return box
 
 if __name__ == "__main__":
+    import math
+    import time
     screen = BleepsScreen()
-    box = screen.new_box(width=10, height=10)
+    box = screen.new_box(width=20, height=20)
+    subbox = box.new_box()
+    subbox.setc(0, 0, 'Q')
 
     for y in range(box.height):
         box.setc(0, y, '|')
@@ -228,14 +232,18 @@ if __name__ == "__main__":
 
     box.set_bg_color(BleepsBox.GREEN)
     box.set_fg_color(BleepsBox.BLACK)
+    box.move(2, 4)
 
-    import time
     screen.draw()
 
     for i in range(60):
         c = '-\\|/'[i % 4]
-        box.setc(5, 5, c)
-        box.draw()
+        y = int(math.sin( (i / 30) * (math.pi * 2) ) * 5)
+        x = int(math.cos( (i / 30) * (math.pi * 2) ) * 5)
+        subbox.move(10 + x, 10 + y)
+        #screen.draw()
+        #box.draw()
+        subbox.draw()
         time.sleep(.1)
     screen.kill()
 
