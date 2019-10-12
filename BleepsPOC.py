@@ -105,7 +105,6 @@ class BleepsScreen:
         sys.stdout.write("\033[?1049l\n");
 
 
-
 class BleepsBox:
     BLACK = 0
     RED = 1
@@ -218,9 +217,7 @@ if __name__ == "__main__":
     import math
     import time
     screen = BleepsScreen()
-    box = screen.new_box(width=20, height=20)
-    subbox = box.new_box()
-    subbox.setc(0, 0, 'Q')
+    box = screen.new_box(width=30, height=20)
 
     for y in range(box.height):
         box.setc(0, y, '|')
@@ -235,12 +232,15 @@ if __name__ == "__main__":
     box.move(2, 4)
 
     screen.draw()
+    subbox = box.new_box()
+    subbox.setc(0, 0, 'Q')
 
     for i in range(60):
         c = '-\\|/'[i % 4]
         y = int(math.sin( (i / 30) * (math.pi * 2) ) * 5)
-        x = int(math.cos( (i / 30) * (math.pi * 2) ) * 5)
-        subbox.move(10 + x, 10 + y)
+        x = int(math.cos( (i / 30) * (math.pi * 2) ) * 12)
+        subbox.setc(0, 0, 'QUINTIN'[i % 7])
+        subbox.move(15 + x, 10 + y)
         #screen.draw()
         #box.draw()
         subbox.draw()

@@ -19,9 +19,11 @@ pub struct BoxHandler {
     cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
 }
 
-pub struct BleepsBox {
+
+
+pub struct Rect {
     enabled: bool,
-    boxes: Vec<usize>,
+    children: Vec<usize>,
 
     // Used to find a position of a box
     box_positions: HashMap<usize, (isize, isize)>,
