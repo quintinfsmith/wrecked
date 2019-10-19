@@ -1,5 +1,6 @@
 import sys
 from localfuncs import get_terminal_size
+#from AsciiBox.Rect import Rect
 from Rect import Rect
 
 class BleepsScreen:
@@ -217,33 +218,30 @@ if __name__ == "__main__":
     import math
     import time
     screen = BleepsScreen()
-    box = screen.new_box(width=30, height=20)
+    screen.draw()
+    wrapper = screen.new_box(
+        width=screen.width,
+        #height=int(screen.height * 1.5)
+        height=3
+    )
+    wrapper.move(0, 0)
+    scrolled = 0
+    for y in range(wrapper.height):
+        box = wrapper.new_box(width=wrapper.width, height=1)
+        box.set_fg_color(y % 8)
+        box.set_bg_color((y - 1) % 8)
+        strname = str(y)
+        for x in range(len(strname)):
+            box.setc(x, 0, strname[x])
 
-    for y in range(box.height):
-        box.setc(0, y, '|')
-        box.setc(box.width - 1, y, '|')
-
-    for x in range(box.width):
-        box.setc(x, 0, '=')
-        box.setc(x, box.height - 1, '=')
-
-    box.set_bg_color(BleepsBox.GREEN)
-    box.set_fg_color(BleepsBox.BLACK)
-    box.move(2, 4)
+        box.move(0, y)
+        #box.draw()
+        time.sleep(.3)
+        while y >= screen.height + scrolled:
+            scrolled += 1
+            wrapper.move(0, 0 - scrolled)
 
     screen.draw()
-    subbox = box.new_box()
-    subbox.setc(0, 0, 'Q')
-
-    for i in range(60):
-        c = '-\\|/'[i % 4]
-        y = int(math.sin( (i / 30) * (math.pi * 2) ) * 5)
-        x = int(math.cos( (i / 30) * (math.pi * 2) ) * 12)
-        subbox.setc(0, 0, 'QUINTIN'[i % 7])
-        subbox.move(15 + x, 10 + y)
-        #screen.draw()
-        #box.draw()
-        subbox.draw()
-        time.sleep(.1)
+    time.sleep(3)
     screen.kill()
 

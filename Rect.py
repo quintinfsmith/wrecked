@@ -257,7 +257,7 @@ class Rect(object):
             child._update_cached_display(boundries=new_boundries)
 
             for (x, y) in coords:
-                if childx >= x and childy >= y and x < child.width and y < child.height:
+                if childx > x and childy > y and x <= child.width and y <= child.height:
                     continue
 
                 if x >= 0 and x < self.width and y >= 0 and y < self.height:
@@ -328,6 +328,8 @@ class Rect(object):
 
             for (x, y) in ghosts:
                 ghostpos = (x - offx, y - offy)
+                #if (ghostpos in self.parent._cached_display.keys()):
+                #    output[ghostpos] = self.parent._cached_display[(x, y)]
                 output[ghostpos] = self.parent._cached_display[(x, y)]
             self.parent.child_ghosts[self.rect_id] = set()
 
@@ -366,8 +368,8 @@ class Rect(object):
 
         output = ""
         for (x, y), (character, color) in self.get_display().items():
-            output += "\033[%d;%dH" % (y + offset[1], x + offset[0])
-            if (color):
+            output += "\033[%d;%dH" % (y + offset[1] + 1, x + offset[0] + 1)
+            if color:
                 # ForeGround
                 if (color >> 5) & 16 == 16:
                     if (color >> 5) & 8 == 8:
