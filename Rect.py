@@ -35,6 +35,8 @@ class Rect(object):
 
     enabled = True
 
+    has_been_drawn = False
+
     # cache
     _cached_display = {}
     def __init__(self):
@@ -275,6 +277,8 @@ class Rect(object):
         if not (self.flags_pos_refresh or self.flag_full_refresh):
             return
 
+        self.has_been_drawn = True
+
 
         # If full refresh is requested, fill flags_pos_refresh with all potential coords
         if self.flag_full_refresh:
@@ -324,13 +328,17 @@ class Rect(object):
             ghosts = self.parent.child_ghosts[self.rect_id]
             offx, offy = self.parent.child_positions[self.rect_id]
 
-            self.parent._update_cached_by_positions(ghosts, [offx, offy, offx + self.width, offy + self.height])
+            top = self.parent
+            while top.parent:
+                top = top.parent
+
+            top._update_cached_by_positions(ghosts, [offx, offy, offx + self.width, offy + self.height])
 
             for (x, y) in ghosts:
                 ghostpos = (x - offx, y - offy)
-                #if (ghostpos in self.parent._cached_display.keys()):
-                #    output[ghostpos] = self.parent._cached_display[(x, y)]
-                output[ghostpos] = self.parent._cached_display[(x, y)]
+                output[ghostpos] = top._cached_display[(x, y)]
+
+
             self.parent.child_ghosts[self.rect_id] = set()
 
 

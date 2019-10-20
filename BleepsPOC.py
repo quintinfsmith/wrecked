@@ -221,10 +221,11 @@ if __name__ == "__main__":
     screen.draw()
     wrapper = screen.new_box(
         width=screen.width,
-        #height=int(screen.height * 1.5)
-        height=3
+        height=int(screen.height // 2)
+        #height=3
     )
-    wrapper.move(0, 0)
+    wrapper.move(0, 1)
+
     scrolled = 0
     for y in range(wrapper.height):
         box = wrapper.new_box(width=wrapper.width, height=1)
@@ -235,11 +236,11 @@ if __name__ == "__main__":
             box.setc(x, 0, strname[x])
 
         box.move(0, y)
-        #box.draw()
-        time.sleep(.3)
-        while y >= screen.height + scrolled:
-            scrolled += 1
-            wrapper.move(0, 0 - scrolled)
+        box.draw()
+        time.sleep(.1)
+        #while y >= screen.height + scrolled:
+        #    scrolled += 1
+        #    wrapper.move(0, 0 - scrolled)
 
     screen.draw()
     time.sleep(3)
