@@ -267,6 +267,7 @@ class Rect(object):
 
         self.flags_pos_refresh = set(positions)
 
+
     def _update_cached_display(self, boundries):
         '''
             Will Never update outside of 0 - width or 0 - height
@@ -292,8 +293,8 @@ class Rect(object):
         # Iterate through flags_pos_refresh and update any children that cover the requested positions
         # Otherwise set _cached_display
         positions_to_refresh = self.flags_pos_refresh.copy()
-
         self._update_cached_by_positions(positions_to_refresh, boundries)
+
 
 
     def flag_refresh(self):
@@ -323,23 +324,41 @@ class Rect(object):
                 continue
             output[(x,y)] = new_c
 
+
+
         # Ghosts
         if self.parent:
             ghosts = self.parent.child_ghosts[self.rect_id]
-            offx, offy = self.parent.child_positions[self.rect_id]
+
+            offx, offy = (0, 0)
+            first_done = False
+            first_offx, first_offy = self.parent.child_positions[self.rect_id]
 
             top = self.parent
             while top.parent:
+                x, y = top.parent.child_positions[top.rect_id]
+                offx += x
+                offy += y
                 top = top.parent
 
-            top._update_cached_by_positions(ghosts, [offx, offy, offx + self.width, offy + self.height])
-
+            new_ghosts = set()
             for (x, y) in ghosts:
-                ghostpos = (x - offx, y - offy)
-                output[ghostpos] = top._cached_display[(x, y)]
+                new_ghosts.add(
+                    (
+                        x + offx,
+                        y + offy
+                    )
+                )
 
+            top._update_cached_by_positions(new_ghosts, [0, 0, top.width, top.height])
+
+            for (x, y) in new_ghosts:
+                ghostpos = (x - first_offx, y - first_offy)
+                if ghostpos[0] >= 0 and ghostpos[1] >= 0 and ghostpos[0] < top.width and ghostpos[1] < top.height:
+                    output[ghostpos] = top._cached_display[(x, y)]
 
             self.parent.child_ghosts[self.rect_id] = set()
+
 
 
         return output
@@ -353,7 +372,10 @@ class Rect(object):
         if self.parent:
             offset = self.parent.child_positions[self.rect_id]
             parent_offset = self.parent.get_offset()
-            offset = (offset[0] + parent_offset[0], offset[1] + parent_offset[1])
+            offset = (
+                offset[0] + parent_offset[0],
+                offset[1] + parent_offset[1]
+            )
         else:
             offset = (0, 0)
 
@@ -374,8 +396,16 @@ class Rect(object):
 
         offset = self.get_offset()
 
+        top = self
+        while top.parent:
+            top = top.parent
+
+
         output = ""
-        for (x, y), (character, color) in self.get_display().items():
+        for (x, y), (character, color) in self.get_display(boundries=[0, 0, top.width, top.height]).items():
+            if not (y + offset[1] >= 0 and x + offset[0] >= 0 and y + offset[1] < top.height and x + offset[0] < top.width):
+                continue
+
             output += "\033[%d;%dH" % (y + offset[1] + 1, x + offset[0] + 1)
             if color:
                 # ForeGround

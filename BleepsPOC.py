@@ -218,17 +218,19 @@ if __name__ == "__main__":
     import math
     import time
     screen = BleepsScreen()
-    screen.draw()
+    #screen.draw()
+
     wrapper = screen.new_box(
         width=screen.width,
-        height=int(screen.height // 2)
-        #height=3
+        height=int(screen.height)
     )
-    wrapper.move(0, 1)
+    wrapper.move(0, 0)
 
     scrolled = 0
+    boxes = []
     for y in range(wrapper.height):
         box = wrapper.new_box(width=wrapper.width, height=1)
+        boxes.append(box)
         box.set_fg_color(y % 8)
         box.set_bg_color((y - 1) % 8)
         strname = str(y)
@@ -236,13 +238,15 @@ if __name__ == "__main__":
             box.setc(x, 0, strname[x])
 
         box.move(0, y)
-        box.draw()
-        time.sleep(.1)
-        #while y >= screen.height + scrolled:
-        #    scrolled += 1
-        #    wrapper.move(0, 0 - scrolled)
+        #time.sleep(.01)
+        if y >= 20 + scrolled:
+            scrolled += 1
+            wrapper.move(0, 0 - scrolled)
+            box.draw()
+        #wrapper.draw()
+        #screen.draw()
 
     screen.draw()
-    time.sleep(3)
+    input()
     screen.kill()
 
