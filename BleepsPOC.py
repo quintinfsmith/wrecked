@@ -218,7 +218,6 @@ if __name__ == "__main__":
     import math
     import time
     screen = BleepsScreen()
-    #screen.draw()
 
     wrapper = screen.new_box(
         width=screen.width,
@@ -238,13 +237,12 @@ if __name__ == "__main__":
             box.setc(x, 0, strname[x])
 
         box.move(0, y)
-        #time.sleep(.01)
         if y >= 20 + scrolled:
             scrolled += 1
             wrapper.move(0, 0 - scrolled)
+            wrapper.draw()
+        else:
             box.draw()
-        #wrapper.draw()
-        #screen.draw()
 
     screen.draw()
     input()

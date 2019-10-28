@@ -1,6 +1,6 @@
 import sys
 # NOTES
-# * DISALLOW positional overflow, ie no children < 0 or > width/height
+# * DISALLOW rendering positional overflow, ie no children < 0 or > width/height
 # * No invisible Rects with visible children
 
 class RectManager:
@@ -325,7 +325,6 @@ class Rect(object):
             output[(x,y)] = new_c
 
 
-
         # Ghosts
         if self.parent:
             ghosts = self.parent.child_ghosts[self.rect_id]
@@ -358,7 +357,6 @@ class Rect(object):
                     output[ghostpos] = top._cached_display[(x, y)]
 
             self.parent.child_ghosts[self.rect_id] = set()
-
 
 
         return output
@@ -401,12 +399,21 @@ class Rect(object):
             top = top.parent
 
 
+        display_data = list(self.get_display(boundries=[0, 0, top.width, top.height]).items())
+        display_data.sort()
+
         output = ""
-        for (x, y), (character, color) in self.get_display(boundries=[0, 0, top.width, top.height]).items():
+        current_row = -1
+        current_col = -1
+        for (x, y), (character, color) in display_data:
             if not (y + offset[1] >= 0 and x + offset[0] >= 0 and y + offset[1] < top.height and x + offset[0] < top.width):
                 continue
 
-            output += "\033[%d;%dH" % (y + offset[1] + 1, x + offset[0] + 1)
+            if x != current_row or y != current_col:
+                output += "\033[%d;%dH" % (y + offset[1] + 1, x + offset[0] + 1)
+            current_row = x
+            current_col = y
+
             if color:
                 # ForeGround
                 if (color >> 5) & 16 == 16:
@@ -430,6 +437,7 @@ class Rect(object):
 
 
             output += "%s" % character
+            current_row += 1
 
         if output:
             sys.stdout.write(output + "\033[0;0H\n")

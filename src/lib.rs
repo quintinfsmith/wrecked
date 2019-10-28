@@ -19,50 +19,85 @@ pub struct BoxHandler {
     cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
 }
 
+//TODO:: Maybe change [u8; 4] to a struct like "Character"
 
 
 pub struct Rect {
-    enabled: bool,
+    rect_id: usize,
+
+    width: usize,
+    height: usize,
+    default_character: [u8; 4],
+    parent: Option<usize>, // RectId
+
     children: Vec<usize>,
-
-    // Used to find a position of a box
-    box_positions: HashMap<usize, (isize, isize)>,
-
     // Used to find a box by position
-    box_space: HashMap<(isize, isize), Vec<usize>>,
+    child_space: HashMap<(isize, isize), Vec<usize>>,
+    _inverse_child_space: HashMap<usize, Vec<(isize, isize)>>,
+    // Used to find a position of a box
+    child_positions: HashMap<usize, (isize, isize)>,
+    child_ghosts: HashMap<usize, Vec<(isize, isize)>>,
 
-    // Used to quickly clear box data from box_space
-    _box_space_cache: HashMap<usize, Vec<(isize, isize)>>,
+    character_space: HashMap<(isize,isize), [u8; 4]>,
 
-    _cached_corners: (isize, isize, isize, isize),
+    flag_full_refresh: bool,
+    flags_pos_refresh: Vec<(isize, isize)>,
 
-    grid: HashMap<(usize, usize), [u8; 4]>,
-    cached: HashMap<(isize, isize), ([u8; 4], u16)>,
-    parent: Option<usize>,
+    enabled: bool,
+    has_been_drawn: bool
 
-    recache_flag: bool,
     color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
+
+    _cached_display: HashMap<(isize, isize), [u8; 4]>
+}
+
+impl Rect {
+    fn new(rect_id: usize) -> Rect {
+        Rect {
+            rect_id: rect_id,
+            parent: None,
+            width: 0,
+            height: 0,
+            children: Vec::new(),
+            child_space: HashMap::new(),
+            _inverse_child_space: HashMap::new(),
+            child_positions: HashMap::new(),
+            child_ghosts: HashMap::new(),
+            character_space: HashMap::new(),
+            flag_full_refresh: true,
+            flags_pos_refresh: Vec::new(),
+            enabled: true,
+            hash_been_drawn: false,
+            color: 0u16,
+            _cached_display: HashMap::new()
+        }
+    }
+
+    fn has_parent(self) -> bool {
+        match (self.parent) {
+            Some(parent_id) => {
+                true
+            }
+            None => {
+                false
+            }
+        }
+    }
+
+
+
+    fn enable(&mut self) {
+        let was_enabled = self.enabled;
+        self.enabled = true;
+        if was_enabled && self.has_parent() {
+        }
+    }
+
+    // Need to add ref to RectManager in Rect and create get_offset()
+    // LEFT OFF HERE //////////////////////////////////////////
 }
 
 impl BleepsBox {
-    fn new(width: usize, height: usize) -> BleepsBox {
-        BleepsBox {
-            enabled: true,
-            boxes: Vec::new(),
-            box_positions: HashMap::new(),
-            box_space: HashMap::new(),
-            _box_space_cache: HashMap::new(),
-            _cached_corners: (0, 0, width, height),
-
-            width: width,
-            height: height,
-            grid: HashMap::new(),
-            cached: HashMap::new(),
-            parent: None,
-            recache_flag: true,
-            color: 0
-        }
-    }
 
     fn flag_recache(&mut self) {
         self.recache_flag = true;
