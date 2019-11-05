@@ -24,6 +24,7 @@ pub struct BoxHandler {
 
 pub struct Rect {
     rect_id: usize,
+    manager: RectManager,
 
     width: usize,
     height: usize,
@@ -52,7 +53,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    fn new(rect_id: usize) -> Rect {
+    fn new(rect_id: usize, manager: RectManager) -> Rect {
         Rect {
             rect_id: rect_id,
             parent: None,
@@ -69,7 +70,8 @@ impl Rect {
             enabled: true,
             hash_been_drawn: false,
             color: 0u16,
-            _cached_display: HashMap::new()
+            _cached_display: HashMap::new(),
+            manager: manager
         }
     }
 
@@ -84,16 +86,286 @@ impl Rect {
         }
     }
 
+    fn get_offset(self) -> (usize, usize) {
+        let mut x = 0;
+        let mut y = 0;
 
+        match (self.parent) {
+            Some(parent_id) => {
+                let parent = self.manager.get_rect(parent_id);
+                let offx, offy = parent.get_offset();
+                x, y = parent.get_child_position(self.rect_id);
+                x += offx;
+                y += offy;
+            },
+            None => ()
+        }
+
+        (x, y)
+    }
+
+    fn get_child_position(self, child_id: usize) -> (usize, usize) {
+        let x;
+        let y;
+
+        match (self.child_positions.get(child_id)) {
+            Some(position) => {
+                x = position.0;
+                y = position.1;
+            }
+            // TODO: Throw Error
+            None => {
+                x = 0;
+                y = 0;
+            }
+        }
+
+        (x, y)
+    }
 
     fn enable(&mut self) {
         let was_enabled = self.enabled;
         self.enabled = true;
-        if was_enabled && self.has_parent() {
+        if (! was_enabled) && self.has_parent() {
+
+            match (self.parent) {
+                Some(parent_id) => {
+                    let (x, y) = self.get_offset();
+                    let parent = self.manager.get_rect(parent_id);
+                    parent.update_child_space(self.rect_id, (x, y, x + self.width, y + self.height));
+                }
+                None => ()
+            }
         }
     }
 
-    // Need to add ref to RectManager in Rect and create get_offset()
+    fn disable(&mut self) {
+        let was_enabled = self.enabled;
+        self.enabled = false;
+        if was_enabled && self.has_parent() {
+
+            match (self.parent) {
+                Some(parent_id) => {
+                    let (x, y) = self.get_offset();
+                    let parent = self.manager.get_rect(parent_id);
+                    parent.clear_child_space(self.rect_id);
+                }
+                None => ()
+            }
+        }
+    }
+
+    fn update_child_space(&mut self, rect_id: usize, dimensions: (usize, usize, usize, usize)) {
+        self.clear_child_space(rect_id);
+        let mut y;
+        let mut x;
+        for _y .. corners.3 {
+            y = _y + corners.1;
+            for _x in corners.2 {
+                x = _x + corners.0;
+                if x >= 0 && x < self.width && y >= 0 && y <= self.height {
+
+                    self.child_space.entry((x, y))
+                        .and_modify(|e| { *e.push(rect_id) })
+                        .or_insert(Vec::new());
+
+                    self._inverse_child_space.entry(rect_id)
+                        .and_modify(|e| { *e.push((x, y)) });
+
+                    match self.child_ghosts.get_mut(&rect_id) {
+                        Some(coord_list) => {
+                            // TODO: I don't like this line. Look into better method
+                            let index = coord_list.binary_search(&(x, y)).unwrap_or_else(|i| i);
+                            if (index > -1) {
+                                coord_list.remove(index);
+                            }
+                        }
+                        None => ()
+                    }
+
+                    self.set_precise_refresh_flag(x, y);
+                }
+            }
+        }
+    }
+
+    fn clear_child_space(&mut self, rect_id: usize) {
+        // TODO
+        for position in self._inverse_child_space.get(rect_id).iter() {
+            match self.child_space.get_mut(&position) {
+                Some(child_ids) => {
+                    // TODO: I don't like this line. Look into better method
+                    let index = child_ids.binary_search(&rect_id).unwrap_or_else(|i| i);
+                    if (index > -1) {
+                        child_ids.remove(index);
+                    }
+                }
+                None => ()
+            }
+
+
+            self.set_precise_refresh_flag(position.0, position.1);
+
+            if (! self.child_ghosts.contains_key(rect_id)) {
+                self.child_ghosts.insert(rect_id, Vec::new());
+            }
+
+            self.child_ghosts.entry(rect_id).and_modify(|id_list| { *id_list.push(position) });
+
+        }
+
+        self._inverse_child_space.entry(rect_id)
+            .and_modify(|id_list| { *id_list.empty() })
+            .or_insert(Vec::new());
+    }
+
+    fn set_character(&mut self, x: isize, y: isize, character: [u8;4]) {
+        self.character_space.entry((x, y))
+            .and_modify(|coord| { *coord = character })
+            .or_insert(character);
+        self.set_precise_refresh_flag(x, y);
+    }
+
+    fn unset_character(&mut self, x: isize, y: isize) {
+        self.set_character(x, y, self.default_character);
+    }
+
+    fn unset_bg_color(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0b1111111111100000;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+
+    fn unset_fg_color(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0b1111110000011111;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+
+    fn unset_color(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0;
+        if orig_color == 0 {
+            self.flag_full_refresh = true;
+        }
+    }
+
+    fn set_bg_color(&mut self, n: u8) -> Result<(), BleepsError> {
+        if n > 15 {
+            Err(BleepsError::BadColor)
+        } else {
+            let orig_color = self.color;
+            let mut modded_n: u16 = n as u16;
+            modded_n &= 0b01111;
+            modded_n |= 0b10000;
+            self.color &= 0b1111111111100000;
+            self.color |= modded_n;
+
+            if self.color != orig_color {
+                self.flag_full_refresh = true;
+            }
+
+            Ok(())
+        }
+    }
+
+    fn set_fg_color(&mut self, n: u8) -> Result<(), BleepsError> {
+        if n > 15 {
+            Err(BleepsError::BadColor)
+        } else {
+            let orig_color = self.color;
+            let mut modded_n: u16 = n as u16;
+            modded_n &= 0b01111;
+            modded_n |= 0b10000;
+            self.color &= 0b1111110000011111;
+            self.color |= modded_n << 5;
+
+            if self.color != orig_color {
+                self.flag_full_refresh = true;
+            }
+
+            Ok(())
+        }
+    }
+
+    fn add_child(&mut self, rect_id: usize) {
+        self.children.push(rect_id);
+        self._inverse_child_space.insert(rect_id, Vec::new());
+        self.set_child_position(rect_id, 0, 0);
+        let mut child = self.manager.get_rect(rect_id);
+        child.set_parent(self.rect_id);
+    }
+
+    fn detach(&mut self) {
+        match self.managet.get_rect(self.parent) {
+            Some(parent) => {
+                parent.detach_child(self.rect_id);
+                self.parent = None; // TODO: This probably isn't right
+            }
+            None => ()
+        }
+
+    }
+
+    fn detach_child(&mut self, rect_id: usize) {
+        self.clear_child_space(rect_id);
+        self.child_positions.remove(rect_id);
+        // TODO: Remove rect_id from children Vec
+    }
+
+    fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = heigght;
+        match self.parent {
+            Some(parent_id) {
+                let parent = self.manager.get_rect(parent_id);
+                let (x, y) = parent.get_child_position(self.rect_id);
+                // Need to reset them under new width/height
+                parent.set_child_position(self.rect_id, x, y);
+            }
+        }
+    }
+
+    fn move(&mut self, x: isize, y: isize) {
+        match self.parent {
+            Some(parent_id) {
+                let parent = self.manager.get_rect(parent_id);
+                parent.set_child_position(self.rect_id, x, y);
+            }
+        }
+    }
+
+    fn set_child_position(&mut self, rect_id: usize, x: isize, y: isize) {
+        self.child_positions.entry(rect_id)
+            .and_modify(|e| { *e = (x, y) })
+            .or_insert((x, y));
+    }
+
+    fn set_precise_refresh_flag(&mut self, x: usize, y: usize) {
+        self.flags_pos_refresh.push((x, y));
+        match self.parent {
+            Some(parent_id) => {
+                let parent = self.manager.get_rect(parent_id);
+                let offset = parent.get_child_position(self.rect_id);
+                parent.set_precise_refresh_flag(offset.0 + x, offset.1 + y);
+            }
+            None => ()
+        }
+    }
+
+    fn _update_cached_by_positions(&mut self, positions: Vec<(isize, isize)>, boundries: (usize, usize, usize, usize)) {
+        let mut child_recache = HashMap::new();
+        let mut i = 0;
+        let mut safe_positions = positions.clone();
+        
+    }
+
     // LEFT OFF HERE //////////////////////////////////////////
 }
 
@@ -180,68 +452,6 @@ impl BleepsBox {
         }
     }
 
-    fn unset_bg_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0b1111111111100000;
-
-        if self.color != orig_color {
-            self.flag_recache();
-        }
-    }
-
-    fn unset_fg_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0b1111110000011111;
-        if self.color != orig_color {
-            self.flag_recache();
-        }
-    }
-
-    fn unset_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0;
-        if orig_color == 0 {
-            self.flag_recache();
-        }
-    }
-
-    fn set_bg_color(&mut self, n: u8) -> Result<(), BleepsError> {
-        if n > 15 {
-            Err(BleepsError::BadColor)
-        } else {
-            let orig_color = self.color;
-            let mut modded_n: u16 = n as u16;
-            modded_n &= 0b01111;
-            modded_n |= 0b10000;
-            self.color &= 0b1111111111100000;
-            self.color |= modded_n;
-
-            if self.color != orig_color {
-                self.flag_recache();
-            }
-
-            Ok(())
-        }
-    }
-
-    fn set_fg_color(&mut self, n: u8) -> Result<(), BleepsError> {
-        if n > 15 {
-            Err(BleepsError::BadColor)
-        } else {
-            let orig_color = self.color;
-            let mut modded_n: u16 = n as u16;
-            modded_n &= 0b01111;
-            modded_n |= 0b10000;
-            self.color &= 0b1111110000011111;
-            self.color |= modded_n << 5;
-
-            if self.color != orig_color {
-                self.flag_recache();
-            }
-
-            Ok(())
-        }
-    }
 
     // Unused, but could be useful in the future
     //fn get(&self, x: usize, y: usize) -> Result<Option<&[u8; 4]>, BleepsError> {
