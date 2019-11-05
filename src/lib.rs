@@ -362,9 +362,79 @@ impl Rect {
     fn _update_cached_by_positions(&mut self, positions: Vec<(isize, isize)>, boundries: (usize, usize, usize, usize)) {
         let mut child_recache = HashMap::new();
         let mut i = 0;
-        let mut safe_positions = positions.clone();
-        
+        let mut good_positions = Vec::new();
+
+        let mut child_id;
+        // 1) Weed out out-of-bounds positions from boundries,
+        // 2) if spaces aren't occupied by a child, set the cache from the character space
+        for (x, y) in positions.iter() {
+            // 1!
+            if (! (x >= boundries[0] && x < boundries[2] && y >= boundries[1] && y < boundries[3])) {
+                continue;
+            }
+            good_positions.push((x, y));
+
+            // 2!
+            if ! self.child_space.has_key((x, y)) || self.child_space[(x, y)].is_empty() {
+                if ! self.character_space.has_key((x, y)) {
+                    self.character_space.insert((x, y), self.default_character);
+                }
+
+                self._cached_display.entry((x, y))
+                    .and_modify(|e| { *e = ( self.character_space[(x, y)], self.color ) })
+                    .or_insert((self.character_space[(x, y)], self.color));
+            } else {
+                child_id = self.child_space[(x, y)].last();
+                if ! child_recache.has_key(child_id) {
+                    child_recache.insert(child_id, Vec::new());
+                }
+                child_recache.entry(child_id)
+                    .and_modify(|e| { *e.push((x, y)) });
+            }
+
+
+        }
+
+        // Iterate through the list of children to update
+        let mut childx;
+        let mut childy;
+        let mut child;
+        let mut new_boundries;
+        let mut tmp_character;
+        for (child_id, position_list) in child_recache.iter() {
+            (childx, childy) = self.get_positions[child_id];
+            child = self.manager.get_rect();
+            child._update_cached_display((
+                boundries.0 - childx,
+                boundries.1 - childy,
+                boundries.2 - childx,
+                boundries.3 - childy
+            ));
+
+            for (x, y) in position_list.iter() {
+                if (childx > x && childy > y && x <= child.width && y <= child.height {
+                    continue;
+                }
+                if x >= 0 && x < self.width && y >= 0 && y < self.height {
+                    match child._cached_display.get(&(x - childx, y - childy)) {
+                        Some(new_chr) => {
+                            self._cached_display.entry((x, y))
+                                .and_modify(|e| *e = new_chr)
+                                .or_insert(new_chr);
+                        }
+                        None => ()
+                    }
+                }
+            }
+        }
+
+        self.flags_pos_refresh = good_positions;
     }
+
+    fn _update_cached_display(&mut self, boundries: (isize, isize, isize, isize)) {
+
+    }
+
 
     // LEFT OFF HERE //////////////////////////////////////////
 }

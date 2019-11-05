@@ -234,6 +234,7 @@ class Rect(object):
             else:
                 positions.pop(i)
 
+
             if (x, y) not in self.child_space.keys() or not self.child_space[(x, y)]:
                 if (x, y) not in self.character_space.keys():
                     self.character_space[(x, y)] = self.default_character
@@ -244,6 +245,8 @@ class Rect(object):
                 if child_id not in child_recache.keys():
                     child_recache[child_id] = []
                 child_recache[child_id].append((x, y))
+
+
 
         for child_id, coords in child_recache.items():
             childx, childy = self.child_positions[child_id]
@@ -256,7 +259,7 @@ class Rect(object):
                 boundries[3] - childy
             ]
 
-            child._update_cached_display(boundries=new_boundries)
+            child._update_cached_display(new_boundries)
 
             for (x, y) in coords:
                 if childx > x and childy > y and x <= child.width and y <= child.height:
