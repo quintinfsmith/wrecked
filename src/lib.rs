@@ -30,8 +30,8 @@ pub struct Rect {
     rect_id: usize,
     manager: RectManager,
 
-    width: usize,
-    height: usize,
+    width: isize,
+    height: isize,
     default_character: [u8; 4],
     parent: Option<usize>, // RectId
 
@@ -53,7 +53,7 @@ pub struct Rect {
 
     color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
-    _cached_display: HashMap<(isize, isize), [u8; 4]>
+    _cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
 }
 
 impl Rect {
@@ -72,10 +72,11 @@ impl Rect {
             flag_full_refresh: true,
             flags_pos_refresh: Vec::new(),
             enabled: true,
-            hash_been_drawn: false,
+            has_been_drawn: false,
             color: 0u16,
             _cached_display: HashMap::new(),
-            manager: manager
+            manager: manager,
+            default_character: [0, 0, 0, 32]
         }
     }
 
@@ -83,6 +84,17 @@ impl Rect {
         self.flag_full_refresh = true;
     }
 
+    fn get_parent(self) -> Option<Rect> {
+        match (self.parent) {
+            Some(parent_id) => {
+                self.manager.get_rect(parent_id)
+            }
+            None => ()
+        }
+    }
+    fn get_child(self, rect_id: usize) -> Option<Rect> {
+        self.manager.get_rect(rect_id)
+    }
     fn has_parent(self) -> bool {
         match (self.parent) {
             Some(parent_id) => {
@@ -94,13 +106,12 @@ impl Rect {
         }
     }
 
-    fn get_offset(self) -> (usize, usize) {
+    fn get_offset(self) -> (isize, isize) {
         let mut x = 0;
         let mut y = 0;
 
-        match (self.parent) {
-            Some(parent_id) => {
-                let parent = self.manager.get_rect(parent_id);
+        match (self.get_parent()) {
+            Some(parent) => {
                 let offx, offy = parent.get_offset();
                 x, y = parent.get_child_position(self.rect_id);
                 x += offx;
@@ -115,18 +126,25 @@ impl Rect {
     fn get_top(self) -> Rect {
         let mut top: Rect;
         top = self;
-        while (top.parent) {
-            top = top.parent;
+        while true {
+            match (top.get_parent()) {
+                Some(parent) => {
+                    top = parent;
+                }
+                None => {
+                    break;
+                }
+            }
         }
 
         top
     }
 
-    fn get_child_position(self, child_id: usize) -> (usize, usize) {
+    fn get_child_position(self, child_id: usize) -> (isize, isize) {
         let x;
         let y;
 
-        match (self.child_positions.get(child_id)) {
+        match (self.child_positions.get(&child_id)) {
             Some(position) => {
                 x = position.0;
                 y = position.1;
@@ -173,30 +191,26 @@ impl Rect {
         }
     }
 
-    fn update_child_space(&mut self, rect_id: usize, dimensions: (usize, usize, usize, usize)) {
+    fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
         let mut y;
         let mut x;
-        for _y .. corners.3 {
+        for _y in 0 .. corners.3 {
             y = _y + corners.1;
-            for _x in corners.2 {
+            for _x in 0 .. corners.2 {
                 x = _x + corners.0;
                 if x >= 0 && x < self.width && y >= 0 && y <= self.height {
 
                     self.child_space.entry((x, y))
-                        .and_modify(|e| { *e.push(rect_id) })
+                        .and_modify(|e| { e.push(rect_id) })
                         .or_insert(Vec::new());
 
                     self._inverse_child_space.entry(rect_id)
-                        .and_modify(|e| { *e.push((x, y)) });
+                        .and_modify(|e| { e.push((x, y)) });
 
                     match self.child_ghosts.get_mut(&rect_id) {
                         Some(coord_list) => {
-                            // TODO: I don't like this line. Look into better method
-                            let index = coord_list.binary_search(&(x, y)).unwrap_or_else(|i| i);
-                            if (index > -1) {
-                                coord_list.remove(index);
-                            }
+                            coord_list.retain(|&e| e != (x, y));
                         }
                         None => ()
                     }
@@ -209,14 +223,11 @@ impl Rect {
 
     fn clear_child_space(&mut self, rect_id: usize) {
         // TODO
-        for position in self._inverse_child_space.get(rect_id).iter() {
+        let positions = self._inverse_child_space[&rect_id];
+        for position in positions.iter() {
             match self.child_space.get_mut(&position) {
                 Some(child_ids) => {
-                    // TODO: I don't like this line. Look into better method
-                    let index = child_ids.binary_search(&rect_id).unwrap_or_else(|i| i);
-                    if (index > -1) {
-                        child_ids.remove(index);
-                    }
+                    child_ids.retain(|&x| x != rect_id);
                 }
                 None => ()
             }
@@ -224,16 +235,17 @@ impl Rect {
 
             self.set_precise_refresh_flag(position.0, position.1);
 
-            if (! self.child_ghosts.contains_key(rect_id)) {
+            if (! self.child_ghosts.contains_key(&rect_id)) {
                 self.child_ghosts.insert(rect_id, Vec::new());
             }
 
-            self.child_ghosts.entry(rect_id).and_modify(|id_list| { *id_list.push(position) });
+            self.child_ghosts.entry(rect_id)
+                .and_modify(|id_list| { id_list.push(*position) });
 
         }
 
         self._inverse_child_space.entry(rect_id)
-            .and_modify(|id_list| { *id_list.empty() })
+            .and_modify(|id_list| { id_list.clear() })
             .or_insert(Vec::new());
     }
 
@@ -321,7 +333,7 @@ impl Rect {
     }
 
     fn detach(&mut self) {
-        match self.managet.get_rect(self.parent) {
+        match self.get_parent() {
             Some(parent) => {
                 parent.detach_child(self.rect_id);
                 self.parent = None; // TODO: This probably isn't right
@@ -333,13 +345,13 @@ impl Rect {
 
     fn detach_child(&mut self, rect_id: usize) {
         self.clear_child_space(rect_id);
-        self.child_positions.remove(rect_id);
+        self.child_positions.remove(&rect_id);
         // TODO: Remove rect_id from children Vec
     }
 
-    fn resize(&mut self, width: usize, height: usize) {
+    fn resize(&mut self, width: isize, height: isize) {
         self.width = width;
-        self.height = heigght;
+        self.height = height;
         match self.parent {
             Some(parent_id) {
                 let parent = self.manager.get_rect(parent_id);
@@ -365,7 +377,7 @@ impl Rect {
             .or_insert((x, y));
     }
 
-    fn set_precise_refresh_flag(&mut self, x: usize, y: usize) {
+    fn set_precise_refresh_flag(&mut self, x: isize, y: isize) {
         self.flags_pos_refresh.push((x, y));
         match self.parent {
             Some(parent_id) => {
@@ -377,7 +389,7 @@ impl Rect {
         }
     }
 
-    fn _update_cached_by_positions(&mut self, positions: Vec<(isize, isize)>, boundries: (usize, usize, usize, usize)) {
+    fn _update_cached_by_positions(&mut self, positions: Vec<(isize, isize)>, boundries: (isize, isize, isize, isize)) {
         let mut child_recache = HashMap::new();
         let mut i = 0;
         let mut new_positions = Vec::new();
@@ -385,27 +397,33 @@ impl Rect {
         let mut y;
         let mut tmp_chr;
         for i in 0 .. positions.len() {
-            (x, y) = positions[i];
-            if x >= boundries.0 && x < boundries.2 && y >= boundries.1 && boundries.3 {
+            x = positions[i].0;
+            y = positions[i].1;
+            if x >= boundries.0 && x < boundries.2 && y >= boundries.1 && y < boundries.3 {
                 continue;
             }
 
             new_positions.push((x, y));
-            if !self.child_space.contains_key((x, y)) || ! self.child_space[(x, y)].len() {
+            if !self.child_space.contains_key(&(x, y)) || self.child_space[&(x, y)].is_empty() {
                 // Make sure at least default character is present
                 tmp_chr = self.character_space.entry((x, y))
                     .or_insert(self.default_character);
 
                 self._cached_display.entry((x,y))
-                    .or_insert((tmp_chr, self.color))
-                    .and_modify(|e| {*e = (tmp_chr, self.color)});
+                    .and_modify(|e| {*e = (*tmp_chr, self.color)})
+                    .or_insert((*tmp_chr, self.color));
             } else {
                 match self.child_space.get(&(x, y)) {
                     Some(child_ids) => {
                         let child_id = child_ids.last();
-                        child_recache.entry(child_id)
-                            .or_insert(Vec::new)
-                            .and_modify(|e| { *e.push((x, y)) });
+                        match child_ids.last() {
+                            Some(child_id) = {
+                                child_recache.entry(child_id)
+                                    .or_insert(Vec::new)
+                                    .and_modify(|e| { *e.push((x, y)) });
+                            }
+                            None => ()
+                        }
 
                     }
                     None => ()
@@ -413,8 +431,8 @@ impl Rect {
             }
 
             for (child_id, coords) in child_recache.iter() {
-                let mut child = self.get_child(child_id);
-                match self.child_positions.get(&child_id) {
+                let mut child = self.get_child(*child_id);
+                match self.child_positions.get(child_id) {
                     Some(pos) => {
                         let mut new_boundries = (
                             boundries.0 - pos.0
@@ -447,13 +465,13 @@ impl Rect {
         self.flags_pos_refresh = new_positions;
     }
 
-    fn _update_cached_display(&self, boundries: (usize, usize, usize, usize)) {
+    fn _update_cached_display(&self, boundries: (isize, isize, isize, isize)) {
         /*
        //TODO
             Since Children indicate to parents that a refresh is requested,
             if no flag is set, there is no need to delve down
         */
-        if self.flags_pos_refresh || self.flag_full_refresh {
+        if ! self.flags_pos_refresh.is_empty() || self.flag_full_refresh {
         }
 
 
@@ -475,26 +493,25 @@ impl Rect {
             Iterate through flags_pos_refresh and update
             any children that cover the requested positions
         */
-        self._update_cached_by_positions(self.flags_pos_refresh);
+        self._update_cached_by_positions(self.flags_pos_refresh, boundries);
     }
 
-    fn get_display(self, boundries: (usize, usize, usize, usize)) -> HashMap<((isize, isize), [u8; 4])> {
+    fn get_display(self, boundries: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         self._update_cached_display(boundries);
 
         let mut output = HashMap::new();
 
-        for ((x, y), new_c) in self._cached_display.iter() {
-            if ! (x >= boundries.0 && x < boundries.2 && y >= boundries.1 && y < boundries.3) {
+        for ((x, y), (new_c, color)) in self._cached_display.iter() {
+            if ! (x >= &boundries.0 && x < &boundries.2 && y >= &boundries.1 && y < &boundries.3) {
                 continue;
             }
-            output.insert((x, y), new_c);
+            output.insert((*x, *y), (*new_c, *color));
         }
 
         // Handle Ghosts
-        match self.parent {
-            Some(parent_id) => {
-                let mut parent = self.get_parent();
-                parent.handle_ghosts();
+        match self.get_parent() {
+            Some(parent) => {
+                parent.handle_ghosts(self.rect_id);
             }
             None => ()
         }
@@ -507,15 +524,14 @@ impl Rect {
                 let mut offy = 0;
 
 
-                let mut (first_offx, first_offy) = self.child_positions[rect_id];
+                let mut (first_offx, first_offy) = self.child_positions[&rect_id];
 
-                let mut top = self;
+                let mut top = *self;
 
                 while true {
-                    match (top.parent) {
-                        Some(parent_id) => {
-                            let mut parent = self.get_parent();
-                            let mut pos = parent.child_positions[top.rect_id];
+                    match (top.get_parent()) {
+                        Some(parent) => {
+                            let mut pos = parent.child_positions[&top.rect_id];
                             offx += pos.0;
                             offy += pos.1;
                             top = parent;
@@ -540,7 +556,7 @@ impl Rect {
                         y - first_offy
                     );
                     if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
-                        let mut topchar = top._cached_display.get(&(x, y));
+                        let mut topchar = top._cached_display.get(&(*x, *y));
                         output.entry(ghostpos)
                             .or_insert(topchar)
                             .and_modify(|e| { *e = topchar });
@@ -551,9 +567,98 @@ impl Rect {
         }
 
         self.child_ghosts.entry(rect_id)
-            .or_insert(Vec::new())
-            .and_modify(Vec::new());
+            .and_modify(|e| { e.clear() })
+            .or_insert(Vec::new());
     }
+
+    fn draw(&mut self) {
+        let offset = self.get_offset();
+        // TODO: top_disp is now a misnomer
+        let top_disp = self.get_display((offset.0, offset.1, self.width, self.height));
+
+        let mut renderstring: String;
+        let mut val_a: &[u8];
+        let mut color_value: u16;
+        let mut current_line_color_value: u16 = 0;
+        let mut utf_char: &[u8];
+        let mut utf_char_split_index: usize;
+        let mut change_char: bool;
+
+        renderstring = "".to_string();
+        for (pos, val) in top_disp.iter() {
+            if (offset.0 + pos.0) < offset.0 || (offset.0 + pos.0) >= offset.0 + self.width || (offset.1 + pos.1) < offset.1 || (offset.1 + pos.1) >= offset.1 + self.height {
+                continue;
+            }
+
+            renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
+
+            val_a = &val.0;
+            color_value = val.1;
+            if color_value != current_line_color_value {
+                if color_value == 0 {
+                    renderstring += &format!("\x1B[0m");
+                } else {
+                    // ForeGround
+                    if (color_value >> 5) & 16 == 16 {
+                        if (color_value >> 5) & 8 == 8 {
+                            renderstring += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
+                        } else {
+                            renderstring += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[39m");
+                    }
+
+                    // BackGround
+                    if color_value & 16 == 16 {
+                        if color_value & 8 == 8 {
+                            renderstring += &format!("\x1B[10{}m", (color_value & 7));
+                        } else {
+                            renderstring += &format!("\x1B[4{}m", (color_value & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[49m");
+                    }
+                }
+                current_line_color_value = color_value;
+            }
+
+
+            utf_char_split_index = 0;
+            for i in 0..4 {
+                if val_a[i] != 0 {
+                    utf_char_split_index = i;
+                    break;
+                }
+            }
+
+            utf_char = val_a.split_at(utf_char_split_index).1;
+
+            renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
+        }
+        print!("{}\x1B[0m", renderstring);
+        println!("\x1B[1;1H");
+
+    }
+}
+
+pub struct RectManager {
+    idgen: usize,
+    rects: HashMap<usize, Rect>
+}
+
+impl RectManager {
+    fn new() -> RectManager {
+        RectManager {
+            idgen: 0,
+            rects: HashMap::new()
+        }
+    }
+    fn get_rect(self, rect_id: usize) -> Rect {
+    }
+}
+
+
 //
 //impl BleepsBox {
 //
