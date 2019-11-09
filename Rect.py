@@ -71,12 +71,14 @@ class Rect(object):
             x, y = self.get_offset()
             self.parent.set_child_space(self.rect_id, x, y, x + self.width, y + self.height)
 
+
     def disable(self):
         was_enabled = self.enabled
 
         self.enabled = False
         if self.parent and was_enabled:
             self.parent.clear_child_space(self.rect_id)
+
 
     def unset_bg_color(self):
         original_color = self.color
@@ -226,6 +228,7 @@ class Rect(object):
         child_recache = {}
         i = 0
         positions = list(positions)
+
         while i < len(positions):
             (x, y) = positions[i]
             if not (x >= boundries[0] and x < boundries[2] and y >= boundries[1] and y < boundries[3]):
@@ -241,8 +244,10 @@ class Rect(object):
                 self._cached_display[(x, y)] = (self.character_space[(x, y)], self.color)
             else:
                 child_id = self.child_space[(x, y)][-1]
+
                 if child_id not in child_recache.keys():
                     child_recache[child_id] = []
+
                 child_recache[child_id].append((x, y))
 
         for child_id, coords in child_recache.items():
@@ -289,7 +294,6 @@ class Rect(object):
                 for x in range(self.width):
                     self.flags_pos_refresh.add((x, y))
 
-
         # Iterate through flags_pos_refresh and update any children that cover the requested positions
         # Otherwise set _cached_display
         positions_to_refresh = self.flags_pos_refresh.copy()
@@ -324,42 +328,42 @@ class Rect(object):
                 continue
             output[(x,y)] = new_c
 
-
         # Ghosts
         if self.parent:
-            ghosts = self.parent.child_ghosts[self.rect_id]
-
-            offx, offy = (0, 0)
-            first_done = False
-            first_offx, first_offy = self.parent.child_positions[self.rect_id]
-
-            top = self.parent
-            while top.parent:
-                x, y = top.parent.child_positions[top.rect_id]
-                offx += x
-                offy += y
-                top = top.parent
-
-            new_ghosts = set()
-            for (x, y) in ghosts:
-                new_ghosts.add(
-                    (
-                        x + offx,
-                        y + offy
-                    )
-                )
-
-            top._update_cached_by_positions(new_ghosts, [0, 0, top.width, top.height])
-
-            for (x, y) in new_ghosts:
-                ghostpos = (x - first_offx, y - first_offy)
-                if ghostpos[0] >= 0 and ghostpos[1] >= 0 and ghostpos[0] < top.width and ghostpos[1] < top.height:
-                    output[ghostpos] = top._cached_display[(x, y)]
-
-            self.parent.child_ghosts[self.rect_id] = set()
-
-
+            self.parent.handle_ghosts(self.rect_id)
         return output
+
+    def handle_ghosts(rect_id):
+        ghosts = self.child_ghosts[rect_id]
+
+        offx, offy = (0, 0)
+        first_offx, first_offy = self.child_positions[rect_id]
+
+        top = self
+        while top.parent:
+            x, y = top.parent.child_positions[top.rect_id]
+            offx += x
+            offy += y
+            top = top.parent
+
+        new_ghosts = set()
+        for (x, y) in ghosts:
+            new_ghosts.add(
+                (
+                    x + offx,
+                    y + offy
+                )
+            )
+
+        top._update_cached_by_positions(new_ghosts, [0, 0, top.width, top.height])
+
+        for (x, y) in new_ghosts:
+            ghostpos = (x - first_offx, y - first_offy)
+            if ghostpos[0] >= 0 and ghostpos[1] >= 0 and ghostpos[0] < top.width and ghostpos[1] < top.height:
+                output[ghostpos] = top._cached_display[(x, y)]
+
+        self.child_ghosts[rect_id] = set()
+
 
 
     def get_offset(self):
@@ -380,15 +384,11 @@ class Rect(object):
         return offset
 
     def get_top(self):
-        if self.parent:
-            top = self.parent
-            while top.parent:
-                top = top.parent
-        else:
-            top = self
+        top = self
+        while top.parent:
+            top = top.parent
 
         return top
-
 
     def draw(self, **kwargs):
 
