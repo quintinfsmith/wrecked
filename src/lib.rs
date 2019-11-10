@@ -4,31 +4,27 @@ use std::collections::HashMap;
 use std::str;
 use std::cmp;
 
+/*
+    TODO
+    Maybe change [u8; 4] to a struct like "Character"
+*/
 
-pub enum BleepsError {
+
+pub enum RectError {
     BadPosition,
     NotFound,
     BadColor,
     InvalidUtf8
 }
 
-pub struct BoxHandler {
-    keygen: usize,
-    open_keys: Vec<usize>,
-    boxes: HashMap<usize, BleepsBox>,
-    cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
+pub struct RectManager<'a> {
+    idgen: usize,
+    rects: HashMap<usize, Rect<'a>>
 }
 
-/*
-    TODO
-    Maybe change [u8; 4] to a struct like "Character"
-    draw()
-*/
-
-
-pub struct Rect {
+pub struct Rect<'a> {
     rect_id: usize,
-    manager: RectManager,
+    manager: &'a RectManager<'a>,
 
     width: isize,
     height: isize,
@@ -49,15 +45,15 @@ pub struct Rect {
     flags_pos_refresh: Vec<(isize, isize)>,
 
     enabled: bool,
-    has_been_drawn: bool
+    has_been_drawn: bool,
 
     color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
     _cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
 }
 
-impl Rect {
-    fn new(rect_id: usize, manager: RectManager) -> Rect {
+impl<'a> Rect<'a> {
+    fn new(rect_id: usize, manager: &'a RectManager<'a>) -> Rect<'a> {
         Rect {
             rect_id: rect_id,
             parent: None,
@@ -84,18 +80,18 @@ impl Rect {
         self.flag_full_refresh = true;
     }
 
-    fn get_parent(self) -> Option<Rect> {
+    fn get_parent(&self) -> Option<&'a Rect<'a>> {
         match (self.parent) {
             Some(parent_id) => {
                 self.manager.get_rect(parent_id)
             }
-            None => ()
+            None => None
         }
     }
-    fn get_child(self, rect_id: usize) -> Option<Rect> {
+    fn get_child(&'a self, rect_id: usize) -> Option<&'a Rect<'a>> {
         self.manager.get_rect(rect_id)
     }
-    fn has_parent(self) -> bool {
+    fn has_parent(&self) -> bool {
         match (self.parent) {
             Some(parent_id) => {
                 true
@@ -106,16 +102,16 @@ impl Rect {
         }
     }
 
-    fn get_offset(self) -> (isize, isize) {
+    fn get_offset(&self) -> (isize, isize) {
         let mut x = 0;
         let mut y = 0;
 
         match (self.get_parent()) {
             Some(parent) => {
-                let offx, offy = parent.get_offset();
-                x, y = parent.get_child_position(self.rect_id);
-                x += offx;
-                y += offy;
+                let (offx, offy) = parent.get_offset();
+                let pos = parent.get_child_position(self.rect_id);
+                x = pos.0 + offx;
+                y = pos.1 + offy;
             },
             None => ()
         }
@@ -123,13 +119,13 @@ impl Rect {
         (x, y)
     }
 
-    fn get_top(self) -> Rect {
+    fn get_top(&self) -> &'a Rect<'a> {
         let mut top: Rect;
-        top = self;
+        top = *self;
         while true {
             match (top.get_parent()) {
                 Some(parent) => {
-                    top = parent;
+                    top = *parent;
                 }
                 None => {
                     break;
@@ -137,10 +133,10 @@ impl Rect {
             }
         }
 
-        top
+        &top
     }
 
-    fn get_child_position(self, child_id: usize) -> (isize, isize) {
+    fn get_child_position(&'a self, child_id: usize) -> (isize, isize) {
         let x;
         let y;
 
@@ -162,12 +158,11 @@ impl Rect {
     fn enable(&mut self) {
         let was_enabled = self.enabled;
         self.enabled = true;
-        if (! was_enabled) && self.has_parent() {
+        if ! was_enabled {
 
-            match (self.parent) {
-                Some(parent_id) => {
+            match self.get_parent() {
+                Some(parent) => {
                     let (x, y) = self.get_offset();
-                    let parent = self.manager.get_rect(parent_id);
                     parent.update_child_space(self.rect_id, (x, y, x + self.width, y + self.height));
                 }
                 None => ()
@@ -178,12 +173,9 @@ impl Rect {
     fn disable(&mut self) {
         let was_enabled = self.enabled;
         self.enabled = false;
-        if was_enabled && self.has_parent() {
-
-            match (self.parent) {
-                Some(parent_id) => {
-                    let (x, y) = self.get_offset();
-                    let parent = self.manager.get_rect(parent_id);
+        if was_enabled {
+            match self.get_parent() {
+                Some(parent) => {
                     parent.clear_child_space(self.rect_id);
                 }
                 None => ()
@@ -286,9 +278,9 @@ impl Rect {
         }
     }
 
-    fn set_bg_color(&mut self, n: u8) -> Result<(), BleepsError> {
+    fn set_bg_color(&mut self, n: u8) -> Result<(), RectError> {
         if n > 15 {
-            Err(BleepsError::BadColor)
+            Err(RectError::BadColor)
         } else {
             let orig_color = self.color;
             let mut modded_n: u16 = n as u16;
@@ -305,9 +297,9 @@ impl Rect {
         }
     }
 
-    fn set_fg_color(&mut self, n: u8) -> Result<(), BleepsError> {
+    fn set_fg_color(&mut self, n: u8) -> Result<(), RectError> {
         if n > 15 {
-            Err(BleepsError::BadColor)
+            Err(RectError::BadColor)
         } else {
             let orig_color = self.color;
             let mut modded_n: u16 = n as u16;
@@ -328,8 +320,16 @@ impl Rect {
         self.children.push(rect_id);
         self._inverse_child_space.insert(rect_id, Vec::new());
         self.set_child_position(rect_id, 0, 0);
-        let mut child = self.manager.get_rect(rect_id);
-        child.set_parent(self.rect_id);
+        match self.manager.get_rect(rect_id) {
+            Some(child) => {
+                child.set_parent(self.rect_id);
+            }
+            None => ()
+        }
+    }
+
+    fn set_parent(&mut self, rect_id: usize) {
+        self.parent = Some(rect_id);
     }
 
     fn detach(&mut self) {
@@ -352,22 +352,22 @@ impl Rect {
     fn resize(&mut self, width: isize, height: isize) {
         self.width = width;
         self.height = height;
-        match self.parent {
-            Some(parent_id) {
-                let parent = self.manager.get_rect(parent_id);
+        match self.get_parent() {
+            Some(parent) => {
                 let (x, y) = parent.get_child_position(self.rect_id);
                 // Need to reset them under new width/height
                 parent.set_child_position(self.rect_id, x, y);
             }
+            None => ()
         }
     }
 
-    fn move(&mut self, x: isize, y: isize) {
-        match self.parent {
-            Some(parent_id) {
-                let parent = self.manager.get_rect(parent_id);
+    fn moveto(&mut self, x: isize, y: isize) {
+        match self.get_parent() {
+            Some(parent) => {
                 parent.set_child_position(self.rect_id, x, y);
             }
+            None => ()
         }
     }
 
@@ -379,9 +379,8 @@ impl Rect {
 
     fn set_precise_refresh_flag(&mut self, x: isize, y: isize) {
         self.flags_pos_refresh.push((x, y));
-        match self.parent {
-            Some(parent_id) => {
-                let parent = self.manager.get_rect(parent_id);
+        match self.get_parent() {
+            Some(parent) => {
                 let offset = parent.get_child_position(self.rect_id);
                 parent.set_precise_refresh_flag(offset.0 + x, offset.1 + y);
             }
@@ -417,10 +416,11 @@ impl Rect {
                     Some(child_ids) => {
                         let child_id = child_ids.last();
                         match child_ids.last() {
-                            Some(child_id) = {
-                                child_recache.entry(child_id)
-                                    .or_insert(Vec::new)
-                                    .and_modify(|e| { *e.push((x, y)) });
+                            Some(child_id) => {
+                                child_recache.entry(*child_id)
+                                    .or_insert(Vec::new());
+                                child_recache.entry(*child_id)
+                                    .and_modify(|positions| { positions.push((x, y)) });
                             }
                             None => ()
                         }
@@ -431,29 +431,38 @@ impl Rect {
             }
 
             for (child_id, coords) in child_recache.iter() {
-                let mut child = self.get_child(*child_id);
-                match self.child_positions.get(child_id) {
-                    Some(pos) => {
-                        let mut new_boundries = (
-                            boundries.0 - pos.0
-                            boundries.1 - pos.1,
-                            boundries.2 - pos.0,
-                            boundries.3 - pos.1
-                        );
+                match self.get_child(*child_id) {
+                    Some(child) => {
+                        match self.child_positions.get(&child_id) {
+                            Some(pos) => {
+                                let mut new_boundries = (
+                                    boundries.0 - pos.0,
+                                    boundries.1 - pos.1,
+                                    boundries.2 - pos.0,
+                                    boundries.3 - pos.1
+                                );
 
-                        child.update_cached_display(new_boundries);
-                        for (x, y) in coords.iter() {
-                            if (pos.0 > x && pos.1 < y && x <= child.width && y <= child.height) {
-                                continue;
+                                child._update_cached_display(new_boundries);
+                                for (x, y) in coords.iter() {
+                                    if (pos.0 > *x && pos.1 > *y && *x <= child.width && *y <= child.height) {
+                                        continue;
+                                    }
+                                    if (*x >= 0 && *x < self.width && *y >= 0 && *y < self.height) {
+                                        match child._cached_display.get(&(x - pos.0, y - pos.1)) {
+                                            Some(new_value) => {
+
+
+                                                self._cached_display.entry((*x, *y))
+                                                    .and_modify(|e| { *e = *new_value })
+                                                    .or_insert(*new_value);
+                                            }
+                                            None => ()
+                                        }
+
+                                    }
+                                }
                             }
-                            if (x >= 0 && x < self.width && y >= 0 && < self.height) {
-                                let mut new_value = child._cached_display.get(x - pos.0, y - pos.1);
-
-                                self._cached_display.entry((x, y))
-                                    .and_modify(|e| { *e = new_value })
-                                    .or_insert(new_value);
-
-                            }
+                            None => ()
                         }
                     }
                     None => ()
@@ -465,7 +474,7 @@ impl Rect {
         self.flags_pos_refresh = new_positions;
     }
 
-    fn _update_cached_display(&self, boundries: (isize, isize, isize, isize)) {
+    fn _update_cached_display(&'a self, boundries: (isize, isize, isize, isize)) {
         /*
        //TODO
             Since Children indicate to parents that a refresh is requested,
@@ -496,7 +505,7 @@ impl Rect {
         self._update_cached_by_positions(self.flags_pos_refresh, boundries);
     }
 
-    fn get_display(self, boundries: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+    fn get_display(&'a self, boundries: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         self._update_cached_display(boundries);
 
         let mut output = HashMap::new();
@@ -511,25 +520,32 @@ impl Rect {
         // Handle Ghosts
         match self.get_parent() {
             Some(parent) => {
-                parent.handle_ghosts(self.rect_id);
+                let filled_ghosts = parent.handle_ghosts(self.rect_id);
+                for (ghostpos, value) in filled_ghosts.iter() {
+                    output.entry(*ghostpos)
+                        .and_modify(|e| { *e = *value })
+                        .or_insert(*value);
+                }
             }
             None => ()
         }
         output
     }
-    fn handle_ghosts(&mut self, rect_id: usize) {
+
+    fn handle_ghosts(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+        let mut output = HashMap::new();
         match self.child_ghosts.get(&rect_id) {
             Some(ghosts) => {
                 let mut offx = 0;
                 let mut offy = 0;
 
 
-                let mut (first_offx, first_offy) = self.child_positions[&rect_id];
+                let (mut first_offx, mut first_offy) = self.child_positions[&rect_id];
 
-                let mut top = *self;
+                let top = self;
 
                 while true {
-                    match (top.get_parent()) {
+                    match top.get_parent() {
                         Some(parent) => {
                             let mut pos = parent.child_positions[&top.rect_id];
                             offx += pos.0;
@@ -548,7 +564,7 @@ impl Rect {
                     new_ghosts.push( (x + offx, y + offy) );
                 }
 
-                top._update_cached_by_positions(new_ghosts, (0, 0, top.width, top.height))
+                top._update_cached_by_positions(new_ghosts, (0, 0, top.width, top.height));
 
                 for (x, y) in new_ghosts.iter() {
                     let mut ghostpos = (
@@ -556,10 +572,14 @@ impl Rect {
                         y - first_offy
                     );
                     if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
-                        let mut topchar = top._cached_display.get(&(*x, *y));
-                        output.entry(ghostpos)
-                            .or_insert(topchar)
-                            .and_modify(|e| { *e = topchar });
+                        match top._cached_display.get(&(*x, *y)) {
+                            Some(topchar) => {
+                                output.entry(ghostpos)
+                                    .and_modify(|e| { *e = *topchar })
+                                    .or_insert(*topchar);
+                            }
+                            None => ()
+                        }
                     }
                 }
             }
@@ -569,6 +589,8 @@ impl Rect {
         self.child_ghosts.entry(rect_id)
             .and_modify(|e| { e.clear() })
             .or_insert(Vec::new());
+
+        output
     }
 
     fn draw(&mut self) {
@@ -642,19 +664,24 @@ impl Rect {
     }
 }
 
-pub struct RectManager {
-    idgen: usize,
-    rects: HashMap<usize, Rect>
-}
-
-impl RectManager {
-    fn new() -> RectManager {
+impl<'a> RectManager<'a> {
+    fn new() -> RectManager<'a> {
         RectManager {
             idgen: 0,
             rects: HashMap::new()
         }
     }
-    fn get_rect(self, rect_id: usize) -> Rect {
+    fn get_rect(&'a self, rect_id: usize) -> Option<&'a Rect<'a>> {
+        let output;
+        match self.rects.get(&rect_id) {
+            Some(rect) => {
+                output = Some(rect);
+            }
+            None => {
+                output = None;
+            }
+        }
+        output
     }
 }
 
