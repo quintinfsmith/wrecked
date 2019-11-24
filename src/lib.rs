@@ -54,7 +54,7 @@ pub struct Rect<'a> {
 
 impl<'a> Rect<'a> {
     fn new(rect_id: usize, manager: &'a mut RectManager<'a>) -> Rect<'a> {
-        Rect {
+        let new_rect = Rect {
             rect_id: rect_id,
             parent: None,
             width: 0,
@@ -73,7 +73,11 @@ impl<'a> Rect<'a> {
             _cached_display: HashMap::new(),
             manager: manager,
             default_character: [0, 0, 0, 32]
-        }
+        };
+
+        manager.add_rect(rect_id, new_rect);
+
+        new_rect
     }
 
     fn flag_refresh(&mut self) {
@@ -695,11 +699,11 @@ impl<'a> RectManager<'a> {
             rects: HashMap::new()
         };
 
-        let new_rect = Rect::new(0, &mut rectmanager);
-
-        rectmanager.rects.insert(0, new_rect);
-
         rectmanager
+    }
+    fn add_rect(&mut self, rect_id: usize, new_rect: Rect<'a>) {
+        let new_id = self.idgen;
+        self.rects.insert(rect_id, new_rect);
     }
 
     fn get_rect(&self, rect_id: usize) -> Option<&Rect<'a>> {
@@ -2031,6 +2035,7 @@ pub extern "C" fn init<'a>(width: usize, height: usize) -> *mut RectManager<'a> 
 
     println!("\x1B[?1049h"); // New screen
     println!("\x1B[?25l"); // Hide Cursor
+
 
     Box::into_raw(Box::new(rectmanager))
 }
