@@ -1,5 +1,5 @@
-//use std::ffi::CStr;
-//use std::os::raw::c_char;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::str;
 //use std::cmp;
@@ -304,16 +304,25 @@ impl RectManager {
             idgen: 0,
             rects: HashMap::new()
         };
+        rectmanager.new_rect(None);
 
         rectmanager
     }
 
-    fn new_rect(&mut self) {
+    fn new_rect(&mut self, parent_id: Option<usize>) {
         let new_id = self.idgen;
         self.idgen += 1;
 
-        self.rects.entry(new_id)
+        let mut rect = self.rects.entry(new_id)
             .or_insert(Rect::new(new_id));
+
+        match parent_id {
+            Some(unpacked) => {
+                rect.set_parent(unpacked);
+            }
+            None => ()
+        };
+
     }
 
     fn add_rect(&mut self, rect_id: usize, new_rect: Rect) {
@@ -2210,50 +2219,29 @@ impl RectManager {
 //}
 //
 //
-//#[no_mangle]
-//pub extern "C" fn kill(ptr: *mut BoxHandler) {
-//    let boxhandler = unsafe { Box::from_raw(ptr) };
-//
-//    println!("\x1B[?25h"); // Show Cursor
-//    println!("\x1B[?1049l"); // Return to previous screen
-//
-//    // TODO: Figure out why releasing causes segfault
-//    Box::into_raw(boxhandler); // Prevent Release
-//    // Releases boxes
-//}
-//
 
-//#[no_mangle]
-//pub extern "C" fn init(width: usize, height: usize) -> *mut RectManager {
-//    let mut rectmanager = RectManager::new();
-//
-//    println!("\x1B[?1049h"); // New screen
-//    println!("\x1B[?25l"); // Hide Cursor
-//
-//
-//
-//
-//
-//    rectmanager.new_rect();
-//    Box::into_raw(Box::new(rectmanager))
-//}
+#[no_mangle]
+pub extern "C" fn kill(ptr: *mut RectManager) {
+    let rectmanager = unsafe { Box::from_raw(ptr) };
 
-//#[no_mangle]
-//pub extern "C" fn init(width: usize, height: usize) -> *mut BoxHandler {
-//    let mut boxhandler = BoxHandler {
-//        keygen: 1,
-//        open_keys: Vec::new(),
-//        boxes: HashMap::new(),
-//        cached_display: HashMap::new(),
-//    };
-//
-//    let top: BleepsBox = BleepsBox::new(width, height);
-//    boxhandler.boxes.insert(0, top);
-//
-//
-//
-//    println!("\x1B[?1049h"); // New screen
-//    println!("\x1B[?25l"); // Hide Cursor
-//
-//    Box::into_raw(Box::new(boxhandler))
-//}
+    println!("\x1B[?25h"); // Show Cursor
+    println!("\x1B[?1049l"); // Return to previous screen
+
+    // TODO: Figure out why releasing causes segfault
+    Box::into_raw(rectmanager); // Prevent Release
+    // Releases boxes
+}
+
+
+
+
+#[no_mangle]
+pub extern "C" fn init(width: usize, height: usize) -> *mut RectManager {
+    let mut rectmanager = RectManager::new();
+
+
+    println!("\x1B[?1049h"); // New screen
+    println!("\x1B[?25l"); // Hide Cursor
+
+    Box::into_raw(Box::new(rectmanager))
+}
