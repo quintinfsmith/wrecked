@@ -7,4 +7,7 @@ authors = ["Quintin Smith <smith.f.quintin@gmail.com>"]
 name = "asciibox"
 crate-type = ["dylib"]
 
+[dependencies]
+lazy_static = "1.4.0"
+
 
