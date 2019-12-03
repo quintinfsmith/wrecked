@@ -108,20 +108,18 @@ impl Rect {
 
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
-        let mut y;
-        let mut x;
-        for _y in 0 .. corners.3 {
-            y = _y + corners.1;
-            for _x in 0 .. corners.2 {
-                x = _x + corners.0;
+        for y in corners.1 .. corners.3 {
+            for x in corners.0 .. corners.2 {
                 if x >= 0 && x < self.width && y >= 0 && y <= self.height {
 
                     self.child_space.entry((x, y))
-                        .and_modify(|e| { e.push(rect_id) })
-                        .or_insert(Vec::new());
+                        .or_insert(Vec::new())
+                        .push(rect_id);
+
 
                     self._inverse_child_space.entry(rect_id)
-                        .and_modify(|e| { e.push((x, y)) });
+                        .or_insert(Vec::new())
+                        .push((x, y));
 
                     match self.child_ghosts.get_mut(&rect_id) {
                         Some(coord_list) => {
@@ -158,17 +156,14 @@ impl Rect {
                 None => ()
             }
 
-            if ! self.child_ghosts.contains_key(&rect_id) {
-                self.child_ghosts.insert(rect_id, Vec::new());
-            }
-
             self.child_ghosts.entry(rect_id)
-                .and_modify(|id_list| { id_list.push(*position) });
+                .or_insert(Vec::new())
+                .push(*position);
         }
 
         self._inverse_child_space.entry(rect_id)
-            .and_modify(|id_list| { id_list.clear() })
-            .or_insert(Vec::new());
+            .or_insert(Vec::new())
+            .clear();
     }
 
     fn set_character(&mut self, x: isize, y: isize, character: [u8;4]) {
@@ -525,7 +520,6 @@ impl RectManager {
                     //}
 
                     new_positions.push((x, y));
-
                     if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
                         // Make sure at least default character is present
                         tmp_color = rect.color;
@@ -537,9 +531,9 @@ impl RectManager {
                             .or_insert((*tmp_chr, tmp_color));
 
                     } else {
+
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
-                                let child_id = child_ids.last();
                                 match child_ids.last() {
                                     Some(child_id) => {
                                         child_recache.entry(*child_id)
@@ -550,6 +544,7 @@ impl RectManager {
                             }
                             None => ()
                         }
+
                     }
 
                     for (child_id, value) in child_recache.iter_mut() {
@@ -569,7 +564,6 @@ impl RectManager {
         };
 
         for (child_id, (coords, child_has_position, child_position)) in child_recache.iter_mut() {
-            println!("---{}---", coords.len());
             child_dim = self.get_rect_size(*child_id);
 
             if *child_has_position {
@@ -657,6 +651,7 @@ impl RectManager {
             None => ()
         }
 
+
         if do_positional_update {
 
             // Climb and set positional refresh flags
@@ -674,8 +669,8 @@ impl RectManager {
 
                         for pos in last_flags.iter() {
                             parent_flags.push((
-                                pos.0 + child_pos.0,
-                                pos.1 + child_pos.1
+                                pos.0 - child_pos.0,
+                                pos.1 - child_pos.1
                             ));
                         }
 
@@ -687,8 +682,6 @@ impl RectManager {
                     }
                 }
             }
-
-
         }
 
     }

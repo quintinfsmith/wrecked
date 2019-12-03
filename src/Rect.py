@@ -241,8 +241,10 @@ if __name__ == "__main__":
     rect = screen.new_rect(width=30, height=20)
     new_rect = rect.new_rect(width=5, height=5)
     new_rect.move(4, 4)
+
     new_rect.set_bg_color(1)
     new_rect.set_fg_color(3)
+
     for y in range(new_rect.height):
         new_rect.set_character(0, y, '|')
         new_rect.set_character(new_rect.width - 1, y, '|')
@@ -251,11 +253,11 @@ if __name__ == "__main__":
         new_rect.set_character(x, 0, '=')
         new_rect.set_character(x, new_rect.height - 1, '=')
 
-    #new_rect.draw()
+    for i in range(5):
+        new_rect.move(i, i)
 
-    screen.draw()
-    #time.sleep(1)
-    time.sleep(1)
+        new_rect.draw()
+        time.sleep(1)
 
     screen.kill()
 
