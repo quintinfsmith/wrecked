@@ -257,6 +257,7 @@ if __name__ == "__main__":
         new_rect.move(i, i)
 
         new_rect.draw()
+        #screen.draw()
         time.sleep(1)
 
     screen.kill()

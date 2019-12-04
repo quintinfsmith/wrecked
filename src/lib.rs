@@ -275,6 +275,7 @@ impl Rect {
         self.height = height;
     }
 
+    // Can't update child_space here, need child width and height
     fn set_child_position(&mut self, rect_id: usize, x: isize, y: isize) {
         self.child_positions.entry(rect_id)
             .and_modify(|e| { *e = (x, y) })
@@ -531,7 +532,6 @@ impl RectManager {
                             .or_insert((*tmp_chr, tmp_color));
 
                     } else {
-
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
                                 match child_ids.last() {
@@ -544,7 +544,6 @@ impl RectManager {
                             }
                             None => ()
                         }
-
                     }
 
                     for (child_id, value) in child_recache.iter_mut() {
@@ -553,8 +552,7 @@ impl RectManager {
                                 value.1 = true;
                                 value.2 = *pos;
                             }
-                            None => {
-                            }
+                            None => ()
                         }
                         value.0.push((x, y));
                     }
@@ -577,9 +575,9 @@ impl RectManager {
                 self._update_cached_display(*child_id, new_boundries);
 
                 for (x, y) in coords.iter() {
-                    if child_position.0 > *x && child_position.1 > *y && *x <= child_dim.0 && *y <= child_dim.1 {
-                        continue;
-                    }
+                    //if child_position.0 > *x && child_position.1 > *y && *x <= child_dim.0 && *y <= child_dim.1 {
+                    //    continue;
+                    //}
                     if *x >= 0 && *x < width && *y >= 0 && *y < height {
                         match self.get_rect_mut(*child_id) {
                             Some(child) => {
@@ -705,7 +703,6 @@ impl RectManager {
 
         // Handle Ghosts
         let filled_ghosts = self._handle_ghosts(rect_id);
-
         for (ghostpos, value) in filled_ghosts.iter() {
             output.entry(*ghostpos)
                 .and_modify(|e| { *e = *value })
@@ -716,22 +713,21 @@ impl RectManager {
     }
 
     fn _handle_ghosts(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+        // TODO: 2things, i think I need to climb up, _updating each rect, instead
+        // of jumping to the top.
+        //  Also I don't think my working_ghosts are right
         let mut output = HashMap::new();
 
         let mut parent_id = 0;
         let mut has_parent = false;
-        match self.get_rect(rect_id) {
-            Some(rect) => {
-                match rect.parent {
-                    Some(pid) => {
-                        parent_id = pid;
-                        has_parent = true;
-                    }
-                    None => ()
-                }
+        match self.get_parent(rect_id) {
+            Some(parent) => {
+                parent_id = parent.rect_id;
+                has_parent = true;
             }
             None => ()
         }
+
 
         if (has_parent) {
             let (mut offx, mut offy) = self.get_offset(parent_id);
@@ -740,9 +736,7 @@ impl RectManager {
 
             match self.get_rect_mut(parent_id) {
                 Some(parent) => {
-
                     firstoff = parent.child_positions[&rect_id];
-
                     match parent.child_ghosts.get_mut(&rect_id) {
                         Some(ghosts) => {
                             for (x, y) in ghosts.iter() {
@@ -765,18 +759,17 @@ impl RectManager {
                 }
                 None => ()
             }
-
             let mut top_dim = self.get_rect_size(top_id);
-            self._update_cached_by_positions(rect_id, &working_ghosts, (0, 0, top_dim.0, top_dim.1));
+            self._update_cached_by_positions(top_id, &working_ghosts, (0, 0, top_dim.0, top_dim.1));
 
             match self.get_rect_mut(top_id) {
                 Some(top) => {
-
                     for (x, y) in working_ghosts.iter() {
                         let mut ghostpos = (
                             *x - firstoff.0,
                             *y - firstoff.1
                         );
+
                         if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
                             match top._cached_display.get(&(*x, *y)) {
                                 Some(topchar) => {
@@ -927,20 +920,18 @@ impl RectManager {
     }
 
     fn set_position(&mut self, rect_id: usize, x: isize, y: isize) {
-        let mut parent_id = 0;
         let mut has_parent = false;
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
                 parent.set_child_position(rect_id, x, y);
                 has_parent = true;
-                parent_id = parent.rect_id;
             }
             None => ()
         }
 
         if has_parent {
             let dim = self.get_rect_size(rect_id);
-            self.update_child_space(parent_id, rect_id, (x, y, x + dim.0, y + dim.1));
+            self.update_child_space(rect_id, (x, y, x + dim.0, y + dim.1));
         }
     }
 
@@ -1095,17 +1086,19 @@ impl RectManager {
         self.rects.remove(&rect_id);
     }
 
-    fn update_child_space(&mut self, rect_id: usize, child_id: usize, corners: (isize, isize, isize, isize)) {
-        match self.get_rect_mut(rect_id) {
+    fn update_child_space(&mut self, child_id: usize, corners: (isize, isize, isize, isize)) {
+        let mut parent_id = 0;
+        match self.get_parent_mut(child_id) {
             Some(rect) => {
                 rect.update_child_space(child_id, corners);
+                parent_id = rect.rect_id;
             }
             None => ()
         }
 
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
-                self.set_precise_refresh_flag(rect_id, x, y);
+                self.set_precise_refresh_flag(parent_id, x, y);
             }
         }
     }
