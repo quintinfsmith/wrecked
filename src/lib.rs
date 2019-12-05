@@ -490,7 +490,7 @@ impl RectManager {
         output
     }
 
-    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &Vec<(isize, isize)>, boundries: (isize, isize, isize, isize)) {
+    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &Vec<(isize, isize)>) {
         // TODO: Double Check the logic in this function. I may have biffed it when refactoring
         /*
             child_recache items are:
@@ -501,26 +501,22 @@ impl RectManager {
         */
         let mut child_recache: HashMap<usize, (Vec<(isize, isize)>, bool, (isize, isize))> = HashMap::new();
         let mut i = 0;
-        let mut new_positions = Vec::new();
         let mut x;
         let mut y;
         let mut tmp_chr;
         let mut tmp_color;
         let mut new_values = Vec::new();
-        let mut new_boundries;
         let mut child_dim;
         let (width, height) = self.get_rect_size(rect_id);
+        let rect_offset = self.get_offset(rect_id);
+
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 for i in 0 .. positions.len() {
                     x = positions[i].0;
                     y = positions[i].1;
 
-                    //if ! (x >= boundries.0 && x < boundries.2 && y >= boundries.1 && y < boundries.3) {
-                    //    continue;
-                    //}
 
-                    new_positions.push((x, y));
                     if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
                         // Make sure at least default character is present
                         tmp_color = rect.color;
@@ -544,17 +540,16 @@ impl RectManager {
                             }
                             None => ()
                         }
-                    }
-
-                    for (child_id, value) in child_recache.iter_mut() {
-                        match rect.child_positions.get_mut(&child_id) {
-                            Some(pos) => {
-                                value.1 = true;
-                                value.2 = *pos;
+                        for (child_id, value) in child_recache.iter_mut() {
+                            match rect.child_positions.get_mut(&child_id) {
+                                Some(pos) => {
+                                    value.1 = true;
+                                    value.2 = *pos;
+                                }
+                                None => ()
                             }
-                            None => ()
+                            value.0.push((x, y));
                         }
-                        value.0.push((x, y));
                     }
                 }
             }
@@ -565,58 +560,57 @@ impl RectManager {
             child_dim = self.get_rect_size(*child_id);
 
             if *child_has_position {
-                new_boundries = (
-                    boundries.0 - child_position.0,
-                    boundries.1 - child_position.1,
-                    boundries.2 - child_position.0,
-                    boundries.3 - child_position.1
-                );
-
-                self._update_cached_display(*child_id, new_boundries);
-
-                for (x, y) in coords.iter() {
-                    //if child_position.0 > *x && child_position.1 > *y && *x <= child_dim.0 && *y <= child_dim.1 {
-                    //    continue;
-                    //}
-                    if *x >= 0 && *x < width && *y >= 0 && *y < height {
-                        match self.get_rect_mut(*child_id) {
-                            Some(child) => {
-                                match child._cached_display.get(&(x - child_position.0, y - child_position.1)) {
-                                    Some(new_value) => {
-                                        new_values.push((*new_value, *x, *y));
-                                    }
-                                    None => ()
-                                };
-                            }
-                            None => ()
+                match self.get_rect_mut(*child_id) {
+                    Some(child) => {
+                        for (x, y) in coords.iter() {
+                            child.flags_pos_refresh.push((
+                                *x - child_position.0,
+                                *y - child_position.1
+                            ));
                         }
                     }
+                    None => ()
+                };
+
+                self._update_cached_display(*child_id);
+
+                match self.get_rect_mut(*child_id) {
+                    Some(child) => {
+                        for (x, y) in coords.iter() {
+                            match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
+                                Some(new_value) => {
+                                    new_values.push((*new_value, *x, *y));
+                                }
+                                None => ()
+                            };
+                        }
+                    }
+                    None => ()
                 }
             }
         }
 
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
+
                 for (new_value, x, y) in new_values.iter() {
                     rect._cached_display.entry((*x, *y))
                         .and_modify(|e| { *e = *new_value })
                         .or_insert(*new_value);
                 }
 
-                rect.flags_pos_refresh = new_positions;
             }
             None => ()
         };
     }
 
-    fn _update_cached_display(&mut self, rect_id: usize, boundries: (isize, isize, isize, isize)) {
+    fn _update_cached_display(&mut self, rect_id: usize) {
         /*
        //TODO
             Since Children indicate to parents that a refresh is requested,
             if no flag is set, there is no need to delve down
         */
         let mut flags_pos_refresh = Vec::new();
-        let mut do_positional_update = false;
 
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
@@ -628,11 +622,10 @@ impl RectManager {
                 */
                 if rect.flag_full_refresh {
                     rect.flag_full_refresh = false;
-                    rect.flags_pos_refresh = Vec::new();
 
                     for y in 0 .. rect.height {
                         for x in 0 .. rect.width {
-                            rect.flags_pos_refresh.push((x,y));
+                            flags_pos_refresh.push((x,y));
                         }
                     }
                 }
@@ -644,57 +637,24 @@ impl RectManager {
                 for pos in rect.flags_pos_refresh.iter() {
                     flags_pos_refresh.push((pos.0, pos.1));
                 }
-                do_positional_update = true;
+                rect.flags_pos_refresh.clear();
             }
             None => ()
         }
 
 
-        if do_positional_update {
-
-            // Climb and set positional refresh flags
-            let mut working_id = rect_id;
-            let mut last_flags = flags_pos_refresh;
-            let mut parent_flags;
-            let mut child_pos;
-
-            loop {
-                self._update_cached_by_positions(rect_id, &last_flags, boundries);
-                match self.get_parent(working_id) {
-                    Some(parent) => {
-                        parent_flags = Vec::new();
-                        child_pos = parent.get_child_position(working_id);
-
-                        for pos in last_flags.iter() {
-                            parent_flags.push((
-                                pos.0 - child_pos.0,
-                                pos.1 - child_pos.1
-                            ));
-                        }
-
-                        working_id = parent.rect_id;
-                        last_flags = parent_flags;
-                    },
-                    None => {
-                        break;
-                    }
-                }
-            }
-        }
+        self._update_cached_by_positions(rect_id, &flags_pos_refresh);
 
     }
 
-    fn get_display(&mut self, rect_id: usize, boundries: (isize, isize, isize, isize)) -> HashMap<(isize, isize), ([u8; 4], u16)> {
+    fn get_display(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         let mut output = HashMap::new();
 
-        self._update_cached_display(rect_id, boundries);
+        self._update_cached_display(rect_id);
 
         match self.get_rect(rect_id) {
             Some(rect) => {
                 for ((x, y), (new_c, color)) in rect._cached_display.iter() {
-                    //if ! (x >= &boundries.0 && x < &boundries.2 && y >= &boundries.1 && y < &boundries.3) {
-                    //    continue;
-                    //}
                     output.insert((*x, *y), (*new_c, *color));
                 }
             }
@@ -705,7 +665,6 @@ impl RectManager {
         let filled_ghosts = self._handle_ghosts(rect_id);
         for (ghostpos, value) in filled_ghosts.iter() {
             output.entry(*ghostpos)
-                .and_modify(|e| { *e = *value })
                 .or_insert(*value);
         }
 
@@ -713,78 +672,81 @@ impl RectManager {
     }
 
     fn _handle_ghosts(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
-        // TODO: 2things, i think I need to climb up, _updating each rect, instead
-        // of jumping to the top.
-        //  Also I don't think my working_ghosts are right
         let mut output = HashMap::new();
+        let mut first_offset = (0, 0);
+        let mut working_ghosts = Vec::new();
+        let mut pass_count = 0;
+        let mut offset;
 
-        let mut parent_id = 0;
-        let mut has_parent = false;
-        match self.get_parent(rect_id) {
+
+        // Collect ghosts from parent
+        match self.get_parent_mut(rect_id) {
             Some(parent) => {
-                parent_id = parent.rect_id;
-                has_parent = true;
+                offset = parent.child_positions[&rect_id];
+                match parent.child_ghosts.get_mut(&rect_id) {
+                    Some(ghosts) => {
+                        for (x, y) in ghosts.iter() {
+                            // store the ghosts relative to the rect, not its parent
+                            working_ghosts.push( (*x - offset.0, *y - offset.1) );
+                        }
+                        ghosts.clear();
+                    }
+                    None => {
+                        parent.child_ghosts.insert(rect_id, Vec::new());
+                    }
+                }
+
             }
             None => ()
         }
 
 
-        if (has_parent) {
-            let (mut offx, mut offy) = self.get_offset(parent_id);
-            let mut working_ghosts = Vec::new();
-            let mut firstoff = (0, 0);
 
-            match self.get_rect_mut(parent_id) {
-                Some(parent) => {
-                    firstoff = parent.child_positions[&rect_id];
-                    match parent.child_ghosts.get_mut(&rect_id) {
-                        Some(ghosts) => {
-                            for (x, y) in ghosts.iter() {
-                                working_ghosts.push( (x + offx, y + offy) );
-                            }
-                            ghosts.clear();
-                        }
-                        None => {
-                            parent.child_ghosts.insert(rect_id, Vec::new());
-                        }
-                    }
-                }
-                None => ()
-            };
 
-            let mut top_id = 0;
-            match self.get_top_mut(parent_id) {
-                Some(top) => {
-                    top_id = top.rect_id;
+        let mut rect_offset = self.get_offset(rect_id);
+        let mut top_id = 0;
+
+        // Setup positional flags
+        match self.get_top_mut(rect_id) {
+            Some(top) => {
+                for (x, y) in working_ghosts.iter() {
+                    top.flags_pos_refresh.push((*x + rect_offset.0, *y + rect_offset.1));
                 }
-                None => ()
+                top_id = top.rect_id;
             }
-            let mut top_dim = self.get_rect_size(top_id);
-            self._update_cached_by_positions(top_id, &working_ghosts, (0, 0, top_dim.0, top_dim.1));
+            None => ()
+        }
 
-            match self.get_rect_mut(top_id) {
-                Some(top) => {
-                    for (x, y) in working_ghosts.iter() {
-                        let mut ghostpos = (
-                            *x - firstoff.0,
-                            *y - firstoff.1
-                        );
 
-                        if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
-                            match top._cached_display.get(&(*x, *y)) {
-                                Some(topchar) => {
-                                    output.entry(ghostpos)
-                                        .and_modify(|e| { *e = *topchar })
-                                        .or_insert(*topchar);
-                                }
-                                None => ()
+        let mut top_dim = self.get_rect_size(top_id);
+        self._update_cached_display(top_id);
+
+
+
+
+        // Grab new characters to replace ghosts for output
+        match self.get_rect_mut(top_id) {
+            Some(top) => {
+                for (x, y) in working_ghosts.iter() {
+                    // working_ghosts are relative to rect, we need to consider the absolute x & y
+                    let mut ghostpos = (
+                        rect_offset.0 + *x,
+                        rect_offset.1 + *y
+                    );
+
+                    if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
+                        match top._cached_display.get(&ghostpos) {
+                            Some(topchar) => {
+                                output.insert((*x, *y), *topchar);
                             }
+                            None => ()
                         }
+
                     }
                 }
-                None => ()
-            };
-        }
+            }
+            None => ()
+        };
 
         output
     }
@@ -803,14 +765,10 @@ impl RectManager {
         let (width, height) = self.get_rect_size(rect_id);
 
         // TODO: top_disp is now a misnomer
-        let top_disp = self.get_display(rect_id, (offset.0, offset.1, width, height));
+        let top_disp = self.get_display(rect_id);
 
         renderstring = "".to_string();
         for (pos, val) in top_disp.iter() {
-            if (offset.0 + pos.0) < offset.0 || (offset.0 + pos.0) >= offset.0 + width || (offset.1 + pos.1) < offset.1 || (offset.1 + pos.1) >= offset.1 + height {
-                continue;
-            }
-
             renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
 
             val_a = &val.0;

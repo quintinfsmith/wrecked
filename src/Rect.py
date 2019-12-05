@@ -7,7 +7,8 @@ from localfuncs import get_terminal_size
 
 class RectManager:
     #SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
-    SO_PATH = "/mnt/media/projects/100/target/debug/libasciibox.so"
+    #SO_PATH = "/mnt/media/projects/100/target/debug/libasciibox.so"
+    SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
 
     def __init__(self):
         ffi = FFI()
@@ -256,8 +257,8 @@ if __name__ == "__main__":
     for i in range(5):
         new_rect.move(i, i)
 
-        new_rect.draw()
-        #screen.draw()
+        screen.draw()
+        #new_rect.draw()
         time.sleep(1)
 
     screen.kill()
