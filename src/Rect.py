@@ -235,11 +235,11 @@ class Rect(object):
         return rect
 
 if __name__ == "__main__":
-    import time
+    import time, math
     screen = RectManager()
     screen.rect_set_fg_color(0, 3)
 
-    rect = screen.new_rect(width=30, height=20)
+    rect = screen.new_rect(width=screen.width, height=screen.height)
     new_rect = rect.new_rect(width=5, height=5)
     new_rect.move(4, 4)
 
@@ -254,12 +254,13 @@ if __name__ == "__main__":
         new_rect.set_character(x, 0, '=')
         new_rect.set_character(x, new_rect.height - 1, '=')
 
-    for i in range(5):
-        new_rect.move(i, i)
+    for i in range(500):
+        y = math.sin(((i / 100) * math.pi * 2)) * ((screen.height - 5) // 2)
+        new_rect.move(5, ((screen.height - 5) // 2) + int(y))
 
-        screen.draw()
-        #new_rect.draw()
-        time.sleep(1)
+        #screen.draw()
+        new_rect.draw()
+        time.sleep(.01)
 
     screen.kill()
 

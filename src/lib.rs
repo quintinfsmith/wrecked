@@ -108,6 +108,8 @@ impl Rect {
 
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
+
+
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
                 if x >= 0 && x < self.width && y >= 0 && y <= self.height {
@@ -526,7 +528,6 @@ impl RectManager {
                         rect._cached_display.entry((x,y))
                             .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
                             .or_insert((*tmp_chr, tmp_color));
-
                     } else {
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
@@ -650,7 +651,13 @@ impl RectManager {
     fn get_display(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         let mut output = HashMap::new();
 
-        self._update_cached_display(rect_id);
+        // Handle Ghosts
+        let filled_ghosts = self._handle_ghosts(rect_id);
+
+        for (ghostpos, value) in filled_ghosts.iter() {
+            output.entry(*ghostpos)
+                .or_insert(*value);
+        }
 
         match self.get_rect(rect_id) {
             Some(rect) => {
@@ -661,12 +668,6 @@ impl RectManager {
             None => ()
         };
 
-        // Handle Ghosts
-        let filled_ghosts = self._handle_ghosts(rect_id);
-        for (ghostpos, value) in filled_ghosts.iter() {
-            output.entry(*ghostpos)
-                .or_insert(*value);
-        }
 
         output
     }
@@ -701,8 +702,6 @@ impl RectManager {
         }
 
 
-
-
         let mut rect_offset = self.get_offset(rect_id);
         let mut top_id = 0;
 
@@ -720,8 +719,6 @@ impl RectManager {
 
         let mut top_dim = self.get_rect_size(top_id);
         self._update_cached_display(top_id);
-
-
 
 
         // Grab new characters to replace ghosts for output
@@ -749,6 +746,15 @@ impl RectManager {
         };
 
         output
+    }
+
+    fn flag_full_refresh(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Some(rect) => {
+                rect.flag_full_refresh = true;
+            }
+            None => ()
+        };
     }
 
     fn draw(&mut self, rect_id: usize) {
@@ -1045,18 +1051,62 @@ impl RectManager {
     }
 
     fn update_child_space(&mut self, child_id: usize, corners: (isize, isize, isize, isize)) {
-        let mut parent_id = 0;
+        let mut working_parent_id = 0;
+        let mut ghosts = Vec::new();
         match self.get_parent_mut(child_id) {
             Some(rect) => {
                 rect.update_child_space(child_id, corners);
-                parent_id = rect.rect_id;
+                working_parent_id = rect.rect_id;
+                if (rect.child_ghosts.contains_key(&child_id)) {
+                    for ghost in rect.child_ghosts[&child_id].iter() {
+                        ghosts.push((ghost.0, ghost.1));
+                    }
+                }
             }
             None => ()
         }
 
-        for y in corners.1 .. corners.3 {
-            for x in corners.0 .. corners.2 {
-                self.set_precise_refresh_flag(parent_id, x, y);
+        let mut new_corners = corners;
+        let mut working_offset = (0, 0);
+        let mut working_ghosts;
+        let mut new_x;
+        let mut new_y;
+
+        loop {
+            new_corners = (
+                new_corners.0 + working_offset.0,
+                new_corners.1 + working_offset.1,
+                new_corners.2 + working_offset.0,
+                new_corners.3 + working_offset.1
+            );
+            working_ghosts = Vec::new();
+            for (x, y) in ghosts.iter() {
+                new_x = *x + working_offset.0;
+                new_y = *y + working_offset.1;
+                self.set_precise_refresh_flag(working_parent_id, new_x, new_y);
+                working_ghosts.push((new_x, new_y));
+            }
+            ghosts = working_ghosts;
+
+            for y in new_corners.1 .. new_corners.3 {
+                for x in new_corners.0 .. new_corners.2 {
+                    self.set_precise_refresh_flag(working_parent_id, x, y);
+                }
+            }
+
+
+            match self.get_parent_mut(working_parent_id) {
+                Some(parent) => {
+
+                    
+
+
+                    working_offset = parent.child_positions[&working_parent_id];
+                    working_parent_id = parent.rect_id;
+                }
+                None => {
+                    break;
+                }
             }
         }
     }
