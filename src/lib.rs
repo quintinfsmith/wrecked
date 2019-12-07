@@ -771,11 +771,24 @@ impl RectManager {
         let (width, height) = self.get_rect_size(rect_id);
 
         // TODO: top_disp is now a misnomer
-        let top_disp = self.get_display(rect_id);
+        let mut top_disp = self.get_display(rect_id);
+
+        let mut sorted = Vec::new();
+        for (pos, val) in top_disp.iter() {
+            sorted.push((pos, val));
+        }
+        sorted.sort();
 
         renderstring = "".to_string();
-        for (pos, val) in top_disp.iter() {
-            renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
+        let mut current_col = -1;
+        let mut current_row = -1;
+
+        for (pos, val) in sorted.iter() {
+            if (pos.0 + offset.1 != current_row || pos.0 + offset.0 != current_col) {
+                renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
+            }
+            current_col = pos.0 + offset.0;
+            current_row = pos.1 + offset.1;
 
             val_a = &val.0;
             color_value = val.1;
@@ -820,6 +833,7 @@ impl RectManager {
             utf_char = val_a.split_at(utf_char_split_index).1;
 
             renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
+            current_col += 1;
         }
 
         print!("{}\x1B[0m", renderstring);

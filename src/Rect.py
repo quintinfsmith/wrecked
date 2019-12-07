@@ -6,9 +6,9 @@ import os
 from localfuncs import get_terminal_size
 
 class RectManager:
-    #SO_PATH = os.path.dirname(os.path.realpath(__file__)) + "/libasciibox.so"
-    #SO_PATH = "/mnt/media/projects/100/target/debug/libasciibox.so"
-    SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
+    #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
+    SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
+
 
     def __init__(self):
         ffi = FFI()
@@ -180,8 +180,8 @@ class Rect(object):
 
         self._screen.rect_detach(self.rect_id)
 
-    def fill(self, character):
-        self._screen.rect_fillc(self.rect_id, character)
+    #def fill(self, character):
+    #    self._screen.rect_fill(self.rect_id, character)
 
     def enable(self):
         self.enabled = True
@@ -258,8 +258,8 @@ if __name__ == "__main__":
         y = math.sin(((i / 100) * math.pi * 2)) * ((screen.height - 5) // 2)
         new_rect.move(5, ((screen.height - 5) // 2) + int(y))
 
-        #screen.draw()
-        new_rect.draw()
+        screen.draw()
+       # new_rect.draw()
         time.sleep(.01)
 
     screen.kill()

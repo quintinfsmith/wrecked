@@ -412,10 +412,10 @@ class Rect(object):
             if not (y + offset[1] >= 0 and x + offset[0] >= 0 and y + offset[1] < top.height and x + offset[0] < top.width):
                 continue
 
-            if x != current_row or y != current_col:
+            if x != current_col or y != current_row:
                 output += "\033[%d;%dH" % (y + offset[1] + 1, x + offset[0] + 1)
-            current_row = x
-            current_col = y
+            current_row = y
+            current_col = x
 
             if color:
                 # ForeGround
@@ -440,7 +440,7 @@ class Rect(object):
 
 
             output += "%s" % character
-            current_row += 1
+            current_col += 1
 
         if output:
             sys.stdout.write(output + "\033[0;0H\n")
