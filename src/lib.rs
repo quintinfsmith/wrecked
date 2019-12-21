@@ -842,18 +842,31 @@ impl RectManager {
     }
 
     fn disable(&mut self, rect_id: usize) {
-
         let mut was_enabled = false;
+        let dimensions = self.get_rect_size(rect_id);
+
         let rect = self.get_rect_mut(rect_id);
+
         was_enabled = rect.enabled;
         rect.disable();
+        let mut offset = (0, 0);
+
+        let mut parent_id = 0;
 
         if was_enabled {
             match self.get_parent_mut(rect_id) {
                 Some(parent) => {
                     parent.clear_child_space(rect_id);
+                    offset = parent.child_positions[&rect_id];
+                    parent_id = parent.rect_id;
                 }
                 None => ()
+            }
+
+            for x in offset.0 .. offset.0 + dimensions.0 {
+                for y in offset.1 .. offset.1 + dimensions.1 {
+                    self.set_precise_refresh_flag(parent_id, x, y);
+                }
             }
         }
     }
@@ -876,13 +889,25 @@ impl RectManager {
     }
 
     fn detach(&mut self, rect_id: usize) {
+        let dimensions = self.get_rect_size(rect_id);
 
+        let mut offset = (0, 0);
+        let mut parent_id = 0;
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
                 parent.detach_child(rect_id);
+                parent_id = parent.rect_id;
+
             }
             None => ()
         };
+
+        for x in offset.0 .. offset.0 + dimensions.0 {
+            for y in offset.1 .. offset.1 + dimensions.1 {
+                self.set_precise_refresh_flag(parent_id, x, y);
+            }
+        }
+
 
         self.get_rect_mut(rect_id).unset_parent();
     }

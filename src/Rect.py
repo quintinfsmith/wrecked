@@ -7,7 +7,7 @@ from localfuncs import get_terminal_size
 
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
-    SO_PATH = "/home/pent/100/target/release/libasciibox.so"
+    SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
 
 
     def __init__(self):
