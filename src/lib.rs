@@ -815,9 +815,9 @@ impl RectManager {
     }
 
     fn disable(&mut self, rect_id: usize) {
+        let dimensions = self.get_rect_size(rect_id);
         let rect = self.get_rect_mut(rect_id);
         let was_enabled = rect.enabled;
-        let dimensions = self.get_rect_size(rect_id);
 
         rect.disable();
         let mut offset = (0, 0);
