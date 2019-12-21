@@ -7,7 +7,7 @@ from localfuncs import get_terminal_size
 
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
-    SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
+    SO_PATH = "/home/pent/100/target/release/libasciibox.so"
 
 
     def __init__(self):
@@ -237,7 +237,7 @@ class Rect(object):
 if __name__ == "__main__":
     import time, math
     screen = RectManager()
-    screen.rect_set_fg_color(0, 3)
+    screen.rect_set_fg_color(30, 4)
 
     rect = screen.new_rect(width=screen.width, height=screen.height)
     new_rect = rect.new_rect(width=5, height=5)
@@ -245,22 +245,9 @@ if __name__ == "__main__":
 
     new_rect.set_bg_color(1)
     new_rect.set_fg_color(3)
+    new_rect.draw()
 
-    for y in range(new_rect.height):
-        new_rect.set_character(0, y, '|')
-        new_rect.set_character(new_rect.width - 1, y, '|')
-
-    for x in range(new_rect.width):
-        new_rect.set_character(x, 0, '=')
-        new_rect.set_character(x, new_rect.height - 1, '=')
-
-    for i in range(500):
-        y = math.sin(((i / 100) * math.pi * 2)) * ((screen.height - 5) // 2)
-        new_rect.move(5, ((screen.height - 5) // 2) + int(y))
-
-        screen.draw()
-       # new_rect.draw()
-        time.sleep(.01)
+    time.sleep(.5)
 
     screen.kill()
 
