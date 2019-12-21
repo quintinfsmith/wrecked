@@ -163,6 +163,8 @@ impl Rect {
             self.child_ghosts.entry(rect_id)
                 .or_insert(Vec::new())
                 .push(*position);
+
+            self.set_precise_refresh_flag(position.0, position.1);
         }
 
         self._inverse_child_space.entry(rect_id)
@@ -815,14 +817,27 @@ impl RectManager {
     fn disable(&mut self, rect_id: usize) {
         let rect = self.get_rect_mut(rect_id);
         let was_enabled = rect.enabled;
+        let dimensions = self.get_rect_size(rect_id);
+
         rect.disable();
+        let mut offset = (0, 0);
+
+        let mut parent_id = 0;
 
         if was_enabled {
             match self.get_parent_mut(rect_id) {
                 Some(parent) => {
                     parent.clear_child_space(rect_id);
+                    offset = parent.child_positions[&rect_id];
+                    parent_id = parent.rect_id;
                 }
                 None => ()
+            }
+
+            for x in offset.0 .. offset.0 + dimensions.0 {
+                for y in offset.1 .. offset.1 + dimensions.1 {
+                    self.set_precise_refresh_flag(parent_id, x, y);
+                }
             }
         }
     }
@@ -844,13 +859,25 @@ impl RectManager {
     }
 
     fn detach(&mut self, rect_id: usize) {
+        let dimensions = self.get_rect_size(rect_id);
 
+        let mut offset = (0, 0);
+        let mut parent_id = 0;
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
                 parent.detach_child(rect_id);
+                parent_id = parent.rect_id;
+
             }
             None => ()
         };
+
+        for x in offset.0 .. offset.0 + dimensions.0 {
+            for y in offset.1 .. offset.1 + dimensions.1 {
+                self.set_precise_refresh_flag(parent_id, x, y);
+            }
+        }
+
 
         self.get_rect_mut(rect_id).unset_parent();
     }
