@@ -7,6 +7,8 @@ use std::cmp;
 /*
     TODO
     Maybe change [u8; 4] to a struct like "Character"
+
+    Drawing gets SLOOW with many layers. look for optimizations.
 */
 
 
@@ -169,10 +171,14 @@ impl Rect {
     }
 
     fn set_character(&mut self, x: isize, y: isize, character: [u8;4]) {
-        self.character_space.entry((x, y))
-            .and_modify(|coord| { *coord = character })
-            .or_insert(character);
-        self.set_precise_refresh_flag(x, y);
+        if y < self.height && y >= 0 && x < self.width && x >= 0 {
+            self.character_space.entry((x, y))
+                .and_modify(|coord| { *coord = character })
+                .or_insert(character);
+            self.set_precise_refresh_flag(x, y);
+        } else {
+            panic!("({},{}) is out of bounds on Rect {}", x, y, self.rect_id);
+        }
     }
 
     fn unset_character(&mut self, x: isize, y: isize) {
@@ -205,47 +211,33 @@ impl Rect {
         }
     }
 
-    fn set_bg_color(&mut self, n: u8) -> Result<(), RectError> {
-        if n > 15 {
-            Err(RectError::BadColor)
-        } else {
-            let orig_color = self.color;
-            let mut modded_n: u16 = n as u16;
-            modded_n &= 0b01111;
-            modded_n |= 0b10000;
-            self.color &= 0b1111111111100000;
-            self.color |= modded_n;
+    fn set_bg_color(&mut self, n: u8) {
+        let orig_color = self.color;
+        let mut modded_n: u16 = n as u16;
+        modded_n &= 0b01111;
+        modded_n |= 0b10000;
+        self.color &= 0b1111111111100000;
+        self.color |= modded_n;
 
-            if self.color != orig_color {
-                self.flag_full_refresh = true;
-            }
-
-            Ok(())
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
         }
     }
 
-    fn set_fg_color(&mut self, n: u8) -> Result<(), RectError> {
-        if n > 15 {
-            Err(RectError::BadColor)
-        } else {
-            let orig_color = self.color;
-            let mut modded_n: u16 = n as u16;
-            modded_n &= 0b01111;
-            modded_n |= 0b10000;
-            self.color &= 0b1111110000011111;
-            self.color |= modded_n << 5;
+    fn set_fg_color(&mut self, n: u8) {
+        let orig_color = self.color;
+        let mut modded_n: u16 = n as u16;
+        modded_n &= 0b01111;
+        modded_n |= 0b10000;
+        self.color &= 0b1111110000011111;
+        self.color |= modded_n << 5;
 
-            if self.color != orig_color {
-                self.flag_full_refresh = true;
-            }
-
-            Ok(())
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
         }
     }
 
     fn add_child(&mut self, child_id: usize) {
-        let rect_id = self.rect_id;
-
         self.children.push(child_id);
         self._inverse_child_space.insert(child_id, Vec::new());
         self.set_child_position(child_id, 0, 0);
@@ -304,7 +296,7 @@ impl RectManager {
         let new_id = self.idgen;
         self.idgen += 1;
 
-        let mut rect = self.rects.entry(new_id)
+        let rect = self.rects.entry(new_id)
             .or_insert(Rect::new(new_id));
 
         match parent_id {
@@ -315,11 +307,6 @@ impl RectManager {
         };
 
         new_id
-    }
-
-    fn add_rect(&mut self, rect_id: usize, new_rect: Rect) {
-        let new_id = self.idgen;
-        self.rects.insert(rect_id, new_rect);
     }
 
     fn get_rect(&self, rect_id: usize) -> &Rect {
@@ -349,7 +336,7 @@ impl RectManager {
         let mut has_parent = false;
         let mut parent_id = 0;
 
-        let mut rect = self.get_rect(rect_id);
+        let rect = self.get_rect(rect_id);
         match rect.parent {
             Some(pid) => {
                 has_parent = true;
@@ -358,7 +345,7 @@ impl RectManager {
             None => ()
         };
 
-        if (has_parent) {
+        if has_parent {
             output = Some(self.get_rect(parent_id));
         }
 
@@ -370,7 +357,7 @@ impl RectManager {
         let mut has_parent = false;
         let mut parent_id = 0;
 
-        let mut rect = self.get_rect(rect_id);
+        let rect = self.get_rect(rect_id);
         match rect.parent {
             Some(pid) => {
                 has_parent = true;
@@ -379,7 +366,7 @@ impl RectManager {
             None => ()
         };
 
-        if (has_parent) {
+        if has_parent {
             output = Some(self.get_rect_mut(parent_id));
         }
 
@@ -426,9 +413,9 @@ impl RectManager {
 
     fn has_parent(&self, rect_id: usize) -> bool {
         let mut output = false;
-        let mut rect = self.get_rect(rect_id);
+        let rect = self.get_rect(rect_id);
         match rect.parent {
-            Some(pid) => {
+            Some(_) => {
                 output = true;
             }
             None => ()
@@ -447,15 +434,11 @@ impl RectManager {
                 offset (if has parent)
         */
         let mut child_recache: HashMap<usize, (Vec<(isize, isize)>, bool, (isize, isize))> = HashMap::new();
-        let mut i = 0;
         let mut x;
         let mut y;
         let mut tmp_chr;
         let mut tmp_color;
         let mut new_values = Vec::new();
-        let mut child_dim;
-        let (width, height) = self.get_rect_size(rect_id);
-        let rect_offset = self.get_offset(rect_id);
 
         let mut rect;
         {
@@ -503,7 +486,6 @@ impl RectManager {
 
         let mut child;
         for (child_id, (coords, child_has_position, child_position)) in child_recache.iter_mut() {
-            child_dim = self.get_rect_size(*child_id);
 
             if *child_has_position {
                 {
@@ -564,14 +546,14 @@ impl RectManager {
                     flags_pos_refresh.push((x,y));
                 }
             }
-        }
-
-        /*
-            Iterate through flags_pos_refresh and update
-            any children that cover the requested positions
-        */
-        for pos in rect.flags_pos_refresh.iter() {
-            flags_pos_refresh.push((pos.0, pos.1));
+        } else {
+            /*
+                Iterate through flags_pos_refresh and update
+                any children that cover the requested positions
+            */
+            for pos in rect.flags_pos_refresh.iter() {
+                flags_pos_refresh.push((pos.0, pos.1));
+            }
         }
         rect.flags_pos_refresh.clear();
 
@@ -599,16 +581,13 @@ impl RectManager {
 
     fn _handle_ghosts(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         let mut output = HashMap::new();
-        let mut first_offset = (0, 0);
         let mut working_ghosts = Vec::new();
-        let mut pass_count = 0;
-        let mut offset;
 
 
         // Collect ghosts from parent
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
-                offset = parent.child_positions[&rect_id];
+                let offset = parent.child_positions[&rect_id];
                 match parent.child_ghosts.get_mut(&rect_id) {
                     Some(ghosts) => {
                         for (x, y) in ghosts.iter() {
@@ -627,8 +606,8 @@ impl RectManager {
         }
 
 
-        let mut rect_offset = self.get_offset(rect_id);
-        let mut top_id;
+        let rect_offset = self.get_offset(rect_id);
+        let top_id;
         let mut top;
 
         // Setup positional flags
@@ -638,15 +617,14 @@ impl RectManager {
             for (x, y) in working_ghosts.iter() {
                 top.flags_pos_refresh.push((*x + rect_offset.0, *y + rect_offset.1));
             }
-
-            let mut top_dim = (top.width, top.height);
         }
         self._update_cached_display(top_id);
         top = self.get_top_mut(rect_id);
 
+        let mut ghostpos;
         for (x, y) in working_ghosts.iter() {
             // working_ghosts are relative to rect, we need to consider the absolute x & y
-            let mut ghostpos = (
+            ghostpos = (
                 rect_offset.0 + *x,
                 rect_offset.1 + *y
             );
@@ -679,15 +657,11 @@ impl RectManager {
         let mut current_line_color_value: u16 = 0;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
-        let mut change_char: bool;
 
-        let (width, height) = self.get_rect_size(rect_id);
-
-        // TODO: top_disp is now a misnomer
-        let mut top_disp = self.get_display(rect_id);
+        let display_map = self.get_display(rect_id);
 
         let mut sorted = Vec::new();
-        for (pos, val) in top_disp.iter() {
+        for (pos, val) in display_map.iter() {
             sorted.push((pos, val));
         }
         sorted.sort();
@@ -697,7 +671,7 @@ impl RectManager {
         let mut current_row = -1;
 
         for (pos, val) in sorted.iter() {
-            if (pos.0 + offset.1 != current_row || pos.0 + offset.0 != current_col) {
+            if pos.1 + offset.1 != current_row || pos.0 + offset.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
             }
             current_col = pos.0 + offset.0;
@@ -754,9 +728,8 @@ impl RectManager {
     }
 
     fn get_rect_size(&self, rect_id: usize) -> (isize, isize) {
-        let mut dimensions = (0, 0);
         let rect = self.get_rect(rect_id);
-        dimensions = (rect.width, rect.height);
+        let dimensions = (rect.width, rect.height);
 
         dimensions
     }
@@ -787,7 +760,7 @@ impl RectManager {
     }
 
     fn resize(&mut self, rect_id: usize, width: isize, height: isize) {
-        let mut rect = self.get_rect_mut(rect_id);
+        let rect = self.get_rect_mut(rect_id);
         rect.resize(width, height);
 
         let mut pos = (0, 0);
@@ -819,7 +792,7 @@ impl RectManager {
     }
 
     fn set_precise_refresh_flag(&mut self, rect_id: usize, x: isize, y: isize) {
-        let mut rect = self.get_rect_mut(rect_id);
+        let rect = self.get_rect_mut(rect_id);
         rect.set_precise_refresh_flag(x, y);
 
         // loop top, setting requisite refresh flags
@@ -840,10 +813,8 @@ impl RectManager {
     }
 
     fn disable(&mut self, rect_id: usize) {
-
-        let mut was_enabled = false;
         let rect = self.get_rect_mut(rect_id);
-        was_enabled = rect.enabled;
+        let was_enabled = rect.enabled;
         rect.disable();
 
         if was_enabled {
@@ -857,9 +828,8 @@ impl RectManager {
     }
 
     fn enable(&mut self, rect_id: usize) {
-        let mut was_enabled = true;
         let rect = self.get_rect_mut(rect_id);
-        was_enabled = rect.enabled;
+        let was_enabled = rect.enabled;
         rect.enable();
 
 
@@ -928,7 +898,7 @@ impl RectManager {
             Some(rect) => {
                 rect.update_child_space(child_id, corners);
                 working_parent_id = rect.rect_id;
-                if (rect.child_ghosts.contains_key(&child_id)) {
+                if rect.child_ghosts.contains_key(&child_id) {
                     for ghost in rect.child_ghosts[&child_id].iter() {
                         ghosts.push((ghost.0, ghost.1));
                     }
