@@ -161,6 +161,8 @@ impl Rect {
             self.child_ghosts.entry(rect_id)
                 .or_insert(Vec::new())
                 .push(*position);
+
+            self.set_precise_refresh_flag(position.0, position.1);
         }
 
         self._inverse_child_space.entry(rect_id)
