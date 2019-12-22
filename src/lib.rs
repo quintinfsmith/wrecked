@@ -487,12 +487,13 @@ impl RectManager {
             if *child_has_position {
                 {
                     child = self.get_rect_mut(*child_id);
-                    for (x, y) in coords.iter() {
-                        child.flags_pos_refresh.push((
-                            *x - child_position.0,
-                            *y - child_position.1
-                        ));
-                    }
+                    child.flag_refresh();
+                    //for (x, y) in coords.iter() {
+                    //    child.flags_pos_refresh.push((
+                    //        *x - child_position.0,
+                    //        *y - child_position.1
+                    //    ));
+                    //}
                 }
 
                 self._update_cached_display(*child_id);
