@@ -565,81 +565,20 @@ impl RectManager {
     fn get_display(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
         let mut output = HashMap::new();
 
-        // Handle Ghosts
-        let filled_ghosts = self._handle_ghosts(rect_id);
+        //Handle Ghosts
+        self._handle_ghosts(rect_id);
 
-        for (ghostpos, value) in filled_ghosts.iter() {
-            output.entry(*ghostpos)
-                .or_insert(*value);
+        let mut top_id = 0;
+        {
+            let top = self.get_top_mut(rect_id);
+            top_id = top.rect_id;
         }
+        self._update_cached_display(top_id);
+
 
         let rect = self.get_rect(rect_id);
         for ((x, y), (new_c, color)) in rect._cached_display.iter() {
             output.insert((*x, *y), (*new_c, *color));
-        }
-
-        output
-    }
-
-    fn _handle_ghosts(&mut self, rect_id: usize) -> HashMap<(isize, isize), ([u8; 4], u16)> {
-        let mut output = HashMap::new();
-        let mut working_ghosts = Vec::new();
-
-
-        // Collect ghosts from parent
-        match self.get_parent_mut(rect_id) {
-            Some(parent) => {
-                let offset = parent.child_positions[&rect_id];
-                match parent.child_ghosts.get_mut(&rect_id) {
-                    Some(ghosts) => {
-                        for (x, y) in ghosts.iter() {
-                            // store the ghosts relative to the rect, not its parent
-                            working_ghosts.push( (*x - offset.0, *y - offset.1) );
-                        }
-                        ghosts.clear();
-                    }
-                    None => {
-                        parent.child_ghosts.insert(rect_id, Vec::new());
-                    }
-                }
-
-            }
-            None => ()
-        }
-
-
-        let rect_offset = self.get_offset(rect_id);
-        let top_id;
-        let mut top;
-
-        // Setup positional flags
-        {
-            top = self.get_top_mut(rect_id);
-            top_id = top.rect_id;
-            for (x, y) in working_ghosts.iter() {
-                top.flags_pos_refresh.push((*x + rect_offset.0, *y + rect_offset.1));
-            }
-        }
-        self._update_cached_display(top_id);
-        top = self.get_top_mut(rect_id);
-
-        let mut ghostpos;
-        for (x, y) in working_ghosts.iter() {
-            // working_ghosts are relative to rect, we need to consider the absolute x & y
-            ghostpos = (
-                rect_offset.0 + *x,
-                rect_offset.1 + *y
-            );
-
-            if ghostpos.0 >= 0 && ghostpos.1 >= 0 && ghostpos.0 < top.width && ghostpos.1 < top.height {
-                match top._cached_display.get(&ghostpos) {
-                    Some(topchar) => {
-                        output.insert((*x, *y), *topchar);
-                    }
-                    None => ()
-                }
-
-            }
         }
 
         output
@@ -651,7 +590,7 @@ impl RectManager {
     }
 
     fn draw(&mut self, rect_id: usize) {
-        let offset = self.get_offset(rect_id);
+        let offset = self.get_absolute_offset(rect_id);
 
         let mut renderstring: String;
         let mut val_a: &[u8];
@@ -736,7 +675,7 @@ impl RectManager {
         dimensions
     }
 
-    fn get_offset(&self, rect_id: usize) -> (isize, isize) {
+    fn get_absolute_offset(&self, rect_id: usize) -> (isize, isize) {
         let mut x = 0;
         let mut y = 0;
         let mut working_id = rect_id;
@@ -800,11 +739,15 @@ impl RectManager {
         // loop top, setting requisite refresh flags
         let mut working_child_id = rect_id;
         let mut tmp_offset;
+        let mut newx = x;
+        let mut newy = y;
         loop {
             match self.get_parent_mut(working_child_id) {
                 Some(parent) => {
                     tmp_offset = parent.get_child_position(working_child_id);
-                    parent.set_precise_refresh_flag(tmp_offset.0 + x, tmp_offset.1 + y);
+                    newx += tmp_offset.0;
+                    newy += tmp_offset.1;
+                    parent.set_precise_refresh_flag(newx, newy);
                     working_child_id = parent.rect_id;
                 }
                 None => {
@@ -891,7 +834,6 @@ impl RectManager {
         };
 
         self.get_rect_mut(rect_id).set_parent(new_parent_id);
-
         self.get_rect_mut(new_parent_id).add_child(rect_id);
     }
 
