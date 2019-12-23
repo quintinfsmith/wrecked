@@ -167,7 +167,7 @@ class Rect(object):
     def attach(self, child_rect):
         self.rects[child_rect.rect_id] = child_rect
         if (child_rect.x or child_rect.y):
-            position = (child_rect.y, child_rect.y)
+            position = (child_rect.x, child_rect.y)
         else:
             position = (0, 0)
         self._screen.rect_attach(child_rect.rect_id, self.rect_id, position)
