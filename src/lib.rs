@@ -322,13 +322,13 @@ impl RectManager {
         }
     }
 
-    fn get_rect_mut(&mut self, rect_id: usize) -> &mut Rect {
+    fn get_rect_mut(&self, rect_id: usize) -> Result<&mut Rect, RectError> {
         match self.rects.get_mut(&rect_id) {
             Some(rect) => {
-                rect
+                Ok(rect)
             }
             None => {
-                panic!("Rect {} Not Found", rect_id);
+                Err(RectError::NotFound)
             }
         }
     }
@@ -460,20 +460,28 @@ impl RectManager {
         output
     }
 
-    fn has_parent(&self, rect_id: usize) -> bool {
-        let mut output = false;
-        let rect = self.get_rect(rect_id);
-        match rect.parent {
-            Some(_) => {
-                output = true;
+    fn has_parent(&self, rect_id: usize) -> Result<bool, RectError> {
+        let mut output;
+        match self.get_rect(rect_id) {
+            Ok(rect) => {
+                match rect.parent {
+                    Some(_) => {
+                        output = Ok(true);
+                    }
+                    None => {
+                        output = Ok(false);
+                    }
+                }
             }
-            None => ()
+            Err(e) => {
+                output = Err(e);
+            }
         }
 
         output
     }
 
-    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &Vec<(isize, isize)>) {
+    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &Vec<(isize, isize)>) => Result<(), RectError> {
         // TODO: Double Check the logic in this function. I may have biffed it when refactoring
         /*
             child_recache items are:
@@ -490,46 +498,52 @@ impl RectManager {
         let mut new_values = Vec::new();
 
         let mut rect;
-        {
-            rect = self.get_rect_mut(rect_id);
-            for i in 0 .. positions.len() {
-                x = positions[i].0;
-                y = positions[i].1;
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                for i in 0 .. positions.len() {
+                    x = positions[i].0;
+                    y = positions[i].1;
 
 
-                if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
-                    // Make sure at least default character is present
-                    tmp_color = rect.color;
-                    tmp_chr = rect.character_space.entry((x, y))
-                        .or_insert(rect.default_character);
+                    if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
+                        // Make sure at least default character is present
+                        tmp_color = rect.color;
+                        tmp_chr = rect.character_space.entry((x, y))
+                            .or_insert(rect.default_character);
 
-                    rect._cached_display.entry((x,y))
-                        .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
-                        .or_insert((*tmp_chr, tmp_color));
-                } else {
-                    match rect.child_space.get(&(x, y)) {
-                        Some(child_ids) => {
-                            match child_ids.last() {
-                                Some(child_id) => {
-                                    child_recache.entry(*child_id)
-                                        .or_insert((Vec::new(), false, (0, 0)));
+                        rect._cached_display.entry((x,y))
+                            .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
+                            .or_insert((*tmp_chr, tmp_color));
+                    } else {
+                        match rect.child_space.get(&(x, y)) {
+                            Some(child_ids) => {
+                                match child_ids.last() {
+                                    Some(child_id) => {
+                                        child_recache.entry(*child_id)
+                                            .or_insert((Vec::new(), false, (0, 0)));
+                                    }
+                                    None => ()
                                 }
-                                None => ()
-                            }
-                        }
-                        None => ()
-                    }
-                    for (child_id, value) in child_recache.iter_mut() {
-                        match rect.child_positions.get_mut(&child_id) {
-                            Some(pos) => {
-                                value.1 = true;
-                                value.2 = *pos;
                             }
                             None => ()
                         }
-                        value.0.push((x, y));
+                        for (child_id, value) in child_recache.iter_mut() {
+                            match rect.child_positions.get_mut(&child_id) {
+                                Some(pos) => {
+                                    value.1 = true;
+                                    value.2 = *pos;
+                                }
+                                None => ()
+                            }
+                            value.0.push((x, y));
+                        }
                     }
                 }
+            }
+            Err(e) => {
+                error = e;
+                error_caught = true;
             }
         }
 
@@ -537,39 +551,55 @@ impl RectManager {
         for (child_id, (coords, child_has_position, child_position)) in child_recache.iter_mut() {
 
             if *child_has_position {
-                {
-                    child = self.get_rect_mut(*child_id);
-                    child.flag_refresh();
-                    //for (x, y) in coords.iter() {
-                    //    child.flags_pos_refresh.push((
-                    //        *x - child_position.0,
-                    //        *y - child_position.1
-                    //    ));
-                    //}
+                match self.get_rect_mut(*child_id) {
+                    Ok(child) => {
+                        child.flag_refresh();
+                        // Will uncomment when I bring back precision refreshing
+                        //for (x, y) in coords.iter() {
+                        //    child.flags_pos_refresh.push((
+                        //        *x - child_position.0,
+                        //        *y - child_position.1
+                        //    ));
+                        //}
+                    }
+                    Err(e) => {
+                        error = e;
+                        error_caught = true;
+                    }
                 }
 
                 self._update_cached_display(*child_id);
 
-                {
-                    child = self.get_rect_mut(*child_id);
-                    for (x, y) in coords.iter() {
-                        match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
-                            Some(new_value) => {
-                                new_values.push((*new_value, *x, *y));
-                            }
-                            None => ()
-                        };
+                match self.get_rect_mut(*child_id) {
+                    Ok(child) => {
+                        for (x, y) in coords.iter() {
+                            match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
+                                Some(new_value) => {
+                                    new_values.push((*new_value, *x, *y));
+                                }
+                                None => ()
+                            };
+                        }
+                    }
+                    Err(e) => {
+                        error = e;
+                        error_caught = true;
                     }
                 }
             }
         }
 
-        {
-            rect = self.get_rect_mut(rect_id);
-            for (new_value, x, y) in new_values.iter() {
-                rect._cached_display.entry((*x, *y))
-                    .and_modify(|e| { *e = *new_value })
-                    .or_insert(*new_value);
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                for (new_value, x, y) in new_values.iter() {
+                    rect._cached_display.entry((*x, *y))
+                        .and_modify(|e| { *e = *new_value })
+                        .or_insert(*new_value);
+                }
+            },
+            Err(e) => {
+                error = e;
+                error_caught = true;
             }
         }
     }
