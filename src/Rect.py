@@ -244,17 +244,21 @@ if __name__ == "__main__":
     screen = RectManager()
 
     rect = screen.new_rect(width=screen.width , height=screen.height // 2)
-    for i in range(10):
-        rect = rect.new_rect(width=screen.width, height=screen.height)
-    new_rect = rect.new_rect(width=5, height=5)
-    new_rect.move(4, 4)
-    rect.set_character(4, 0, "X")
-    screen.rect_set_character(0,4, 0, "Y")
-    new_rect.set_character(4, 0, "Z")
-    new_rect.set_bg_color(1)
-    new_rect.set_fg_color(3)
-    rect.set_bg_color(4)
-    new_rect.draw()
+    screen.rect_set_character(1, 4, 0, "Y")
+    screen.rect_set_bg_color(1, 4)
+   # rect.set_character(4, 0, "Y")
+   # rect.set_bg_color(4)
+
+
+#    for i in range(10):
+#        rect = rect.new_rect(width=screen.width, height=screen.height)
+#    new_rect = rect.new_rect(width=5, height=5)
+#    new_rect.move(4, 4)
+#
+#    new_rect.set_character(4, 0, "Z")
+#    new_rect.set_bg_color(1)
+#    new_rect.set_fg_color(3)
+#    new_rect.draw()
 
     screen.draw()
 
