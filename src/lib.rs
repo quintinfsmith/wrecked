@@ -3,6 +3,8 @@ use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::str;
 use std::cmp;
+use std::fs::File;
+use std::io::prelude::*;
 
 /*
     TODO
@@ -11,6 +13,11 @@ use std::cmp;
     Drawing gets SLOOW with many layers. look for optimizations.
 */
 
+fn logg(msg: &String) -> std::io::Result<()> {
+    let mut file = File::create("rlogg")?;
+    file.write_all(msg.as_bytes())?;
+    Ok(())
+}
 
 #[derive(PartialEq, Eq)]
 pub enum RectError {
@@ -570,7 +577,6 @@ impl RectManager {
 
         if output.is_ok() {
             for (child_id, (coords, child_has_position, child_position)) in child_recache.iter_mut() {
-
                 if *child_has_position {
                     match self.get_rect_mut(*child_id) {
                         Ok(child) => {
@@ -1217,6 +1223,7 @@ impl RectManager {
                     new_y = *y + working_offset.1;
                     working_ghosts.push((new_x, new_y));
                 }
+
                 output = self.flag_refresh(working_parent_id);
 
                 if output.is_ok() {

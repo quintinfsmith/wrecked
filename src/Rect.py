@@ -270,8 +270,8 @@ if __name__ == "__main__":
 
     rect = screen.new_rect(width=screen.width , height=screen.height // 2)
     screen.rect_set_character(0, 4, 0, "Y")
-    screen.rect_set_bg_color(1, 4)
-   # rect.set_character(4, 0, "Y")
+    rect.set_character(4, 2, "Y")
+    rect.move(1,1)
    # rect.set_bg_color(4)
 
 
