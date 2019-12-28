@@ -5,6 +5,18 @@ import tty, termios
 import os
 from localfuncs import get_terminal_size
 
+def logg(error_code, args, msg):
+    strargs = '('
+    for i, a in enumerate(args):
+        strargs += str(a)
+        if i < len(args) - 1:
+            strargs += ', '
+    strargs += ")"
+    newline = "%d - %s: %s\n" % (error_code, strargs, msg)
+
+    with open("logg", "a") as fp:
+        fp.write(newline)
+
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
@@ -20,28 +32,28 @@ class RectManager:
 
 
             uint32_t new_rect(RectManager, uint32_t, uint32_t, uint32_t);
-            void delete_rect(RectManager, uint32_t);
+            uint32_t delete_rect(RectManager, uint32_t);
 
 
-            void set_position(RectManager, uint32_t, int32_t, int32_t);
-            void resize(RectManager, uint32_t, uint32_t, uint32_t);
-            void attach(RectManager, uint32_t, uint32_t);
-            void detach(RectManager, uint32_t);
+            uint32_t set_position(RectManager, uint32_t, int32_t, int32_t);
+            uint32_t resize(RectManager, uint32_t, uint32_t, uint32_t);
+            uint32_t attach(RectManager, uint32_t, uint32_t);
+            uint32_t detach(RectManager, uint32_t);
 
 
-            void unset_color(RectManager, uint32_t);
-            void set_bg_color(RectManager, uint32_t, uint8_t);
-            void set_fg_color(RectManager, uint32_t, uint8_t);
-            void unset_bg_color(RectManager, uint32_t);
-            void unset_fg_color(RectManager, uint32_t);
+            uint32_t unset_color(RectManager, uint32_t);
+            uint32_t set_bg_color(RectManager, uint32_t, uint8_t);
+            uint32_t set_fg_color(RectManager, uint32_t, uint8_t);
+            uint32_t unset_bg_color(RectManager, uint32_t);
+            uint32_t unset_fg_color(RectManager, uint32_t);
 
-            void disable_rect(RectManager, uint32_t);
-            void enable_rect(RectManager, uint32_t);
+            uint32_t disable_rect(RectManager, uint32_t);
+            uint32_t enable_rect(RectManager, uint32_t);
 
-            void set_character(RectManager, uint32_t, uint32_t, uint32_t, const char*);
-            void unset_character(RectManager, uint32_t, uint32_t, uint32_t);
+            uint32_t set_character(RectManager, uint32_t, uint32_t, uint32_t, const char*);
+            uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
 
-            void draw(RectManager, uint32_t);
+            uint32_t draw(RectManager, uint32_t);
         """)
 
         self.lib = ffi.dlopen(self.SO_PATH)
@@ -55,48 +67,58 @@ class RectManager:
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
         if (position != (0,0)):
-            self.rect_move(rect_id, *position)
+            err = self.rect_move(rect_id, *position)
+
+            logg(err, [rect_id], 'attach')
 
     def rect_detach(self, rect_id):
-        self.lib.detach(self.rectmanager, rect_id)
+        err = self.lib.detach(self.rectmanager, rect_id)
+        logg(err, [rect_id], 'dettach')
 
 
     def rect_disable(self, rect_id):
-        self.lib.disable(self.rectmanager, rect_id)
+        err = self.lib.disable(self.rectmanager, rect_id)
+        logg(err, [rect_id], 'disable')
 
 
     def rect_enable(self, rect_id):
-        self.lib.enable(self.rectmanager, rect_id)
+        err = self.lib.enable(self.rectmanager, rect_id)
+        logg(err, [rect_id], 'enable')
 
 
     def rect_set_character(self, rect_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
-        self.lib.set_character(self.rectmanager, rect_id, x, y, fmt_character)
+        err = self.lib.set_character(self.rectmanager, rect_id, x, y, fmt_character)
+
+        logg(err, [rect_id, x, y, character], 'set_character')
 
     def rect_unset_character(self, rect_id, x, y):
-        self.lib.unset_character(self.rectmanager, rect_id, x, y)
+        err = self.lib.unset_character(self.rectmanager, rect_id, x, y)
+        logg(err, [rect_id, x, y], 'unset_character')
 
     def rect_unset_bg_color(self, rect_id):
-        self.lib.unset_bg_color(self.rectmanager, rect_id)
+        err = self.lib.unset_bg_color(self.rectmanager, rect_id)
 
     def rect_unset_fg_color(self, rect_id):
-        self.lib.unset_fg_color(self.rectmanager, rect_id)
+        err = self.lib.unset_fg_color(self.rectmanager, rect_id)
 
 
     def rect_unset_color(self, rect_id):
-        self.lib.unset_color(self.rectmanager, rect_id)
+        err = self.lib.unset_color(self.rectmanager, rect_id)
 
     def rect_set_bg_color(self, rect_id, color):
-        self.lib.set_bg_color(self.rectmanager, rect_id, color)
+        err = self.lib.set_bg_color(self.rectmanager, rect_id, color)
 
     def rect_set_fg_color(self, rect_id, color):
-        self.lib.set_fg_color(self.rectmanager, rect_id, color)
+        err = self.lib.set_fg_color(self.rectmanager, rect_id, color)
 
     def rect_move(self, rect_id, x, y):
-        self.lib.set_position(self.rectmanager, rect_id, x, y)
+        err = self.lib.set_position(self.rectmanager, rect_id, x, y)
+        logg(err, [rect_id, x, y], 'move')
 
     def rect_resize(self, rect_id, width, height):
-        self.lib.resize(self.rectmanager, rect_id, width, height)
+        err = self.lib.resize(self.rectmanager, rect_id, width, height)
+        logg(err, [rect_id, width, height], 'resize')
 
     def new_rect(self, **kwargs):
         width = 1
@@ -117,16 +139,19 @@ class RectManager:
 
 
     def rect_draw(self, rect_id):
-        self.lib.draw(self.rectmanager, rect_id)
+        err = self.lib.draw(self.rectmanager, rect_id)
+        logg(err, [rect_id], 'draw')
 
     def rect_remove(self, rect_id):
-        self.lib.delete_rect(self.rectmanager, rect_id)
+        err = self.lib.delete_rect(self.rectmanager, rect_id)
+        logg(err, [rect_id], 'remove')
 
-    def draw(self):
-        self.lib.draw(self.rectmanager, 0)
 
     def kill(self):
         self.lib.kill(self.rectmanager)
+
+    def draw(self):
+        self.rect_draw(0)
 
 class Rect(object):
     BLACK = 0
@@ -244,7 +269,7 @@ if __name__ == "__main__":
     screen = RectManager()
 
     rect = screen.new_rect(width=screen.width , height=screen.height // 2)
-    screen.rect_set_character(1, 4, 0, "Y")
+    screen.rect_set_character(0, 4, 0, "Y")
     screen.rect_set_bg_color(1, 4)
    # rect.set_character(4, 0, "Y")
    # rect.set_bg_color(4)

@@ -14,13 +14,13 @@ use std::cmp;
 
 #[derive(PartialEq, Eq)]
 pub enum RectError {
-    AllGood,
-    BadPosition,
-    NotFound,
-    ParentNotFound, // rect has an associated parent id that does not exist in RectManager
-    NoParent, // Rect has no parent id
-    BadColor,
-    InvalidUtf8
+    AllGood = 0,
+    BadPosition = 1,
+    NotFound = 2,
+    ParentNotFound = 3, // rect has an associated parent id that does not exist in RectManager
+    NoParent = 4, // Rect has no parent id
+    BadColor = 5,
+    InvalidUtf8 = 6
 }
 
 pub struct RectManager {
@@ -409,15 +409,16 @@ impl RectManager {
         output
     }
 
-
     // Top can be the same as the given rect
     fn get_top(&self, rect_id: usize) -> Result<&Rect, RectError> {
         let mut current_id = rect_id;
         let mut output = Err(RectError::NotFound);
+        let mut rect_defined = false;
 
         loop {
             match self.get_rect(current_id) {
                 Ok(current_rect) => {
+                    rect_defined = true;
                     match current_rect.parent {
                         Some(parent_id) => {
                             current_id = parent_id
@@ -426,7 +427,7 @@ impl RectManager {
                             break;
                         }
                     }
-                },
+                }
                 Err(e) => {
                     // Should only happen on first loop, indicating that the
                     // queried rect doesn't exist
@@ -436,12 +437,15 @@ impl RectManager {
             }
         }
 
-        if output.is_ok() {
+        if rect_defined {
             output = self.get_rect(current_id);
         }
 
         output
     }
+
+
+    // Top can be the same as the given rect
 
     // Top can be the same as the given rect
     fn get_top_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
@@ -514,7 +518,6 @@ impl RectManager {
         let mut tmp_chr;
         let mut tmp_color;
         let mut new_values = Vec::new();
-
 
         let mut output = Ok(());
 
@@ -610,6 +613,8 @@ impl RectManager {
                 }
             }
         }
+
+
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
                 Ok(rect) => {
@@ -1239,75 +1244,107 @@ impl RectManager {
 
 
 #[no_mangle]
-pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.disable(rect_id);
+    let result = rectmanager.disable(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
 #[no_mangle]
-pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.enable(rect_id);
+    let result = rectmanager.enable(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
 #[no_mangle]
-pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.draw(rect_id);
+    let result = rectmanager.draw(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) {
+pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    match rectmanager.get_rect_mut(rect_id) {
+    let result = match rectmanager.get_rect_mut(rect_id) {
         Ok(rect) => {
             rect.set_fg_color(col);
+            Ok(())
         },
         Err(e) => {
-
+            Err(e)
         }
     };
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) {
+pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    match rectmanager.get_rect_mut(rect_id) {
+    let result = match rectmanager.get_rect_mut(rect_id) {
         Ok(rect) => {
             rect.set_bg_color(col);
+            Ok(())
         },
         Err(e) => {
-
+            Err(e)
         }
     };
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
 
 #[no_mangle]
-pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: isize, new_height: isize) {
+pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: isize, new_height: isize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.resize(rect_id, new_width, new_height);
+    let result = rectmanager.resize(rect_id, new_width, new_height);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
@@ -1378,10 +1415,11 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
         new_c[(4 - cmp::min(4, string_bytes.len())) + i] = string_bytes[i];
     }
 
-    let output = rectmanager.set_character(rect_id, x, y, new_c);
+
+    let result = rectmanager.set_character(rect_id, x, y, new_c);
 
     Box::into_raw(rectmanager); // Prevent Release
-    match output {
+    match result {
         Ok(_) => RectError::AllGood,
         Err(e) => e
     }
@@ -1389,22 +1427,32 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
 
 
 #[no_mangle]
-pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) {
+pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let output = rectmanager.unset_character(rect_id, x, y);
+    let result = rectmanager.unset_character(rect_id, x, y);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
 #[no_mangle]
-pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> RectError {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.delete_rect(rect_id);
+    let result = rectmanager.delete_rect(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
@@ -1421,34 +1469,50 @@ pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: isize
 }
 
 #[no_mangle]
-pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) {
+pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> RectError {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.set_position(rect_id, x, y);
+    let result = rectmanager.set_position(rect_id, x, y);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize)  -> RectError {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.detach(rect_id);
+    let result = rectmanager.detach(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
 #[no_mangle]
-pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize) {
+pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize) -> RectError {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.attach(rect_id, parent_id);
+    let result = rectmanager.attach(rect_id, parent_id);
 
     Box::into_raw(rectmanager); // Prevent Release
+
+
+    match result {
+        Ok(_) => RectError::AllGood,
+        Err(e) => e
+    }
 }
 
 
@@ -1477,36 +1541,3 @@ pub extern "C" fn init(width: isize, height: isize) -> *mut RectManager {
     Box::into_raw(Box::new(rectmanager))
 }
 
-//
-//#[no_mangle]
-//pub extern "C" fn draw_area(ptr: *mut RectManager, from_box: usize, x: isize, y: isize, width: isize, height: isize) {
-//    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-//
-//    match _draw_area(&mut rectmanager, from_box, (x, y), (width, height)) {
-//        Ok(_) => (),
-//        Err(e) => panic!(e)
-//    };
-//
-//    Box::into_raw(rectmanager); // Prevent Release
-//}
-//
-//#[no_mangle]
-//pub extern "C" fn fillc(ptr: *mut RectManager, rect_id: usize, c: *const c_char) {
-//    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-//
-//    assert!(!c.is_null());
-//
-//    let c_str = unsafe { CStr::from_ptr(c) };
-//    let string_bytes = c_str.to_str().expect("Not a valid UTF-8 string").as_bytes();
-//
-//    let boxes = &mut rectmanager.boxes;
-//    match boxes.get_mut(&(rect_id as usize)) {
-//        Some(bleepsbox) => {
-//            bleepsbox.fill(string_bytes);
-//        }
-//        None => ()
-//    };
-//
-//    Box::into_raw(rectmanager); // Prevent Release
-//}
-//
