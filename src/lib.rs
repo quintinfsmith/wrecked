@@ -3,8 +3,9 @@ use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::str;
 use std::cmp;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
+
 
 /*
     TODO
@@ -13,10 +14,14 @@ use std::io::prelude::*;
     Drawing gets SLOOW with many layers. look for optimizations.
 */
 
-fn logg(msg: &String) -> std::io::Result<()> {
-    let mut file = File::create("rlogg")?;
-    file.write_all(msg.as_bytes())?;
-    Ok(())
+fn logg(mut msg: String) {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open("rlogg")
+        .unwrap();
+
+    writeln!(file, "{}\n", msg);
 }
 
 #[derive(PartialEq, Eq)]
@@ -122,7 +127,6 @@ impl Rect {
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
 
-
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
                 if x >= 0 && x < self.width && y >= 0 && y <= self.height {
@@ -175,6 +179,7 @@ impl Rect {
                 .push(*position);
 
         }
+
         self.flag_refresh();
         self._inverse_child_space.entry(rect_id)
             .or_insert(Vec::new())
@@ -312,10 +317,11 @@ impl RectManager {
 
         match parent_id {
             Some(unpacked) => {
-                rect.set_parent(unpacked);
+                self.attach(new_id, unpacked);
             }
             None => ()
         };
+
 
         new_id
     }
@@ -451,9 +457,6 @@ impl RectManager {
         output
     }
 
-
-    // Top can be the same as the given rect
-
     // Top can be the same as the given rect
     fn get_top_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
         let mut current_id = rect_id;
@@ -557,6 +560,7 @@ impl RectManager {
                             }
                             None => ()
                         }
+
                         for (child_id, value) in child_recache.iter_mut() {
                             match rect.child_positions.get_mut(&child_id) {
                                 Some(pos) => {
@@ -700,7 +704,7 @@ impl RectManager {
             Err(e) => {
                 output = Err(e);
             }
-        }
+        };
 
 
         if output.is_ok() {
@@ -927,6 +931,7 @@ impl RectManager {
         match self.get_parent_mut(rect_id) {
             Ok(parent) => {
                 parent.set_child_position(rect_id, x, y);
+                has_parent = true;
             }
             Err(error) => {
                 if error == RectError::ParentNotFound || error == RectError::NotFound {
@@ -1227,7 +1232,6 @@ impl RectManager {
                 output = self.flag_refresh(working_parent_id);
 
                 if output.is_ok() {
-                    ghosts = working_ghosts;
 
                     match self.get_parent_mut(working_parent_id) {
                         Ok(parent) => {

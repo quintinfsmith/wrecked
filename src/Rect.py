@@ -4,6 +4,7 @@ import sys
 import tty, termios
 import os
 from localfuncs import get_terminal_size
+import json
 
 def logg(error_code, args, msg):
     strargs = '('
@@ -16,6 +17,25 @@ def logg(error_code, args, msg):
 
     with open("logg", "a") as fp:
         fp.write(newline)
+
+class RectError(Exception):
+    def __init__(self, **kwargs):
+        self.msg = json.dumps(kwargs)
+        super().__init__(self.msg)
+
+class RectNotFound(RectError):
+    pass
+class RectParentNotFound(RectError):
+    pass
+class RectOutOfBounds(RectError):
+    pass
+
+EXCEPTIONS = {
+    0: None,
+    1: RectOutOfBounds,
+    2: RectNotFound,
+    3: RectParentNotFound
+}
 
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
@@ -66,60 +86,110 @@ class RectManager:
 
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
+        err = 0
         if (position != (0,0)):
             err = self.rect_move(rect_id, *position)
 
-            logg(err, [rect_id], 'attach')
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                parent_id=parent_id,
+                position=position
+            )
 
     def rect_detach(self, rect_id):
         err = self.lib.detach(self.rectmanager, rect_id)
-        logg(err, [rect_id], 'dettach')
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_disable(self, rect_id):
         err = self.lib.disable(self.rectmanager, rect_id)
-        logg(err, [rect_id], 'disable')
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_enable(self, rect_id):
         err = self.lib.enable(self.rectmanager, rect_id)
-        logg(err, [rect_id], 'enable')
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_set_character(self, rect_id, x, y, character):
         fmt_character = bytes(character, 'utf-8')
         err = self.lib.set_character(self.rectmanager, rect_id, x, y, fmt_character)
 
-        logg(err, [rect_id, x, y, character], 'set_character')
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                position=(x, y),
+                character=character
+            )
+
 
     def rect_unset_character(self, rect_id, x, y):
         err = self.lib.unset_character(self.rectmanager, rect_id, x, y)
-        logg(err, [rect_id, x, y], 'unset_character')
+
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                position=(x, y),
+                character=character
+            )
 
     def rect_unset_bg_color(self, rect_id):
         err = self.lib.unset_bg_color(self.rectmanager, rect_id)
 
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
     def rect_unset_fg_color(self, rect_id):
         err = self.lib.unset_fg_color(self.rectmanager, rect_id)
+
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_unset_color(self, rect_id):
         err = self.lib.unset_color(self.rectmanager, rect_id)
 
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
     def rect_set_bg_color(self, rect_id, color):
         err = self.lib.set_bg_color(self.rectmanager, rect_id, color)
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                color=color
+            )
 
     def rect_set_fg_color(self, rect_id, color):
         err = self.lib.set_fg_color(self.rectmanager, rect_id, color)
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                color=color
+            )
 
     def rect_move(self, rect_id, x, y):
         err = self.lib.set_position(self.rectmanager, rect_id, x, y)
-        logg(err, [rect_id, x, y], 'move')
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                position=(x, y)
+            )
 
     def rect_resize(self, rect_id, width, height):
         err = self.lib.resize(self.rectmanager, rect_id, width, height)
-        logg(err, [rect_id, width, height], 'resize')
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                dimensions=(width, height)
+            )
 
+
+    # TODO: Handle Errors here
     def new_rect(self, **kwargs):
         width = 1
         if 'width' in kwargs.keys():
@@ -140,11 +210,19 @@ class RectManager:
 
     def rect_draw(self, rect_id):
         err = self.lib.draw(self.rectmanager, rect_id)
-        logg(err, [rect_id], 'draw')
+
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                dimensions=(width, height)
+            )
 
     def rect_remove(self, rect_id):
         err = self.lib.delete_rect(self.rectmanager, rect_id)
-        logg(err, [rect_id], 'remove')
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id
+            )
 
 
     def kill(self):
@@ -272,7 +350,7 @@ if __name__ == "__main__":
     screen.rect_set_character(0, 4, 0, "Y")
     rect.set_character(4, 2, "Y")
     rect.move(1,1)
-   # rect.set_bg_color(4)
+    rect.set_bg_color(4)
 
 
 #    for i in range(10):
