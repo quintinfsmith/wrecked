@@ -23,18 +23,18 @@ class RectError(Exception):
         self.msg = json.dumps(kwargs)
         super().__init__(self.msg)
 
-class RectNotFound(RectError):
+class NotFound(RectError):
     pass
-class RectParentNotFound(RectError):
+class ParentNotFound(RectError):
     pass
-class RectOutOfBounds(RectError):
+class OutOfBounds(RectError):
     pass
 
 EXCEPTIONS = {
     0: None,
-    1: RectOutOfBounds,
-    2: RectNotFound,
-    3: RectParentNotFound
+    1: OutOfBounds,
+    2: NotFound,
+    3: ParentNotFound
 }
 
 class RectManager:
