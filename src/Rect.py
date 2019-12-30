@@ -80,6 +80,8 @@ class RectManager:
         self.width, self.height = get_terminal_size()
         self.rectmanager = self.lib.init(self.width, self.height)
 
+        self.root = Rect(0, self, width=self.width, height=self.height)
+
         self._serving = 0
         self._queue_number = 0
 
@@ -190,7 +192,7 @@ class RectManager:
 
 
     # TODO: Handle Errors here
-    def new_rect(self, **kwargs):
+    def create_rect(self, **kwargs):
         width = 1
         if 'width' in kwargs.keys():
             width = kwargs['width']
@@ -226,10 +228,18 @@ class RectManager:
 
 
     def kill(self):
+        rects = []
+        for rect_id, rect in self.root.rects.items():
+            rects.append(rect)
+
+        while rects:
+            rects.pop().detach()
+
         self.lib.kill(self.rectmanager)
 
     def draw(self):
         self.rect_draw(0)
+
 
 class Rect(object):
     BLACK = 0
@@ -336,7 +346,7 @@ class Rect(object):
 
     def new_rect(self, **kwargs):
         kwargs['parent'] = self.rect_id
-        rect = self._screen.new_rect(**kwargs)
+        rect = self._screen.create_rect(**kwargs)
         self.rects[rect.rect_id] = rect
         rect.parent = self
 
@@ -346,7 +356,7 @@ if __name__ == "__main__":
     import time, math
     screen = RectManager()
 
-    rect = screen.new_rect(width=screen.width , height=screen.height // 2)
+    rect = screen.root.new_rect(width=screen.width, height=screen.height // 2)
     screen.rect_set_character(0, 4, 0, "Y")
     rect.set_character(4, 2, "Y")
     rect.move(1,1)
@@ -363,7 +373,7 @@ if __name__ == "__main__":
 #    new_rect.set_fg_color(3)
 #    new_rect.draw()
 
-    screen.draw()
+    screen.root.draw()
 
     input()
 

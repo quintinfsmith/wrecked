@@ -1548,10 +1548,21 @@ pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize
 
 #[no_mangle]
 pub extern "C" fn kill(ptr: *mut RectManager) {
-    let rectmanager = unsafe { Box::from_raw(ptr) };
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    println!("\x1B[?25h"); // Show Cursor
     println!("\x1B[?1049l"); // Return to previous screen
+    println!("\x1B[?25h"); // Show Cursor
+
+    let mut rect_ids = Vec::new();
+    for (rect_id, rect) in rectmanager.rects.iter() {
+        rect_ids.push(*rect_id);
+    }
+
+    for rect_id in rect_ids.iter() {
+        rectmanager.detach(*rect_id);
+    }
+
+    rectmanager.draw(0);
 
     // TODO: Figure out why releasing causes segfault
     Box::into_raw(rectmanager); // Prevent Release
