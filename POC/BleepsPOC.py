@@ -18,13 +18,11 @@ class BleepsScreen:
     def box_flag_cache(self, box_id):
         self.rect.flag_full_refresh = True
 
-
     def box_attach(self, box_id, parent_id, position=(0,0)):
         self.box_cache[parent_id].rect.add_child(self.box_cache[box_id])
 
         if position != (0,0):
             self.box_move(box_id, *position)
-
 
     def box_detach(self, box_id):
         self.box_cache[box_id].rect.detach()
