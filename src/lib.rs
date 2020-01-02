@@ -1052,6 +1052,33 @@ impl RectManager {
         output
     }
 
+    fn empty(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut children = Vec::new();
+        let mut output = Ok(());
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                for child_id in rect.children.iter() {
+                    children.push(*child_id);
+                }
+            }
+            Err(error) => {
+                output = Err(error);
+            }
+        };
+
+        if (output.is_ok()) {
+            for child_id in children.iter() {
+                output = self.detach(*child_id);
+                if (output.is_err()) {
+                    break;
+                }
+            }
+        }
+
+        output
+    }
+
     fn detach(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut parent_id = 0;
         let mut has_parent = false;
@@ -1504,6 +1531,21 @@ pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let result = rectmanager.set_position(rect_id, x, y);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(error) => error as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn empty(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.empty(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 

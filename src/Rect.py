@@ -60,6 +60,8 @@ class RectManager:
             uint32_t attach(RectManager, uint32_t, uint32_t);
             uint32_t detach(RectManager, uint32_t);
 
+            uint32_t empty(RectManager, uint32_t);
+
 
             uint32_t unset_color(RectManager, uint32_t);
             uint32_t set_bg_color(RectManager, uint32_t, uint8_t);
@@ -104,6 +106,10 @@ class RectManager:
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
+    def rect_empty(self, rect_id):
+        err = self.lib.empty(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_disable(self, rect_id):
         err = self.lib.disable(self.rectmanager, rect_id)
@@ -343,6 +349,9 @@ class Rect(object):
 
     def unset_color(self):
         self._screen.rect_unset_bg_color(self.rect_id)
+
+    def empty(self):
+        self._screen.rect_empty(self.rect_id)
 
     def new_rect(self, **kwargs):
         kwargs['parent'] = self.rect_id
