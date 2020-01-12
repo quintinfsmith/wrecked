@@ -1,6 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::str;
 use std::cmp;
 use std::fs::OpenOptions;
@@ -60,7 +61,7 @@ pub struct Rect {
     character_space: HashMap<(isize,isize), [u8; 4]>,
 
     flag_full_refresh: bool,
-    flags_pos_refresh: Vec<(isize, isize)>,
+    flags_pos_refresh: HashSet<(isize, isize)>,
 
     enabled: bool,
     has_been_drawn: bool,
@@ -84,7 +85,7 @@ impl Rect {
             child_ghosts: HashMap::new(),
             character_space: HashMap::new(),
             flag_full_refresh: true,
-            flags_pos_refresh: Vec::new(),
+            flags_pos_refresh: HashSet::new(),
             enabled: true,
             has_been_drawn: false,
             color: 0u16,
@@ -116,7 +117,7 @@ impl Rect {
                 .or_insert(Vec::new());
 
             for (x, y) in positions.iter() {
-                self.flags_pos_refresh.push((*x, *y))
+                self.flags_pos_refresh.insert((*x, *y));
             }
 
         }
@@ -159,7 +160,7 @@ impl Rect {
                         .or_insert(Vec::new())
                         .push((x, y));
 
-                    self.flags_pos_refresh.push((x, y));
+                    self.flags_pos_refresh.insert((x, y));
 
                     match self.child_ghosts.get_mut(&rect_id) {
                         Some(coord_list) => {
@@ -188,7 +189,7 @@ impl Rect {
 
         for position in new_positions.iter() {
 
-            self.flags_pos_refresh.push(*position);
+            self.flags_pos_refresh.insert(*position);
 
             match self.child_space.get_mut(&position) {
                 Some(child_ids) => {
@@ -214,7 +215,7 @@ impl Rect {
             self.character_space.entry((x, y))
                 .and_modify(|coord| { *coord = character })
                 .or_insert(character);
-            self.flags_pos_refresh.push((x, y));
+            self.flags_pos_refresh.insert((x, y));
             output = Ok(());
         } else {
             output = Err(RectError::BadPosition);
@@ -547,7 +548,7 @@ impl RectManager {
         output
     }
 
-    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &Vec<(isize, isize)>) -> Result<(), RectError> {
+    fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), RectError> {
         // TODO: Double Check the logic in this function. I may have biffed it when refactoring
         /*
             child_recache items are:
@@ -557,8 +558,8 @@ impl RectManager {
                 offset (if has parent)
         */
         let mut child_recache: HashMap<usize, (Vec<(isize, isize)>, bool, (isize, isize))> = HashMap::new();
-        let mut x;
-        let mut y;
+        let mut x: isize;
+        let mut y: isize;
         let mut tmp_chr;
         let mut tmp_color;
         let mut new_values = Vec::new();
@@ -567,20 +568,22 @@ impl RectManager {
 
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
-                for i in 0 .. positions.len() {
-                    x = positions[i].0;
-                    y = positions[i].1;
-
+                for (_x, _y) in positions.iter() {
+                    x = *_x;
+                    y = *_y;
 
                     if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
                         // Make sure at least default character is present
                         tmp_color = rect.color;
+
                         tmp_chr = rect.character_space.entry((x, y))
                             .or_insert(rect.default_character);
 
                         rect._cached_display.entry((x,y))
                             .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
                             .or_insert((*tmp_chr, tmp_color));
+
+
                     } else {
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
@@ -619,7 +622,7 @@ impl RectManager {
                     match self.get_rect_mut(*child_id) {
                         Ok(child) => {
                             for (x, y) in coords.iter() {
-                                child.flags_pos_refresh.push((
+                                child.flags_pos_refresh.insert((
                                     *x - child_position.0,
                                     *y - child_position.1
                                 ));
@@ -681,7 +684,7 @@ impl RectManager {
             Since Children indicate to parents that a refresh is requested,
             if no flag is set, there is no need to delve down
         */
-        let mut flags_pos_refresh = Vec::new();
+        let mut flags_pos_refresh = HashSet::new();
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -697,7 +700,7 @@ impl RectManager {
 
                     for y in 0 .. rect.height {
                         for x in 0 .. rect.width {
-                            flags_pos_refresh.push((x,y));
+                            flags_pos_refresh.insert((x, y));
                         }
                     }
                 } else {
@@ -706,7 +709,7 @@ impl RectManager {
                         any children that cover the requested positions
                     */
                     for pos in rect.flags_pos_refresh.iter() {
-                        flags_pos_refresh.push((pos.0, pos.1));
+                        flags_pos_refresh.insert((pos.0, pos.1));
                     }
                 }
                 rect.flags_pos_refresh.clear();
@@ -791,7 +794,6 @@ impl RectManager {
             }
         };
 
-
         let mut renderstring = "".to_string();
         if output.is_ok() {
             let mut val_a: &[u8];
@@ -813,7 +815,13 @@ impl RectManager {
 
                     for (pos, val) in sorted.iter() {
                         if pos.1 + offset.1 != current_row || pos.0 + offset.0 != current_col {
+                            // end the open formatting
+                            renderstring += &format!("\x1B[0m");
+
                             renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
+
+                            // Cut off any open formatting
+                            renderstring += &format!("\x1B[0m");
                         }
                         current_col = pos.0 + offset.0;
                         current_row = pos.1 + offset.1;
@@ -1001,19 +1009,52 @@ impl RectManager {
             output = self.update_child_space(rect_id, (x, y, x + dim.0, y + dim.1));
         }
 
+        if output.is_ok() {
+            self.flag_parent_refresh(rect_id);
+        }
+
         output
     }
 
     // Flags the area of the parent of given rect covered by the given rect
     fn flag_parent_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
+        let mut dimensions = self.get_rect_size(rect_id).ok().unwrap();
+        let mut working_id = rect_id;
+        let mut offset = (0, 0);
 
-        match self.get_parent_mut(rect_id) {
-            Ok(rect) => {
-                output = rect.flag_child_rect_refresh(rect_id);
-            }
-            Err(e) => {
-                output = Err(e);
+        loop {
+            match self.get_relative_offset(working_id) {
+                Ok(rel_offset) => {
+                    offset = (
+                        offset.0 + rel_offset.0,
+                        offset.1 + rel_offset.1
+                    );
+                }
+                Err(error) => {
+                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                        output = Err(error);
+                    }
+                    break;
+                }
+            };
+
+
+            match self.get_parent_mut(working_id) {
+                Ok(parent) => {
+                    for x in 0 .. dimensions.0 {
+                        for y in 0 .. dimensions.1 {
+                            parent.flags_pos_refresh.insert((offset.0 + x, offset.1 + y));
+                        }
+                    }
+                    working_id = parent.rect_id;
+                }
+                Err(error) => {
+                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                        output = Err(error);
+                    }
+                    break;
+                }
             }
         }
 
@@ -1025,7 +1066,7 @@ impl RectManager {
 
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
-                rect.flags_pos_refresh.push((x, y));
+                rect.flags_pos_refresh.insert((x, y));
             }
             Err(e) => {
                 output = Err(e);
@@ -1051,7 +1092,7 @@ impl RectManager {
 
                 match self.get_parent_mut(working_id) {
                     Ok(parent) => {
-                        parent.flags_pos_refresh.push((x_out, y_out));
+                        parent.flags_pos_refresh.insert((x_out, y_out));
                         working_id = parent.rect_id;
                     }
                     Err(error) => {
@@ -1080,22 +1121,7 @@ impl RectManager {
         };
 
         if output.is_ok() {
-            // loop top, setting requisite refresh flags
-            let mut working_child_id = rect_id;
-            loop {
-                match self.get_parent_mut(working_child_id) {
-                    Ok(parent) => {
-                        parent.flag_child_rect_refresh(working_child_id);
-                        working_child_id = parent.rect_id;
-                    }
-                    Err(error) => {
-                        if error == RectError::ParentNotFound || error == RectError::NotFound {
-                            output = Err(error);
-                        }
-                        break;
-                    }
-                };
-            }
+            output = self.flag_parent_refresh(rect_id);
         }
 
         output
@@ -1585,7 +1611,6 @@ pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
         Err(e) => e as u32
     }
 }
-
 
 
 #[no_mangle]
