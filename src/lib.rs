@@ -1351,7 +1351,7 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -
 pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = match rectmanager.get_rect_mut(rect_id) {
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
         Ok(rect) => {
             rect.set_bg_color(col);
             Ok(())
@@ -1360,6 +1360,10 @@ pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -
             Err(e)
         }
     };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -1390,7 +1394,7 @@ pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: isize
 pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = match rectmanager.get_rect_mut(rect_id) {
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
         Ok(rect) => {
             rect.unset_bg_color();
             Ok(())
@@ -1399,6 +1403,10 @@ pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
             Err(e)
         }
     };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -1414,7 +1422,7 @@ pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = match rectmanager.get_rect_mut(rect_id) {
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
         Ok(rect) => {
             rect.unset_fg_color();
             Ok(())
@@ -1423,6 +1431,10 @@ pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
             Err(e)
         }
     };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
 
     Box::into_raw(rectmanager); // Prevent Release
 
