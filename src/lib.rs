@@ -32,7 +32,8 @@ pub enum RectError {
     ParentNotFound = 3, // rect has an associated parent id that does not exist in RectManager
     NoParent = 4, // Rect has no parent id
     BadColor = 5,
-    InvalidUtf8 = 6
+    InvalidUtf8 = 6,
+    InvalidChild = 7
 }
 
 pub struct RectManager {
@@ -104,6 +105,25 @@ impl Rect {
         self.flag_full_refresh = true;
     }
 
+    fn flag_child_rect_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        if (! self.has_child(rect_id)) {
+            output = Err(RectError::InvalidChild);
+        } else {
+
+            let positions = self._inverse_child_space.entry(rect_id)
+                .or_insert(Vec::new());
+
+            for (x, y) in positions.iter() {
+                self.flags_pos_refresh.push((*x, *y))
+            }
+
+        }
+
+        output
+    }
+
     fn get_child_position(&self, child_id: usize) -> (isize, isize) {
         let x;
         let y;
@@ -135,10 +155,11 @@ impl Rect {
                         .or_insert(Vec::new())
                         .push(rect_id);
 
-
                     self._inverse_child_space.entry(rect_id)
                         .or_insert(Vec::new())
                         .push((x, y));
+
+                    self.flags_pos_refresh.push((x, y));
 
                     match self.child_ghosts.get_mut(&rect_id) {
                         Some(coord_list) => {
@@ -156,7 +177,7 @@ impl Rect {
         // Works around borrowing
         // TODO: Implement Copy for Vec<(isize, isize)> ?
         let mut new_positions = Vec::new();
-        match  self._inverse_child_space.get(&rect_id) {
+        match self._inverse_child_space.get(&rect_id) {
             Some(positions) => {
                 for position in positions.iter() {
                     new_positions.push((position.0, position.1));
@@ -166,6 +187,8 @@ impl Rect {
         };
 
         for position in new_positions.iter() {
+
+            self.flags_pos_refresh.push(*position);
 
             match self.child_space.get_mut(&position) {
                 Some(child_ids) => {
@@ -180,7 +203,6 @@ impl Rect {
 
         }
 
-        self.flag_refresh();
         self._inverse_child_space.entry(rect_id)
             .or_insert(Vec::new())
             .clear();
@@ -192,7 +214,7 @@ impl Rect {
             self.character_space.entry((x, y))
                 .and_modify(|coord| { *coord = character })
                 .or_insert(character);
-            self.flag_refresh();
+            self.flags_pos_refresh.push((x, y));
             output = Ok(());
         } else {
             output = Err(RectError::BadPosition);
@@ -295,6 +317,18 @@ impl Rect {
             .and_modify(|e| { *e = (x, y) })
             .or_insert((x, y));
     }
+
+    fn has_child(&mut self, child_id: usize) -> bool {
+        let mut output = false;
+        for connected_child_id in self.children.iter() {
+            if *connected_child_id == child_id {
+                output = true;
+                break;
+            }
+        }
+        output
+    }
+
 }
 
 impl RectManager {
@@ -584,14 +618,12 @@ impl RectManager {
                 if *child_has_position {
                     match self.get_rect_mut(*child_id) {
                         Ok(child) => {
-                            child.flag_refresh();
-                            // Will uncomment when I bring back precision refreshing
-                            //for (x, y) in coords.iter() {
-                            //    child.flags_pos_refresh.push((
-                            //        *x - child_position.0,
-                            //        *y - child_position.1
-                            //    ));
-                            //}
+                            for (x, y) in coords.iter() {
+                                child.flags_pos_refresh.push((
+                                    *x - child_position.0,
+                                    *y - child_position.1
+                                ));
+                            }
                         }
                         Err(e) => {
                             output = Err(e);
@@ -857,6 +889,30 @@ impl RectManager {
 
         output
     }
+    fn get_relative_offset(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
+        let mut x = 0;
+        let mut y = 0;
+        let mut output = Ok((0, 0));
+        let mut pos;
+
+
+        match self.get_parent(rect_id) {
+            Ok(parent) => {
+                pos = parent.get_child_position(rect_id);
+                x += pos.0;
+                y += pos.1;
+            },
+            Err(error) => {
+                output = Err(error);
+            }
+        };
+
+        if output.is_ok() {
+           output = Ok((x, y));
+        }
+
+        output
+    }
 
     fn get_absolute_offset(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
         let mut x = 0;
@@ -948,6 +1004,69 @@ impl RectManager {
         output
     }
 
+    // Flags the area of the parent of given rect covered by the given rect
+    fn flag_parent_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        match self.get_parent_mut(rect_id) {
+            Ok(rect) => {
+                output = rect.flag_child_rect_refresh(rect_id);
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        }
+
+        output
+    }
+
+    fn flag_pos_refresh(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.flags_pos_refresh.push((x, y));
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        };
+
+        if output.is_ok() {
+            // loop top, setting requisite refresh flags
+            let mut x_out = x;
+            let mut y_out = y;
+            let mut working_id = rect_id;
+            loop {
+                match self.get_relative_offset(rect_id) {
+                    Ok(offs) => {
+                        x_out += offs.0;
+                        y_out += offs.1;
+                    }
+                    Err(e) => {
+                        output = Err(e);
+                        break;
+                    }
+                };
+
+                match self.get_parent_mut(working_id) {
+                    Ok(parent) => {
+                        parent.flags_pos_refresh.push((x_out, y_out));
+                        working_id = parent.rect_id;
+                    }
+                    Err(error) => {
+                        if error == RectError::ParentNotFound || error == RectError::NotFound {
+                            output = Err(error);
+                        }
+                        break;
+                    }
+                };
+            }
+        }
+
+        output
+    }
+
     fn flag_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
@@ -966,7 +1085,7 @@ impl RectManager {
             loop {
                 match self.get_parent_mut(working_child_id) {
                     Ok(parent) => {
-                        parent.flag_refresh();
+                        parent.flag_child_rect_refresh(working_child_id);
                         working_child_id = parent.rect_id;
                     }
                     Err(error) => {
