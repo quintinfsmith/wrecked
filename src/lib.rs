@@ -992,25 +992,40 @@ impl RectManager {
         let mut output = Ok(());
 
         let mut has_parent = false;
+        let mut did_move = true;
+
         match self.get_parent_mut(rect_id) {
             Ok(parent) => {
-                parent.set_child_position(rect_id, x, y);
-                has_parent = true;
+                match parent.child_positions.get(&rect_id) {
+                    Some((xx, yy)) => {
+                        if *xx == x && *yy == y {
+                            did_move = false;
+                        }
+                    }
+                    None => ()
+                };
+                if (did_move) {
+                    parent.set_child_position(rect_id, x, y);
+                    has_parent = true;
+                }
             }
             Err(error) => {
+                did_move = false;
                 if error == RectError::ParentNotFound || error == RectError::NotFound {
                     output = Err(error);
                 }
             }
         };
 
-        if has_parent {
-            let dim = self.get_rect_size(rect_id).ok().unwrap();
-            output = self.update_child_space(rect_id, (x, y, x + dim.0, y + dim.1));
-        }
+        if did_move {
+            if has_parent {
+                let dim = self.get_rect_size(rect_id).ok().unwrap();
+                output = self.update_child_space(rect_id, (x, y, x + dim.0, y + dim.1));
+            }
 
-        if output.is_ok() {
-            self.flag_parent_refresh(rect_id);
+            if output.is_ok() {
+                self.flag_parent_refresh(rect_id);
+            }
         }
 
         output
@@ -1401,7 +1416,6 @@ impl RectManager {
                     working_ghosts.push((new_x, new_y));
                 }
 
-                output = self.flag_refresh(working_parent_id);
 
                 if output.is_ok() {
 
@@ -1409,6 +1423,12 @@ impl RectManager {
                         Ok(parent) => {
                             working_offset = parent.child_positions[&working_parent_id];
                             working_parent_id = parent.rect_id;
+
+                            for x in new_corners.0 .. new_corners.2 {
+                                for y in new_corners.1 .. new_corners.3 {
+                                    parent.flags_pos_refresh.insert((x, y));
+                                }
+                            }
                         },
                         Err(error) => {
                             if error == RectError::ParentNotFound || error == RectError::NotFound {
