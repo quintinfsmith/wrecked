@@ -39,7 +39,8 @@ pub enum RectError {
 
 pub struct RectManager {
     idgen: usize,
-    rects: HashMap<usize, Rect>
+    rects: HashMap<usize, Rect>,
+    draw_queue: Vec<usize>
 }
 
 pub struct Rect {
@@ -68,7 +69,8 @@ pub struct Rect {
 
     color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
-    _cached_display: HashMap<(isize, isize), ([u8; 4], u16)>
+    _cached_display: HashMap<(isize, isize), ([u8; 4], u16)>,
+
 }
 
 impl Rect {
@@ -336,7 +338,8 @@ impl RectManager {
     fn new() -> RectManager {
         let mut rectmanager = RectManager {
             idgen: 0,
-            rects: HashMap::new()
+            rects: HashMap::new(),
+            draw_queue: Vec::new()
         };
         rectmanager.new_rect(None);
 
@@ -758,8 +761,80 @@ impl RectManager {
         output
     }
 
+    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), ([u8; 4], u16))>) {
+        let mut renderstring = "".to_string();
+
+        let mut current_col = -1;
+        let mut current_row = -1;
+
+        let mut val_a: &[u8];
+        let mut color_value: u16;
+        let mut current_line_color_value: u16 = 0;
+        let mut utf_char: &[u8];
+        let mut utf_char_split_index: usize;
+        display_map.sort();
+
+        for (pos, val) in display_map.iter() {
+            if pos.1 != current_row || pos.0 != current_col {
+                renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
+
+            }
+            current_col = pos.0;
+            current_row = pos.1;
+
+            val_a = &val.0;
+            color_value = val.1;
+            if color_value != current_line_color_value {
+                if color_value == 0 {
+                    renderstring += &format!("\x1B[0m");
+                } else {
+                    // ForeGround
+                    if (color_value >> 5) & 16 == 16 {
+                        if (color_value >> 5) & 8 == 8 {
+                            renderstring += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
+                        } else {
+                            renderstring += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[39m");
+                    }
+
+                    // BackGround
+                    if color_value & 16 == 16 {
+                        if color_value & 8 == 8 {
+                            renderstring += &format!("\x1B[10{}m", (color_value & 7));
+                        } else {
+                            renderstring += &format!("\x1B[4{}m", (color_value & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[49m");
+                    }
+                }
+                current_line_color_value = color_value;
+            }
+
+
+            utf_char_split_index = 0;
+            for i in 0..4 {
+                if val_a[i] != 0 {
+                    utf_char_split_index = i;
+                    break;
+                }
+            }
+
+            utf_char = val_a.split_at(utf_char_split_index).1;
+
+            renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
+            current_col += 1;
+        }
+
+        print!("{}\x1B[0m", renderstring);
+        println!("\x1B[1;1H");
+    }
+
     fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
+        let mut to_draw = Vec::new();
 
         let mut offset = (0, 0);
         match self.get_absolute_offset(rect_id) {
@@ -771,87 +846,69 @@ impl RectManager {
             }
         };
 
-        let mut renderstring = "".to_string();
         if output.is_ok() {
-            let mut val_a: &[u8];
-            let mut color_value: u16;
-            let mut current_line_color_value: u16 = 0;
-            let mut utf_char: &[u8];
-            let mut utf_char_split_index: usize;
-
             match self.get_display(rect_id) {
                 Ok(display_map) => {
-                    let mut sorted = Vec::new();
                     for (pos, val) in display_map.iter() {
-                        sorted.push((pos, val));
+                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
                     }
-                    sorted.sort();
-
-                    let mut current_col = -1;
-                    let mut current_row = -1;
-
-                    for (pos, val) in sorted.iter() {
-                        if pos.1 + offset.1 != current_row || pos.0 + offset.0 != current_col {
-                            renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
-
-                        }
-                        current_col = pos.0 + offset.0;
-                        current_row = pos.1 + offset.1;
-
-                        val_a = &val.0;
-                        color_value = val.1;
-                        if color_value != current_line_color_value {
-                            if color_value == 0 {
-                                renderstring += &format!("\x1B[0m");
-                            } else {
-                                // ForeGround
-                                if (color_value >> 5) & 16 == 16 {
-                                    if (color_value >> 5) & 8 == 8 {
-                                        renderstring += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
-                                    } else {
-                                        renderstring += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
-                                    }
-                                } else {
-                                    renderstring += &format!("\x1B[39m");
-                                }
-
-                                // BackGround
-                                if color_value & 16 == 16 {
-                                    if color_value & 8 == 8 {
-                                        renderstring += &format!("\x1B[10{}m", (color_value & 7));
-                                    } else {
-                                        renderstring += &format!("\x1B[4{}m", (color_value & 7));
-                                    }
-                                } else {
-                                    renderstring += &format!("\x1B[49m");
-                                }
-                            }
-                            current_line_color_value = color_value;
-                        }
-
-
-                        utf_char_split_index = 0;
-                        for i in 0..4 {
-                            if val_a[i] != 0 {
-                                utf_char_split_index = i;
-                                break;
-                            }
-                        }
-
-                        utf_char = val_a.split_at(utf_char_split_index).1;
-
-                        renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
-                        current_col += 1;
-                    }
-                },
+                }
                 Err(e) => {
                     output = Err(e);
                 }
             }
         }
 
-        print!("{}\x1B[0m", renderstring);
-        println!("\x1B[0;0H");
+        if output.is_ok() {
+            self._draw(&mut to_draw);
+        }
+
+        output
+    }
+
+    fn draw_queued(&mut self) -> Result<(), RectError> {
+        let mut output = Ok(());
+        let mut to_draw = Vec::new();
+
+        let mut offset = (0, 0);
+
+        let mut draw_queue = Vec::new();
+
+        for rect_id in self.draw_queue.iter() {
+            draw_queue.push(*rect_id);
+        }
+        self.draw_queue.clear();
+
+
+        for rect_id in draw_queue {
+            match self.get_absolute_offset(rect_id) {
+                Ok(_offset) => {
+                    offset = _offset;
+                }
+                Err(e)=> {
+                    output = Err(e);
+                }
+            };
+
+            if output.is_ok() {
+                match self.get_display(rect_id) {
+                    Ok(display_map) => {
+                        for (pos, val) in display_map.iter() {
+                            to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                        }
+                    }
+                    Err(e) => {
+                        output = Err(e);
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        self._draw(&mut to_draw);
+
 
         output
     }
@@ -1418,6 +1475,18 @@ impl RectManager {
 
         output
     }
+
+    fn queue_draw(&mut self, rect_id: usize) -> Result<(), RectError> {
+        match self.get_rect(rect_id) {
+            Ok(_) => {
+                self.draw_queue.push(rect_id);
+                Ok(())
+            }
+            Err(error) => {
+                Err(error)
+            }
+        }
+    }
 }
 
 
@@ -1450,12 +1519,48 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn queue_draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.queue_draw(rect_id);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn draw_queued(ptr: *mut RectManager) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.draw_queued();
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.draw(rect_id);
+    let mut result;
+    let draw_queue_length = rectmanager.draw_queue.len();
+    if draw_queue_length > 0 {
+        result = rectmanager.queue_draw(rect_id);
+        if (result.is_ok()) {
+            result = rectmanager.draw_queued()
+        }
+    } else {
+        result = rectmanager.draw(rect_id);
+    }
 
     Box::into_raw(rectmanager); // Prevent Release
 

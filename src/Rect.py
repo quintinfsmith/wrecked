@@ -56,6 +56,7 @@ class RectManager:
 
             uint32_t new_rect(RectManager, uint32_t, uint32_t, uint32_t);
             uint32_t delete_rect(RectManager, uint32_t);
+            uint32_t draw_queued(RectManager);
 
 
             uint32_t set_position(RectManager, uint32_t, int32_t, int32_t);
@@ -79,6 +80,8 @@ class RectManager:
             uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
 
             uint32_t draw(RectManager, uint32_t);
+            uint32_t queue_draw(RectManager, uint32_t);
+
         """)
 
         self.lib = ffi.dlopen(self.SO_PATH)
@@ -90,6 +93,17 @@ class RectManager:
         self._serving = 0
         self._queue_number = 0
 
+    def draw_queued(self):
+        err = self.lib.draw_queued(self.rectmanager)
+
+        if err:
+            raise EXCEPTIONS[err]()
+
+    def rect_queue_draw(self, rect_id):
+        err = self.lib.queue_draw(self.rectmanager, rect_id)
+
+        if err:
+            raise EXCEPTIONS[err](rect_id=rect_id)
 
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
@@ -321,6 +335,12 @@ class Rect(object):
     def draw(self):
         self._screen.rect_draw(self.rect_id)
 
+    def queue_draw(self):
+        self._screen.rect_queue_draw(self.rect_id)
+
+    def draw_queued(self):
+        self._screen.draw_queued()
+
     def refresh(self):
         self._screen.draw()
 
@@ -385,10 +405,13 @@ if __name__ == "__main__":
     new_rect.set_bg_color(Rect.RED)
     new_rect.set_fg_color(3)
 
-#    new_rect.draw()
-#    rect.draw()
-    screen.root.draw()
-    screen.root.draw()
+    screen.root.queue_draw()
+    new_rect.queue_draw()
+    rect.queue_draw()
+
+    #screen.root.draw()
+
+    screen.draw_queued()
 
     input()
 
