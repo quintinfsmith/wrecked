@@ -731,23 +731,10 @@ impl RectManager {
         let mut output = Ok(HashMap::new());
         let mut outhash = HashMap::new();
 
-        let mut top_id = 0;
-        match self.get_top_mut(rect_id) {
-            Ok(top) => {
-                top_id = top.rect_id;
-            }
+        match self._update_cached_display(rect_id) {
+            Ok(_) => {}
             Err(e) => {
                 output = Err(e);
-            }
-        };
-
-
-        if output.is_ok() {
-            match self._update_cached_display(top_id) {
-                Ok(_) => {}
-                Err(e) => {
-                    output = Err(e);
-                }
             }
         }
 
@@ -769,16 +756,6 @@ impl RectManager {
         }
 
         output
-    }
-
-    fn flag_full_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
-        match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
-                rect.flag_full_refresh = true;
-                Ok(())
-            }
-            Err(e) => Err(e)
-        }
     }
 
     fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
@@ -815,13 +792,8 @@ impl RectManager {
 
                     for (pos, val) in sorted.iter() {
                         if pos.1 + offset.1 != current_row || pos.0 + offset.0 != current_col {
-                            // end the open formatting
-                            renderstring += &format!("\x1B[0m");
-
                             renderstring += &format!("\x1B[{};{}H", offset.1 + pos.1 + 1, offset.0 + pos.0 + 1);
 
-                            // Cut off any open formatting
-                            renderstring += &format!("\x1B[0m");
                         }
                         current_col = pos.0 + offset.0;
                         current_row = pos.1 + offset.1;
@@ -879,7 +851,7 @@ impl RectManager {
         }
 
         print!("{}\x1B[0m", renderstring);
-        println!("\x1B[1;1H");
+        println!("\x1B[0;0H");
 
         output
     }
@@ -897,6 +869,7 @@ impl RectManager {
 
         output
     }
+
     fn get_relative_offset(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
         let mut x = 0;
         let mut y = 0;
@@ -1099,8 +1072,10 @@ impl RectManager {
                         x_out += offs.0;
                         y_out += offs.1;
                     }
-                    Err(e) => {
-                        output = Err(e);
+                    Err(error) => {
+                        if error == RectError::ParentNotFound || error == RectError::NotFound {
+                            output = Err(error);
+                        }
                         break;
                     }
                 };
@@ -1330,7 +1305,7 @@ impl RectManager {
         };
 
         if output.is_ok() {
-            output = self.flag_refresh(rect_id);
+            output = self.flag_pos_refresh(rect_id, x, y);
         }
 
         output

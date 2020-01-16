@@ -368,23 +368,26 @@ if __name__ == "__main__":
     import time, math
     screen = RectManager()
 
-    rect = screen.root.new_rect(width=screen.width, height=screen.height // 2)
+    rect = screen.root.new_rect(
+        width=20,
+        height=20
+    )
+
     screen.rect_set_character(0, 4, 0, "Y")
+
     rect.set_character(4, 2, "Y")
     rect.move(1,1)
-    rect.set_bg_color(4)
+    rect.set_bg_color(Rect.BLUE)
+    new_rect = rect.new_rect(width=5, height=5)
+    new_rect.move(4, 4)
 
+    new_rect.set_character(4, 0, "Z")
+    new_rect.set_bg_color(Rect.RED)
+    new_rect.set_fg_color(3)
 
-#    for i in range(10):
-#        rect = rect.new_rect(width=screen.width, height=screen.height)
-#    new_rect = rect.new_rect(width=5, height=5)
-#    new_rect.move(4, 4)
-#
-#    new_rect.set_character(4, 0, "Z")
-#    new_rect.set_bg_color(1)
-#    new_rect.set_fg_color(3)
 #    new_rect.draw()
-
+#    rect.draw()
+    screen.root.draw()
     screen.root.draw()
 
     input()
