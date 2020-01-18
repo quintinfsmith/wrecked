@@ -57,7 +57,6 @@ pub struct Rect {
     _inverse_child_space: HashMap<usize, Vec<(isize, isize)>>,
     // Used to find a position of a box
     child_positions: HashMap<usize, (isize, isize)>,
-    child_ghosts: HashMap<usize, Vec<(isize, isize)>>,
 
     character_space: HashMap<(isize,isize), [u8; 4]>,
 
@@ -84,7 +83,6 @@ impl Rect {
             child_space: HashMap::new(),
             _inverse_child_space: HashMap::new(),
             child_positions: HashMap::new(),
-            child_ghosts: HashMap::new(),
             character_space: HashMap::new(),
             flag_full_refresh: true,
             flags_pos_refresh: HashSet::new(),
@@ -162,15 +160,6 @@ impl Rect {
                         .or_insert(Vec::new())
                         .push((x, y));
 
-                    self.flags_pos_refresh.insert((x, y));
-
-                    match self.child_ghosts.get_mut(&rect_id) {
-                        Some(coord_list) => {
-                            coord_list.retain(|&e| e != (x, y));
-                        }
-                        None => ()
-                    }
-
                 }
             }
         }
@@ -199,10 +188,6 @@ impl Rect {
                 }
                 None => ()
             }
-
-            self.child_ghosts.entry(rect_id)
-                .or_insert(Vec::new())
-                .push(*position);
 
         }
 
@@ -586,7 +571,6 @@ impl RectManager {
                             .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
                             .or_insert((*tmp_chr, tmp_color));
 
-
                     } else {
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
@@ -866,49 +850,130 @@ impl RectManager {
         output
     }
 
+    // Get n where n is the position in sibling array
+    fn get_rank(&self, rect_id: usize) -> Result<usize, RectError> {
+        let mut output = Ok(0);
+        let mut rank = 0;
+        match self.get_parent(rect_id) {
+            Ok(parent) => {
+                rank = parent.children.binary_search(&rect_id).ok().unwrap();
+            }
+            Err(error) => {
+                if error == RectError::ParentNotFound || error == RectError::NotFound {
+                    output = Err(error);
+                }
+            }
+        }
+
+        if output.is_ok() {
+            output = Ok(rank);
+        }
+
+        output
+    }
+
+    fn get_depth(&self, rect_id: usize) -> Result<usize, RectError> {
+        let mut output = Ok(0);
+        let mut depth = 0;
+        let mut working_id = rect_id;
+        loop {
+            match self.get_parent(working_id) {
+                Ok(parent) => {
+                    working_id = parent.rect_id;
+                    depth += 1
+                }
+                Err(error) => {
+                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                        output = Err(error);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if output.is_ok() {
+            output = Ok(depth);
+        }
+
+        output
+    }
+
     fn draw_queued(&mut self) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut to_draw = Vec::new();
+        let mut depth_tracker: HashMap<(isize, isize), usize> = HashMap::new();
 
         let mut offset = (0, 0);
 
         let mut draw_queue = Vec::new();
 
         for rect_id in self.draw_queue.iter() {
-            draw_queue.push(*rect_id);
+            draw_queue.push((0, 0, *rect_id));
         }
         self.draw_queue.clear();
 
-
-        for rect_id in draw_queue {
-            match self.get_absolute_offset(rect_id) {
-                Ok(_offset) => {
-                    offset = _offset;
+        for (depth, rank, rect_id) in draw_queue.iter_mut() {
+            match self.get_depth(*rect_id) {
+                Ok(real_depth) => {
+                    *depth = real_depth;
                 }
-                Err(e)=> {
-                    output = Err(e);
+                Err(error) => {
+                    output = Err(error);
+                    break;
                 }
-            };
-
-            if output.is_ok() {
-                match self.get_display(rect_id) {
-                    Ok(display_map) => {
-                        for (pos, val) in display_map.iter() {
-                            to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                        }
-                    }
-                    Err(e) => {
-                        output = Err(e);
-                        break;
-                    }
+            }
+            match self.get_rank(*rect_id) {
+                Ok(real_rank) => {
+                    *rank = real_rank;
                 }
-            } else {
-                break;
+                Err(error) => {
+                    output = Err(error);
+                    break;
+                }
             }
         }
 
-        self._draw(&mut to_draw);
+        if output.is_ok() {
 
+            draw_queue.sort();
+
+
+            for (depth, _rank, rect_id) in draw_queue {
+                match self.get_absolute_offset(rect_id) {
+                    Ok(_offset) => {
+                        offset = _offset;
+                    }
+                    Err(e)=> {
+                        output = Err(e);
+                    }
+                };
+
+                if output.is_ok() {
+                    match self.get_display(rect_id) {
+                        Ok(display_map) => {
+                            for (pos, val) in display_map.iter() {
+                                //to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                                // TODO: Might Not be necessary
+                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
+                                    to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                                }
+                                depth_tracker.entry(*pos)
+                                    .and_modify(|e| { *e = depth })
+                                    .or_insert(depth);
+                            }
+                        }
+                        Err(e) => {
+                            output = Err(e);
+                            break;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            self._draw(&mut to_draw);
+        }
 
         output
     }
@@ -1013,6 +1078,7 @@ impl RectManager {
 
         if output.is_ok() {
             output = self.set_position(rect_id, pos.0, pos.1);
+            self.flag_refresh(rect_id);
         }
 
         output
@@ -1047,15 +1113,12 @@ impl RectManager {
             }
         };
 
-        if did_move {
-            if has_parent {
-                let dim = self.get_rect_size(rect_id).ok().unwrap();
-                output = self.update_child_space(rect_id, (x, y, x + dim.0, y + dim.1));
-            }
+        if has_parent {
+            output = self.update_child_space(rect_id);
+        }
 
-            if output.is_ok() {
-                self.flag_parent_refresh(rect_id);
-            }
+        if output.is_ok() {
+            self.flag_parent_refresh(rect_id);
         }
 
         output
@@ -1276,6 +1339,8 @@ impl RectManager {
         let mut has_parent = false;
         let mut output = Ok(());
 
+        output = self.clear_child_space(rect_id);
+
         match self.get_parent_mut(rect_id) {
             Ok(parent) => {
                 parent.detach_child(rect_id);
@@ -1289,9 +1354,6 @@ impl RectManager {
             }
         };
 
-        if has_parent {
-            output = self.flag_refresh(parent_id);
-        }
 
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
@@ -1309,20 +1371,9 @@ impl RectManager {
 
     fn attach(&mut self, rect_id: usize, new_parent_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
-        match self.get_parent_mut(rect_id) {
-            Ok(parent) => {
-                parent.detach_child(rect_id);
-            },
-            Err(error) => {
-                if error == RectError::ParentNotFound || error == RectError::NotFound {
-                    output = Err(error);
-                }
-            }
-        };
 
-        if output.is_ok() {
-            output = self.flag_refresh(new_parent_id);
-        }
+        output = self.detach(rect_id);
+
 
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
@@ -1344,6 +1395,12 @@ impl RectManager {
                     output = Err(error);
                 }
             };
+        }
+
+
+        // TODO: This SHOULD only need flag_parent_refresh. but for some reason that break.
+        if output.is_ok() {
+            output = self.flag_refresh(rect_id);
         }
 
         output
@@ -1404,20 +1461,20 @@ impl RectManager {
         output
     }
 
-    fn update_child_space(&mut self, child_id: usize, corners: (isize, isize, isize, isize)) -> Result<(), RectError> {
+    fn update_child_space(&mut self, child_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
-        let mut working_parent_id = 0;
-        let mut ghosts = Vec::new();
+        let mut dimensions = self.get_rect_size(child_id).ok().unwrap();
+        let mut position = self.get_relative_offset(child_id).ok().unwrap();
+
         match self.get_parent_mut(child_id) {
             Ok(rect) => {
-                rect.update_child_space(child_id, corners);
-                working_parent_id = rect.rect_id;
-                if rect.child_ghosts.contains_key(&child_id) {
-                    for ghost in rect.child_ghosts[&child_id].iter() {
-                        ghosts.push((ghost.0, ghost.1));
-                    }
-                }
+                rect.update_child_space(child_id, (
+                    position.0,
+                    position.1,
+                    position.0 + dimensions.0,
+                    position.1 + dimensions.1
+                ));
             }
             Err(error) => {
                 if error == RectError::ParentNotFound || error == RectError::NotFound {
@@ -1426,49 +1483,24 @@ impl RectManager {
             }
         };
 
-        if output.is_ok() {
-            let mut new_corners = corners;
-            let mut working_offset = (0, 0);
-            let mut working_ghosts;
-            let mut new_x;
-            let mut new_y;
-
-            loop {
-                new_corners = (
-                    new_corners.0 + working_offset.0,
-                    new_corners.1 + working_offset.1,
-                    new_corners.2 + working_offset.0,
-                    new_corners.3 + working_offset.1
-                );
-
-                working_ghosts = Vec::new();
-                for (x, y) in ghosts.iter() {
-                    new_x = *x + working_offset.0;
-                    new_y = *y + working_offset.1;
-                    working_ghosts.push((new_x, new_y));
-                }
+        self.flag_parent_refresh(child_id);
 
 
-                if output.is_ok() {
+        output
+    }
 
-                    match self.get_parent_mut(working_parent_id) {
-                        Ok(parent) => {
-                            working_offset = parent.child_positions[&working_parent_id];
-                            working_parent_id = parent.rect_id;
+    fn clear_child_space(&mut self, child_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
 
-                            for x in new_corners.0 .. new_corners.2 {
-                                for y in new_corners.1 .. new_corners.3 {
-                                    parent.flags_pos_refresh.insert((x, y));
-                                }
-                            }
-                        },
-                        Err(error) => {
-                            if error == RectError::ParentNotFound || error == RectError::NotFound {
-                                output = Err(error);
-                            }
-                            break;
-                        }
-                    };
+        self.flag_parent_refresh(child_id);
+
+        match self.get_parent_mut(child_id) {
+            Ok(parent) => {
+                parent.clear_child_space(child_id);
+            }
+            Err(error) => {
+                if error == RectError::ParentNotFound || error == RectError::NotFound {
+                    output = Err(error);
                 }
             }
         }
