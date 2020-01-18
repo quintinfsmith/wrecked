@@ -44,6 +44,9 @@ class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
 
+    DRAW_BUFFER = 10000
+    LOCK_WAIT = 1 / 60
+
 
     def __init__(self):
         ffi = FFI()
@@ -93,11 +96,32 @@ class RectManager:
         self._serving = 0
         self._queue_number = 0
 
+        self.draw_locked = False
+        self.lock_ticketer = 0
+        self.lock_serving = 0
+
+    def get_lock_ticket(self):
+        output = self.lock_ticketer
+        self.lock_ticketer = (self.lock_ticketer + 1) % RectManager.DRAW_BUFFER
+        return output
+
+    def release_lock(self):
+        self.lock_serving = (self.lock_serving + 1) % RectManager.DRAW_BUFFER
+
+    def enter_draw_queue(self):
+        ticket = self.get_lock_ticket()
+        while self.lock_serving != ticket:
+            time.sleep(RectManager.LOCK_WAIT)
+
     def draw_queued(self):
+        self.enter_draw_queue()
+
         err = self.lib.draw_queued(self.rectmanager)
 
         if err:
             raise EXCEPTIONS[err]()
+
+        self.release_lock()
 
     def rect_queue_draw(self, rect_id):
         err = self.lib.queue_draw(self.rectmanager, rect_id)
@@ -234,6 +258,7 @@ class RectManager:
 
 
     def rect_draw(self, rect_id):
+        self.enter_draw_queue()
         err = self.lib.draw(self.rectmanager, rect_id)
 
         if err:
@@ -241,6 +266,7 @@ class RectManager:
                 rect_id=rect_id,
                 dimensions=(width, height)
             )
+        self.release_lock()
 
     def rect_remove(self, rect_id):
         err = self.lib.delete_rect(self.rectmanager, rect_id)
