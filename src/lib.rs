@@ -344,6 +344,7 @@ impl RectManager {
             }
             None => ()
         };
+        self.flag_refresh(new_id);
 
 
         new_id
@@ -690,6 +691,7 @@ impl RectManager {
                             flags_pos_refresh.insert((x, y));
                         }
                     }
+                    rect.flags_pos_refresh.clear();
                 } else {
                     /*
                         Iterate through flags_pos_refresh and update
@@ -761,7 +763,6 @@ impl RectManager {
         for (pos, val) in display_map.iter() {
             if pos.1 != current_row || pos.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
-
             }
             current_col = pos.0;
             current_row = pos.1;
@@ -1102,8 +1103,8 @@ impl RectManager {
                 };
                 if (did_move) {
                     parent.set_child_position(rect_id, x, y);
-                    has_parent = true;
                 }
+                has_parent = true;
             }
             Err(error) => {
                 did_move = false;

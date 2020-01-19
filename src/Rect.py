@@ -420,9 +420,10 @@ if __name__ == "__main__":
     )
 
     screen.rect_set_character(0, 4, 0, "Y")
+    screen.rect_set_bg_color(0, Rect.BRIGHTMAGENTA)
 
     rect.set_character(4, 2, "Y")
-    rect.move(1,1)
+    rect.move(0,1)
     rect.set_bg_color(Rect.BLUE)
     new_rect = rect.new_rect(width=5, height=5)
     new_rect.move(4, 4)
@@ -431,13 +432,13 @@ if __name__ == "__main__":
     new_rect.set_bg_color(Rect.RED)
     new_rect.set_fg_color(3)
 
-    screen.root.queue_draw()
-    new_rect.queue_draw()
-    rect.queue_draw()
+    ##screen.root.queue_draw()
+    ##new_rect.queue_draw()
+    ##rect.queue_draw()
 
     #screen.root.draw()
 
-    screen.draw_queued()
+    screen.draw()
 
     input()
 
