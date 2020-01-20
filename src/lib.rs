@@ -607,20 +607,6 @@ impl RectManager {
         if output.is_ok() {
             for (child_id, (coords, child_has_position, child_position)) in child_recache.iter_mut() {
                 if *child_has_position {
-                    match self.get_rect_mut(*child_id) {
-                        Ok(child) => {
-                            for (x, y) in coords.iter() {
-                                child.flags_pos_refresh.insert((
-                                    *x - child_position.0,
-                                    *y - child_position.1
-                                ));
-                            }
-                        }
-                        Err(e) => {
-                            output = Err(e);
-                        }
-                    }
-
                     if output.is_ok() {
                         output = self._update_cached_display(*child_id);
                     }
@@ -953,14 +939,12 @@ impl RectManager {
                     match self.get_display(rect_id) {
                         Ok(display_map) => {
                             for (pos, val) in display_map.iter() {
-                                //to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                                // TODO: Might Not be necessary
-                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
+                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() >= depth {
                                     to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                                    depth_tracker.entry(*pos)
+                                        .and_modify(|e| { *e = depth })
+                                        .or_insert(depth);
                                 }
-                                depth_tracker.entry(*pos)
-                                    .and_modify(|e| { *e = depth })
-                                    .or_insert(depth);
                             }
                         }
                         Err(e) => {
@@ -1164,7 +1148,7 @@ impl RectManager {
                     }
                     break;
                 }
-            }
+            };
         }
 
         output
