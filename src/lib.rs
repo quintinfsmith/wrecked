@@ -1127,7 +1127,7 @@ impl RectManager {
                 dimensions = _dim;
             }
             Err(e) => {
-                output = e;
+                output = Err(e);
             }
         };
 
