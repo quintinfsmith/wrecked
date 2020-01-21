@@ -145,7 +145,6 @@ impl Rect {
         (x, y)
     }
 
-
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
 
@@ -664,31 +663,33 @@ impl RectManager {
 
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
-                rect.has_been_drawn = true;
+                if rect.enabled {
+                    rect.has_been_drawn = true;
 
-                /*
-                  If a full refresh is requested,
-                  fill flags_pos_refresh with all potential coords
-                */
-                if rect.flag_full_refresh {
-                    rect.flag_full_refresh = false;
+                    /*
+                      If a full refresh is requested,
+                      fill flags_pos_refresh with all potential coords
+                    */
+                    if rect.flag_full_refresh {
+                        rect.flag_full_refresh = false;
 
-                    for y in 0 .. rect.height {
-                        for x in 0 .. rect.width {
-                            flags_pos_refresh.insert((x, y));
+                        for y in 0 .. rect.height {
+                            for x in 0 .. rect.width {
+                                flags_pos_refresh.insert((x, y));
+                            }
+                        }
+                        rect.flags_pos_refresh.clear();
+                    } else {
+                        /*
+                            Iterate through flags_pos_refresh and update
+                            any children that cover the requested positions
+                        */
+                        for pos in rect.flags_pos_refresh.iter() {
+                            flags_pos_refresh.insert((pos.0, pos.1));
                         }
                     }
                     rect.flags_pos_refresh.clear();
-                } else {
-                    /*
-                        Iterate through flags_pos_refresh and update
-                        any children that cover the requested positions
-                    */
-                    for pos in rect.flags_pos_refresh.iter() {
-                        flags_pos_refresh.insert((pos.0, pos.1));
-                    }
                 }
-                rect.flags_pos_refresh.clear();
             }
             Err(e) => {
                 output = Err(e);
@@ -717,8 +718,10 @@ impl RectManager {
         if output.is_ok() {
             match self.get_rect(rect_id) {
                 Ok(rect) => {
-                    for ((x, y), (new_c, color)) in rect._cached_display.iter() {
-                        outhash.insert((*x, *y), (*new_c, *color));
+                    if rect.enabled {
+                        for ((x, y), (new_c, color)) in rect._cached_display.iter() {
+                            outhash.insert((*x, *y), (*new_c, *color));
+                        }
                     }
                 }
                 Err(e) => {
@@ -1306,6 +1309,20 @@ impl RectManager {
             }
             if output.is_ok() {
                 output = self.flag_refresh(rect_id);
+            }
+        }
+
+        output
+    }
+
+    fn is_rect_enabled(&self, rect_id: usize) -> Result<bool, RectError> {
+        let mut output = Ok(false);
+        match self.get_rect(rect_id) {
+            Ok(rect) => {
+                output = Ok(rect.enabled);
+            }
+            Err(e) => {
+                output = Err(e);
             }
         }
 
