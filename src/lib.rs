@@ -34,7 +34,8 @@ pub enum RectError {
     NoParent = 4, // Rect has no parent id
     BadColor = 5,
     InvalidUtf8 = 6,
-    InvalidChild = 7
+    InvalidChild = 7,
+    ChildNotFound = 8
 }
 
 pub struct RectManager {
@@ -843,7 +844,14 @@ impl RectManager {
         let mut rank = 0;
         match self.get_parent(rect_id) {
             Ok(parent) => {
-                rank = parent.children.binary_search(&rect_id).ok().unwrap();
+                match parent.children.binary_search(&rect_id) {
+                    Ok(_rank) => {
+                        rank = _rank;
+                    }
+                    Err(e) => {
+                        output = Err(RectError::ChildNotFound);
+                    }
+                };
             }
             Err(error) => {
                 if error == RectError::ParentNotFound || error == RectError::NotFound {
@@ -1112,43 +1120,55 @@ impl RectManager {
     // Flags the area of the parent of given rect covered by the given rect
     fn flag_parent_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
-        let mut dimensions = self.get_rect_size(rect_id).ok().unwrap();
+
+        let mut dimensions = (0, 0);
+        match self.get_rect_size(rect_id) {
+            Ok(_dim) => {
+                dimensions = _dim;
+            }
+            Err(e) => {
+                output = e;
+            }
+        };
+
         let mut working_id = rect_id;
         let mut offset = (0, 0);
 
-        loop {
-            match self.get_relative_offset(working_id) {
-                Ok(rel_offset) => {
-                    offset = (
-                        offset.0 + rel_offset.0,
-                        offset.1 + rel_offset.1
-                    );
-                }
-                Err(error) => {
-                    if error == RectError::ParentNotFound || error == RectError::NotFound {
-                        output = Err(error);
+        if output.is_ok() {
+            loop {
+                match self.get_relative_offset(working_id) {
+                    Ok(rel_offset) => {
+                        offset = (
+                            offset.0 + rel_offset.0,
+                            offset.1 + rel_offset.1
+                        );
                     }
-                    break;
-                }
-            };
-
-
-            match self.get_parent_mut(working_id) {
-                Ok(parent) => {
-                    for x in 0 .. dimensions.0 {
-                        for y in 0 .. dimensions.1 {
-                            parent.flags_pos_refresh.insert((offset.0 + x, offset.1 + y));
+                    Err(error) => {
+                        if error == RectError::ParentNotFound || error == RectError::NotFound {
+                            output = Err(error);
                         }
+                        break;
                     }
-                    working_id = parent.rect_id;
-                }
-                Err(error) => {
-                    if error == RectError::ParentNotFound || error == RectError::NotFound {
-                        output = Err(error);
+                };
+
+
+                match self.get_parent_mut(working_id) {
+                    Ok(parent) => {
+                        for x in 0 .. dimensions.0 {
+                            for y in 0 .. dimensions.1 {
+                                parent.flags_pos_refresh.insert((offset.0 + x, offset.1 + y));
+                            }
+                        }
+                        working_id = parent.rect_id;
                     }
-                    break;
-                }
-            };
+                    Err(error) => {
+                        if error == RectError::ParentNotFound || error == RectError::NotFound {
+                            output = Err(error);
+                        }
+                        break;
+                    }
+                };
+            }
         }
 
         output
@@ -1449,27 +1469,49 @@ impl RectManager {
     fn update_child_space(&mut self, child_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
-        let mut dimensions = self.get_rect_size(child_id).ok().unwrap();
-        let mut position = self.get_relative_offset(child_id).ok().unwrap();
-
-        match self.get_parent_mut(child_id) {
-            Ok(rect) => {
-                rect.update_child_space(child_id, (
-                    position.0,
-                    position.1,
-                    position.0 + dimensions.0,
-                    position.1 + dimensions.1
-                ));
+        let mut dimensions = (0, 0);
+        match self.get_rect_size(child_id) {
+            Ok(_dim) => {
+                dimensions = _dim;
             }
-            Err(error) => {
-                if error == RectError::ParentNotFound || error == RectError::NotFound {
-                    output = Err(error);
-                }
+            Err(e) => {
+                output = Err(e);
             }
         };
 
-        self.flag_parent_refresh(child_id);
+        let mut position = (0, 0);
+        if output.is_ok() {
+            match self.get_relative_offset(child_id) {
+                Ok(_pos) => {
+                    position = _pos;
+                }
+                Err(e) => {
+                    output = Err(e);
+                }
+            };
+        }
 
+        if output.is_ok() {
+            match self.get_parent_mut(child_id) {
+                Ok(rect) => {
+                    rect.update_child_space(child_id, (
+                        position.0,
+                        position.1,
+                        position.0 + dimensions.0,
+                        position.1 + dimensions.1
+                    ));
+                }
+                Err(error) => {
+                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                        output = Err(error);
+                    }
+                }
+            };
+
+        }
+        if output.is_ok() {
+            self.flag_parent_refresh(child_id);
+        }
 
         output
     }
