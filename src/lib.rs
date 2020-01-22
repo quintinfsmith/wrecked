@@ -934,6 +934,7 @@ impl RectManager {
         if output.is_ok() {
 
             draw_queue.sort();
+            draw_queue.reverse();
 
 
             for (depth, _rank, rect_id) in draw_queue {
