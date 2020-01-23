@@ -821,11 +821,26 @@ impl RectManager {
             }
         };
 
+        let mut dimensions = (0, 0);
+        match self.get_top(rect_id) {
+            Ok(top) => {
+                dimensions = (top.width, top.height);
+            }
+            Err(e) => { }
+        }
+
         if output.is_ok() {
             match self.get_display(rect_id) {
                 Ok(display_map) => {
                     for (pos, val) in display_map.iter() {
-                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                        if offset.0 + pos.0 < 0
+                        || offset.0 + pos.0 >= dimensions.0
+                        || offset.1 + pos.1 < 0
+                        || offset.1 + pos.1 >= dimensions.1 {
+                            // pass
+                        } else {
+                            to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                        }
                     }
                 }
                 Err(e) => {
@@ -908,7 +923,18 @@ impl RectManager {
         for rect_id in self.draw_queue.iter() {
             draw_queue.push((0, 0, *rect_id));
         }
+
         self.draw_queue.clear();
+
+        let mut dimensions = (0, 0);
+        match self.get_rect(0) {
+            Ok(top) => {
+                dimensions = (top.width, top.height);
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        };
 
         for (depth, rank, rect_id) in draw_queue.iter_mut() {
             match self.get_depth(*rect_id) {
@@ -934,8 +960,7 @@ impl RectManager {
         if output.is_ok() {
 
             draw_queue.sort();
-
-
+            //draw_queue.reverse();
             for (depth, _rank, rect_id) in draw_queue {
                 match self.get_absolute_offset(rect_id) {
                     Ok(_offset) => {
@@ -950,11 +975,18 @@ impl RectManager {
                     match self.get_display(rect_id) {
                         Ok(display_map) => {
                             for (pos, val) in display_map.iter() {
-                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() >= depth {
-                                    to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                                    depth_tracker.entry(*pos)
-                                        .and_modify(|e| { *e = depth })
-                                        .or_insert(depth);
+                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
+                                    if offset.0 + pos.0 < 0
+                                    || offset.0 + pos.0 >= dimensions.0
+                                    || offset.1 + pos.1 < 0
+                                    || offset.1 + pos.1 >= dimensions.1 {
+                                        // pass
+                                    } else {
+                                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                                        depth_tracker.entry(*pos)
+                                            .and_modify(|e| { *e = depth })
+                                            .or_insert(depth);
+                                    }
                                 }
                             }
                         }
