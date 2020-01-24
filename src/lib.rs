@@ -929,14 +929,19 @@ impl RectManager {
         let mut rank = 0;
         match self.get_parent(rect_id) {
             Ok(parent) => {
-                match parent.children.binary_search(&rect_id) {
-                    Ok(_rank) => {
+                let mut _rank = 0;
+                for i in parent.children.iter() {
+                    if *i == rect_id {
                         rank = _rank;
+                        break;
                     }
-                    Err(e) => {
-                        output = Err(RectError::ChildNotFound);
-                    }
-                };
+                    _rank += 1;
+                }
+
+                if _rank == parent.children.len() {
+                    output = Err(RectError::ChildNotFound);
+                }
+
             }
             Err(error) => {
                 if error == RectError::ParentNotFound || error == RectError::NotFound {

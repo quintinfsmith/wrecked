@@ -31,13 +31,16 @@ class OutOfBounds(RectError):
     pass
 class NoParent(RectError):
     pass
+class ChildNotFound(RectError):
+    pass
 
 EXCEPTIONS = {
     0: None,
     1: OutOfBounds,
     2: NotFound,
     3: ParentNotFound,
-    4: NoParent
+    4: NoParent,
+    8: ChildNotFound
 }
 
 class RectManager:
