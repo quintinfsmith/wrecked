@@ -704,6 +704,65 @@ impl RectManager {
         output
     }
 
+    fn get_visible_box(&self, rect_id: usize) -> Result<(isize, isize, isize, isize), RectError> {
+        let mut output = Ok((0, 0, 0, 0));
+        let mut rect_box = (0, 0, 0, 0);
+
+        match self.get_rect_size(rect_id) {
+            Ok(_dim) => {
+                rect_box.2 = _dim.0;
+                rect_box.3 = _dim.1;
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        };
+
+        match self.get_absolute_offset(rect_id) {
+            Ok(offset) => {
+                rect_box.0 = offset.0;
+                rect_box.1 = offset.1;
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        }
+
+        let mut working_id = rect_id;
+        let mut parent_dim = (0, 0);
+        loop {
+            match self.get_parent(working_id) {
+                Ok(parent) => {
+                    parent_dim = (parent.width, parent.height);
+                    working_id = parent.rect_id;
+
+                }
+                Err(error) => {
+                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                        output = Err(error);
+                    }
+                    break;
+                }
+            }
+            match self.get_absolute_offset(working_id) {
+                Ok(offset) => {
+                    rect_box.0 = cmp::max(rect_box.0, offset.0);
+                    rect_box.1 = cmp::max(rect_box.1, offset.1);
+                    rect_box.2 = cmp::min((offset.0 + parent_dim.0) - rect_box.0, rect_box.2);
+                    rect_box.3 = cmp::min((offset.1 + parent_dim.1) - rect_box.1, rect_box.3);
+                }
+                Err(e) => {
+                    output = Err(e);
+                }
+            }
+        }
+        if output.is_ok() {
+            output = Ok(rect_box);
+        }
+
+        output
+    }
+
     fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), ([u8; 4], u16)>, RectError> {
         let mut output = Ok(HashMap::new());
         let mut outhash = HashMap::new();
@@ -827,16 +886,24 @@ impl RectManager {
                 dimensions = (top.width, top.height);
             }
             Err(e) => { }
-        }
+        };
+
+        let mut boundry_box = (0, 0, 0, 0);
+        match self.get_visible_box(rect_id) {
+            Ok(_box) => {
+                boundry_box = _box;
+            }
+            Err(e) => { }
+        };
 
         if output.is_ok() {
             match self.get_display(rect_id) {
                 Ok(display_map) => {
                     for (pos, val) in display_map.iter() {
-                        if offset.0 + pos.0 < 0
-                        || offset.0 + pos.0 >= dimensions.0
-                        || offset.1 + pos.1 < 0
-                        || offset.1 + pos.1 >= dimensions.1 {
+                        if offset.0 + pos.0 < boundry_box.0
+                        || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
+                        || offset.1 + pos.1 < boundry_box.1
+                        || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
                             // pass
                         } else {
                             to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
@@ -962,7 +1029,7 @@ impl RectManager {
             draw_queue.sort();
             draw_queue.reverse();
 
-
+            let mut boundry_box = (0, 0, 0, 0);
             for (depth, _rank, rect_id) in draw_queue {
                 match self.get_absolute_offset(rect_id) {
                     Ok(_offset) => {
@@ -974,14 +1041,22 @@ impl RectManager {
                 };
 
                 if output.is_ok() {
+
+                    match self.get_visible_box(rect_id) {
+                        Ok(_box) => {
+                            boundry_box = _box;
+                        }
+                        Err(e) => { }
+                    };
+
                     match self.get_display(rect_id) {
                         Ok(display_map) => {
                             for (pos, val) in display_map.iter() {
                                 if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
-                                    if offset.0 + pos.0 < 0
-                                    || offset.0 + pos.0 >= dimensions.0
-                                    || offset.1 + pos.1 < 0
-                                    || offset.1 + pos.1 >= dimensions.1 {
+                                    if offset.0 + pos.0 < boundry_box.0
+                                    || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
+                                    || offset.1 + pos.1 < boundry_box.1
+                                    || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
                                         // pass
                                     } else {
                                         to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
