@@ -99,7 +99,7 @@ class RectManager:
         self._serving = 0
         self._queue_number = 0
 
-        self.draw_locked = False
+        self.locked = False
         self.lock_ticketer = 0
         self.lock_serving = 0
 
@@ -111,33 +111,39 @@ class RectManager:
     def release_lock(self):
         self.lock_serving = (self.lock_serving + 1) % RectManager.DRAW_BUFFER
 
-    def enter_draw_queue(self):
+    def enter_lock_queue(self):
         ticket = self.get_lock_ticket()
         while self.lock_serving != ticket:
             time.sleep(RectManager.LOCK_WAIT)
 
     def draw_queued(self):
-        self.enter_draw_queue()
+        self.enter_lock_queue()
 
         err = self.lib.draw_queued(self.rectmanager)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]()
 
-        self.release_lock()
 
     def rect_queue_draw(self, rect_id):
+        self.enter_lock_queue()
+
         err = self.lib.queue_draw(self.rectmanager, rect_id)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](rect_id=rect_id)
 
+
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
+        self.enter_lock_queue()
         self.lib.attach(self.rectmanager, rect_id, parent_id)
         err = 0
         if (position != (0,0)):
             err = self.rect_move(rect_id, *position)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -146,31 +152,40 @@ class RectManager:
             )
 
     def rect_detach(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.detach(self.rectmanager, rect_id)
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_empty(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.empty(self.rectmanager, rect_id)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_disable(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.disable(self.rectmanager, rect_id)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_enable(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.enable(self.rectmanager, rect_id)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_set_character(self, rect_id, x, y, character):
+        self.enter_lock_queue()
         fmt_character = bytes(character, 'utf-8')
         err = self.lib.set_character(self.rectmanager, rect_id, x, y, fmt_character)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -180,8 +195,10 @@ class RectManager:
 
 
     def rect_unset_character(self, rect_id, x, y):
+        self.enter_lock_queue()
         err = self.lib.unset_character(self.rectmanager, rect_id, x, y)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -190,26 +207,34 @@ class RectManager:
             )
 
     def rect_unset_bg_color(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.unset_bg_color(self.rectmanager, rect_id)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_unset_fg_color(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.unset_fg_color(self.rectmanager, rect_id)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_unset_color(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.unset_color(self.rectmanager, rect_id)
 
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_set_bg_color(self, rect_id, color):
+        self.enter_lock_queue()
         err = self.lib.set_bg_color(self.rectmanager, rect_id, color)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -217,7 +242,9 @@ class RectManager:
             )
 
     def rect_set_fg_color(self, rect_id, color):
+        self.enter_lock_queue()
         err = self.lib.set_fg_color(self.rectmanager, rect_id, color)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -225,7 +252,9 @@ class RectManager:
             )
 
     def rect_move(self, rect_id, x, y):
+        self.enter_lock_queue()
         err = self.lib.set_position(self.rectmanager, rect_id, x, y)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -233,7 +262,9 @@ class RectManager:
             )
 
     def rect_resize(self, rect_id, width, height):
+        self.enter_lock_queue()
         err = self.lib.resize(self.rectmanager, rect_id, width, height)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
@@ -243,6 +274,7 @@ class RectManager:
 
     # TODO: Handle Errors here
     def create_rect(self, **kwargs):
+        self.enter_lock_queue()
         width = 1
         if 'width' in kwargs.keys():
             width = kwargs['width']
@@ -256,23 +288,26 @@ class RectManager:
             parent = kwargs['parent']
 
         new_rect_id = self.lib.new_rect(self.rectmanager, parent, width, height)
+        self.release_lock()
 
         return Rect(new_rect_id, self, width=width, height=height)
 
 
     def rect_draw(self, rect_id):
-        self.enter_draw_queue()
+        self.enter_lock_queue()
         err = self.lib.draw(self.rectmanager, rect_id)
+        self.release_lock()
 
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
                 dimensions=(width, height)
             )
-        self.release_lock()
 
     def rect_remove(self, rect_id):
+        self.enter_lock_queue()
         err = self.lib.delete_rect(self.rectmanager, rect_id)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id
