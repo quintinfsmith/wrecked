@@ -2,7 +2,7 @@ from cffi import FFI
 from ctypes import c_bool
 import sys
 import tty, termios
-import os
+import os, time
 from localfuncs import get_terminal_size
 import json
 
@@ -154,6 +154,7 @@ class RectManager:
     def rect_detach(self, rect_id):
         self.enter_lock_queue()
         err = self.lib.detach(self.rectmanager, rect_id)
+        self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
