@@ -47,7 +47,7 @@ class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
 
-    DRAW_BUFFER = 10000
+    LOCK_BUFFER = 10000
     LOCK_WAIT = 1 / 60
 
 
@@ -105,11 +105,11 @@ class RectManager:
 
     def get_lock_ticket(self):
         output = self.lock_ticketer
-        self.lock_ticketer = (self.lock_ticketer + 1) % RectManager.DRAW_BUFFER
+        self.lock_ticketer = (self.lock_ticketer + 1) % RectManager.LOCK_BUFFER
         return output
 
     def release_lock(self):
-        self.lock_serving = (self.lock_serving + 1) % RectManager.DRAW_BUFFER
+        self.lock_serving = (self.lock_serving + 1) % RectManager.LOCK_BUFFER
 
     def enter_lock_queue(self):
         ticket = self.get_lock_ticket()
