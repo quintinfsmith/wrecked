@@ -166,7 +166,6 @@ impl Rect {
     }
 
     fn clear_child_space(&mut self, rect_id: usize) {
-        // Works around borrowing
         // TODO: Implement Copy for Vec<(isize, isize)> ?
         let mut new_positions = Vec::new();
         match self._inverse_child_space.get(&rect_id) {
@@ -1542,6 +1541,64 @@ impl RectManager {
         output
     }
 
+    fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        let mut new_characters = Vec::new();
+
+        let mut tmp_char;
+        let mut new_c: [u8; 4];
+
+        let owned_string = string.to_owned();
+        logg(format!("{} ----", owned_string.len()));
+        for j in 0 .. owned_string.len() {
+            tmp_char = owned_string.get(j .. j + 1).unwrap().as_bytes();
+            new_c = [0; 4];
+            for i in 0..cmp::min(4, tmp_char.len()) {
+                // Put the 0 offset first
+                new_c[(4 - cmp::min(4, tmp_char.len())) + i] = tmp_char[i];
+                new_characters.push(new_c);
+            }
+        }
+
+        let mut dimensions = (0, 0);
+        match self.get_rect_size(rect_id) {
+            Ok(_dim) => {
+                dimensions = _dim;
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        };
+
+        let mut x;
+        let mut y;
+        let start_offset = (start_y * dimensions.0) + start_x;
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                let mut i = start_offset;
+                for character in new_characters.iter() {
+                    x = i % dimensions.0;
+                    y = i / dimensions.0;
+                    //if y < dimensions.1 && x < dimensions.0 {
+                        rect.set_character(x, y, *character);
+                    //}
+                    i += 1;
+                }
+            }
+            Err(e) => {
+                output = Err(e);
+            }
+        };
+
+        if output.is_ok() {
+            output = self.flag_refresh(rect_id);
+        }
+
+        output
+    }
+
     fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: [u8;4]) -> Result<(), RectError> {
         let mut output = Ok(());
 
@@ -1899,6 +1956,26 @@ pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     match result {
         Ok(_) => 0,
         Err(e) => e as u32
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    //assert!(!c.is_null()); TODO: figure out need for this assertion.
+    let c_str = unsafe { CStr::from_ptr(c) };
+    let string_ = c_str.to_str().unwrap();
+
+    let result = rectmanager.set_string(rect_id, x, y, string_);
+
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(error) => error as u32
     }
 }
 

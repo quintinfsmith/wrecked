@@ -83,6 +83,7 @@ class RectManager:
             uint32_t enable_rect(RectManager, uint32_t);
 
             uint32_t set_character(RectManager, uint32_t, uint32_t, uint32_t, const char*);
+            uint32_t set_string(RectManager, uint32_t, uint32_t, uint32_t, const char*);
             uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
 
             uint32_t draw(RectManager, uint32_t);
@@ -103,6 +104,8 @@ class RectManager:
         self.lock_ticketer = 0
         self.lock_serving = 0
 
+        self.LOCK_ENABLED = True
+
     def get_lock_ticket(self):
         output = self.lock_ticketer
         self.lock_ticketer = (self.lock_ticketer + 1) % RectManager.LOCK_BUFFER
@@ -112,9 +115,10 @@ class RectManager:
         self.lock_serving = (self.lock_serving + 1) % RectManager.LOCK_BUFFER
 
     def enter_lock_queue(self):
-        ticket = self.get_lock_ticket()
-        while self.lock_serving != ticket:
-            time.sleep(RectManager.LOCK_WAIT)
+        if self.LOCK_ENABLED:
+            ticket = self.get_lock_ticket()
+            while self.lock_serving != ticket:
+                time.sleep(RectManager.LOCK_WAIT)
 
     def draw_queued(self):
         self.enter_lock_queue()
@@ -192,6 +196,19 @@ class RectManager:
                 rect_id=rect_id,
                 position=(x, y),
                 character=character
+            )
+
+    def rect_set_string(self, rect_id, x, y, string):
+        self.enter_lock_queue()
+        fmt_string = bytes(string, 'utf-8')
+        err = self.lib.set_string(self.rectmanager, rect_id, x, y, fmt_string)
+
+        self.release_lock()
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                position=(x, y),
+                string=string
             )
 
 
@@ -415,6 +432,9 @@ class Rect(object):
     def set_character(self, x, y, character):
         self._screen.rect_set_character(self.rect_id, x, y, character)
 
+    def set_string(self, x, y, string):
+        self._screen.rect_set_string(self.rect_id, x, y, string)
+
     def unset_character(self, x, y):
         self._screen.rect_unset_character(self.rect_id, x, y)
 
@@ -454,22 +474,25 @@ if __name__ == "__main__":
     screen = RectManager()
 
     rect = screen.root.new_rect(
-        width=20,
+        width=5,
         height=20
     )
-
-    screen.rect_set_character(0, 4, 0, "Y")
-    screen.rect_set_bg_color(0, Rect.BRIGHTMAGENTA)
-
-    rect.set_character(4, 2, "Y")
-    rect.move(0,1)
     rect.set_bg_color(Rect.BLUE)
-    new_rect = rect.new_rect(width=5, height=5)
-    new_rect.move(4, 4)
 
-    new_rect.set_character(4, 0, "Z")
-    new_rect.set_bg_color(Rect.RED)
-    new_rect.set_fg_color(3)
+    screen.root.set_string(0, 0, "WHOOT" )
+    #screen.rect_set_character(0, 4, 0, "Y")
+    #screen.rect_set_bg_color(0, Rect.BRIGHTMAGENTA)
+
+    rect.set_string(0, 0, "Yolo")
+    rect.move(3,3)
+
+    #rect.set_bg_color(Rect.BLUE)
+    #new_rect = rect.new_rect(width=5, height=5)
+    #new_rect.move(4, 4)
+
+    #new_rect.set_character(4, 0, "Z")
+    #new_rect.set_bg_color(Rect.RED)
+    #new_rect.set_fg_color(3)
 
     ##screen.root.queue_draw()
     ##new_rect.queue_draw()
@@ -478,6 +501,7 @@ if __name__ == "__main__":
     #screen.root.draw()
 
     screen.draw()
+    screen.root.draw()
 
     input()
 
