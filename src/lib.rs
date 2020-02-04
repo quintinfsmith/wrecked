@@ -11,8 +11,6 @@ use std::io::prelude::*;
 /*
     TODO
     Maybe change [u8; 4] to a struct like "Character"
-
-    Drawing gets SLOOW with many layers. look for optimizations.
 */
 
 fn logg(mut msg: String) {
@@ -151,7 +149,6 @@ impl Rect {
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
                 if x >= 0 && x < self.width && y >= 0 && y <= self.height {
-
                     self.child_space.entry((x, y))
                         .or_insert(Vec::new())
                         .push(rect_id);
@@ -159,7 +156,6 @@ impl Rect {
                     self._inverse_child_space.entry(rect_id)
                         .or_insert(Vec::new())
                         .push((x, y));
-
                 }
             }
         }
@@ -178,7 +174,6 @@ impl Rect {
         };
 
         for position in new_positions.iter() {
-
             self.flags_pos_refresh.insert(*position);
 
             match self.child_space.get_mut(&position) {
@@ -316,6 +311,9 @@ impl Rect {
         output
     }
 
+    fn clear(&mut self) {
+        self.character_space.clear();
+    }
 }
 
 impl RectManager {
@@ -1442,6 +1440,23 @@ impl RectManager {
         output
     }
 
+    // Remove all characters
+    fn clear(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.clear();
+            }
+            Err(error) => {
+                output = Err(error);
+            }
+        };
+
+        output
+    }
+
+    // Remove All Children
     fn empty(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut children = Vec::new();
         let mut output = Ok(());
@@ -2054,6 +2069,21 @@ pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let result = rectmanager.set_position(rect_id, x, y);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(error) => error as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn clear(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.clear(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 

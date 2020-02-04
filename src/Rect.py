@@ -71,6 +71,7 @@ class RectManager:
             uint32_t detach(RectManager, uint32_t);
 
             uint32_t empty(RectManager, uint32_t);
+            uint32_t clear(RectManager, uint32_t);
 
 
             uint32_t unset_color(RectManager, uint32_t);
@@ -165,6 +166,13 @@ class RectManager:
     def rect_empty(self, rect_id):
         self.enter_lock_queue()
         err = self.lib.empty(self.rectmanager, rect_id)
+        self.release_lock()
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
+    def rect_clear(self, rect_id):
+        self.enter_lock_queue()
+        err = self.lib.clear(self.rectmanager, rect_id)
         self.release_lock()
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
@@ -460,6 +468,9 @@ class Rect(object):
 
     def empty(self):
         self._screen.rect_empty(self.rect_id)
+
+    def clear(self):
+        self._screen.rect_clear(self.rect_id)
 
     def new_rect(self, **kwargs):
         kwargs['parent'] = self.rect_id
