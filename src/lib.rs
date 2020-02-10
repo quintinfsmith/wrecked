@@ -1749,6 +1749,29 @@ impl RectManager {
             }
         }
     }
+
+    fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
+        let mut parent_id = 0;
+        match self.get_parent_mut(old_rect_id) {
+            Ok(parent) => {
+                parent_id = parent.rect_id;
+            }
+            Err(error) => {
+                output = Err(error);
+            }
+        }
+
+        if output.is_ok() {
+            output = self.detach(old_rect_id);
+        }
+
+        if output.is_ok() {
+            output = self.attach(new_rect_id, parent_id);
+        }
+
+        output
+    }
 }
 
 
