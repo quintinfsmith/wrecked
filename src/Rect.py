@@ -43,9 +43,139 @@ EXCEPTIONS = {
     8: ChildNotFound
 }
 
+class Rect(object):
+    BLACK = 0
+    RED = 1
+    GREEN = 2
+    YELLOW = 3
+    BLUE = 4
+    MAGENTA = 5
+    CYAN = 6
+    WHITE = 7
+    BRIGHT = 0x08
+    BRIGHTBLACK = BLACK | BRIGHT
+    BRIGHTRED = RED |  BRIGHT
+    BRIGHTGREEN = GREEN | BRIGHT
+    BRIGHTYELLOW = YELLOW | BRIGHT
+    BRIGHTBLUE = BLUE | BRIGHT
+    BRIGHTMAGENTA = MAGENTA | BRIGHT
+    BRIGHTCYAN = CYAN | BRIGHT
+    BRIGHTWHITE = WHITE | BRIGHT
+
+    def __init__(self, n, screen, **kwargs):
+        self._screen  = screen
+        self.rect_id = n
+        self.rects = {}
+        self.parent = None
+        self.enabled = True
+        self.x = 0
+        self.y = 0
+
+        self.width = 1
+        if 'width' in kwargs.keys():
+            self.width = kwargs['width']
+        self.height = 1
+        if 'height' in kwargs.keys():
+            self.height = kwargs['height']
+
+
+    def attach(self, child_rect):
+        self.rects[child_rect.rect_id] = child_rect
+        if (child_rect.x or child_rect.y):
+            position = (child_rect.x, child_rect.y)
+        else:
+            position = (0, 0)
+        self._screen.rect_attach(child_rect.rect_id, self.rect_id, position)
+
+    def resize(self, width, height):
+        self.width = width
+        self.height = height
+        self._screen.rect_resize(self.rect_id, width, height)
+
+    def detach(self):
+        try:
+            del self.parent.rects[self.rect_id]
+        except:
+            pass
+
+        self._screen.rect_detach(self.rect_id)
+
+    def replace_with(self, rect):
+        self._screen.rect_replace_with(self.rect_id, rect.rect_id)
+
+    #def fill(self, character):
+    #    self._screen.rect_fill(self.rect_id, character)
+
+    def enable(self):
+        self.enabled = True
+        self._screen.rect_enable(self.rect_id);
+
+    def disable(self):
+        self.enabled = False
+        self._screen.rect_disable(self.rect_id);
+
+    def draw(self):
+        self._screen.rect_draw(self.rect_id)
+
+    def queue_draw(self):
+        self._screen.rect_queue_draw(self.rect_id)
+
+    def draw_queued(self):
+        self._screen.draw_queued()
+
+    def refresh(self):
+        self._screen.draw()
+
+    def remove(self):
+        self._screen.rect_remove(self.rect_id)
+
+    def set_character(self, x, y, character):
+        self._screen.rect_set_character(self.rect_id, x, y, character)
+
+    def set_string(self, x, y, string):
+        self._screen.rect_set_string(self.rect_id, x, y, string)
+
+    def unset_character(self, x, y):
+        self._screen.rect_unset_character(self.rect_id, x, y)
+
+    def move(self, new_x, new_y):
+        self.x = new_x
+        self.y = new_y
+        self._screen.rect_move(self.rect_id, new_x, new_y)
+
+    def set_fg_color(self, new_col):
+        self._screen.rect_set_fg_color(self.rect_id, new_col)
+
+    def set_bg_color(self, new_col):
+        self._screen.rect_set_bg_color(self.rect_id, new_col)
+
+    def unset_fg_color(self):
+        self._screen.rect_unset_fg_color(self.rect_id)
+
+    def unset_bg_color(self):
+        self._screen.rect_unset_bg_color(self.rect_id)
+
+    def unset_color(self):
+        self._screen.rect_unset_bg_color(self.rect_id)
+
+    def empty(self):
+        self._screen.rect_empty(self.rect_id)
+
+    def clear(self):
+        self._screen.rect_clear(self.rect_id)
+
+    def new_rect(self, **kwargs):
+        kwargs['parent'] = self.rect_id
+        rect = self._screen.create_rect(**kwargs)
+        self.rects[rect.rect_id] = rect
+        rect.parent = self
+
+        return rect
+
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
+    RECT_CONSTRUCTOR = Rect
 
 
 
@@ -96,7 +226,7 @@ class RectManager:
         self.width, self.height = get_terminal_size()
         self.rectmanager = self.lib.init(self.width, self.height)
 
-        self.root = Rect(0, self, width=self.width, height=self.height)
+        self.root = self.RECT_CONSTRUCTOR(0, self, width=self.width, height=self.height)
 
 
     def draw_queued(self):
@@ -279,8 +409,7 @@ class RectManager:
 
         new_rect_id = self.lib.new_rect(self.rectmanager, parent, width, height)
 
-
-        return Rect(new_rect_id, self, width=width, height=height)
+        return self.RECT_CONSTRUCTOR(new_rect_id, self, width=width, height=height)
 
 
     def rect_draw(self, rect_id):
@@ -315,135 +444,6 @@ class RectManager:
     def draw(self):
         self.rect_draw(0)
 
-
-class Rect(object):
-    BLACK = 0
-    RED = 1
-    GREEN = 2
-    YELLOW = 3
-    BLUE = 4
-    MAGENTA = 5
-    CYAN = 6
-    WHITE = 7
-    BRIGHT = 0x08
-    BRIGHTBLACK = BLACK | BRIGHT
-    BRIGHTRED = RED |  BRIGHT
-    BRIGHTGREEN = GREEN | BRIGHT
-    BRIGHTYELLOW = YELLOW | BRIGHT
-    BRIGHTBLUE = BLUE | BRIGHT
-    BRIGHTMAGENTA = MAGENTA | BRIGHT
-    BRIGHTCYAN = CYAN | BRIGHT
-    BRIGHTWHITE = WHITE | BRIGHT
-
-    def __init__(self, n, screen, **kwargs):
-        self._screen  = screen
-        self.rect_id = n
-        self.rects = {}
-        self.parent = None
-        self.enabled = True
-        self.x = 0
-        self.y = 0
-
-        self.width = 1
-        if 'width' in kwargs.keys():
-            self.width = kwargs['width']
-        self.height = 1
-        if 'height' in kwargs.keys():
-            self.height = kwargs['height']
-
-
-    def attach(self, child_rect):
-        self.rects[child_rect.rect_id] = child_rect
-        if (child_rect.x or child_rect.y):
-            position = (child_rect.x, child_rect.y)
-        else:
-            position = (0, 0)
-        self._screen.rect_attach(child_rect.rect_id, self.rect_id, position)
-
-    def resize(self, width, height):
-        self.width = width
-        self.height = height
-        self._screen.rect_resize(self.rect_id, width, height)
-
-    def detach(self):
-        try:
-            del self.parent.rects[self.rect_id]
-        except:
-            pass
-
-        self._screen.rect_detach(self.rect_id)
-
-    def replace_with(self, rect):
-        self._screen.rect_replace_with(self.rect_id, rect.rect_id)
-
-    #def fill(self, character):
-    #    self._screen.rect_fill(self.rect_id, character)
-
-    def enable(self):
-        self.enabled = True
-        self._screen.rect_enable(self.rect_id);
-
-    def disable(self):
-        self.enabled = False
-        self._screen.rect_disable(self.rect_id);
-
-    def draw(self):
-        self._screen.rect_draw(self.rect_id)
-
-    def queue_draw(self):
-        self._screen.rect_queue_draw(self.rect_id)
-
-    def draw_queued(self):
-        self._screen.draw_queued()
-
-    def refresh(self):
-        self._screen.draw()
-
-    def remove(self):
-        self._screen.rect_remove(self.rect_id)
-
-    def set_character(self, x, y, character):
-        self._screen.rect_set_character(self.rect_id, x, y, character)
-
-    def set_string(self, x, y, string):
-        self._screen.rect_set_string(self.rect_id, x, y, string)
-
-    def unset_character(self, x, y):
-        self._screen.rect_unset_character(self.rect_id, x, y)
-
-    def move(self, new_x, new_y):
-        self.x = new_x
-        self.y = new_y
-        self._screen.rect_move(self.rect_id, new_x, new_y)
-
-    def set_fg_color(self, new_col):
-        self._screen.rect_set_fg_color(self.rect_id, new_col)
-
-    def set_bg_color(self, new_col):
-        self._screen.rect_set_bg_color(self.rect_id, new_col)
-
-    def unset_fg_color(self):
-        self._screen.rect_unset_fg_color(self.rect_id)
-
-    def unset_bg_color(self):
-        self._screen.rect_unset_bg_color(self.rect_id)
-
-    def unset_color(self):
-        self._screen.rect_unset_bg_color(self.rect_id)
-
-    def empty(self):
-        self._screen.rect_empty(self.rect_id)
-
-    def clear(self):
-        self._screen.rect_clear(self.rect_id)
-
-    def new_rect(self, **kwargs):
-        kwargs['parent'] = self.rect_id
-        rect = self._screen.create_rect(**kwargs)
-        self.rects[rect.rect_id] = rect
-        rect.parent = self
-
-        return rect
 
 if __name__ == "__main__":
     import time, math
