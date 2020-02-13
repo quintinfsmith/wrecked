@@ -172,6 +172,10 @@ class Rect(object):
 
         return rect
 
+    def shift_contents(self, x, y):
+        self._screen.rect_shift_contents(self.rect_id, x, y)
+
+
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
@@ -219,6 +223,8 @@ class RectManager:
             uint32_t queue_draw(RectManager, uint32_t);
 
             uint32_t replace_with(RectManager, uint32_t, uint32_t);
+
+            uint32_t shift_contents(RectManager, uint32_t, int32_t, int32_t);
 
         """)
 
@@ -430,6 +436,15 @@ class RectManager:
                 rect_id=rect_id
             )
 
+    def rect_shift_contents(self, rect_id, x, y):
+        err = self.lib.shift_contents(self.rectmanager, rect_id, x, y)
+
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                x=x,
+                y=y
+            )
 
     def kill(self):
         rects = []

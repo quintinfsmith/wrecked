@@ -124,6 +124,15 @@ impl Rect {
         output
     }
 
+    fn shift_contents(&mut self, x_offset: isize, y_offset: isize) {
+        for (child_id, position) in self.child_positions.iter_mut() {
+            *position = (
+                position.0 + x_offset,
+                position.1 + y_offset
+            )
+        }
+    }
+
     fn get_child_position(&self, child_id: usize) -> (isize, isize) {
         let x;
         let y;
@@ -1026,7 +1035,7 @@ impl RectManager {
             }
         }
 
-        if output.is_ok() {
+        if output.is_ok() && draw_queue.len() > 0 {
 
             draw_queue.sort();
             draw_queue.reverse();
@@ -1187,6 +1196,25 @@ impl RectManager {
             output = self.set_position(rect_id, pos.0, pos.1);
             self.flag_refresh(rect_id);
         }
+
+        output
+    }
+
+    fn shift_contents(&mut self, rect_id: usize, x_offset: isize, y_offset: isize) -> Result<(), RectError> {
+        let mut output = Ok(());
+        let mut child_ids = Vec::new();
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.shift_contents(x_offset, y_offset);
+                for child_id in rect.children.iter() {
+                    child_ids.push(*child_id);
+                }
+            }
+            Err(error) => {
+                output = Err(error);
+            }
+        }
+        self.flag_refresh(rect_id);
 
         output
     }
@@ -1565,14 +1593,18 @@ impl RectManager {
         let mut new_c: [u8; 4];
 
         let owned_string = string.to_owned();
-        logg(format!("{} ----", owned_string.len()));
         for j in 0 .. owned_string.len() {
-            tmp_char = owned_string.get(j .. j + 1).unwrap().as_bytes();
-            new_c = [0; 4];
-            for i in 0..cmp::min(4, tmp_char.len()) {
-                // Put the 0 offset first
-                new_c[(4 - cmp::min(4, tmp_char.len())) + i] = tmp_char[i];
-                new_characters.push(new_c);
+            match owned_string.get(j .. j + 1) {
+                Some(_tmp_char) => {
+                    tmp_char = _tmp_char.as_bytes();
+                    new_c = [0; 4];
+                    for i in 0..cmp::min(4, tmp_char.len()) {
+                        // Put the 0 offset first
+                        new_c[(4 - cmp::min(4, tmp_char.len())) + i] = tmp_char[i];
+                        new_characters.push(new_c);
+                    }
+                }
+                None => ()
             }
         }
 
@@ -1821,8 +1853,13 @@ pub extern "C" fn queue_draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 #[no_mangle]
 pub extern "C" fn draw_queued(ptr: *mut RectManager) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.draw_queued();
+    let draw_queue_length = rectmanager.draw_queue.len();
+    let mut result;
+    if draw_queue_length > 0 {
+        result = rectmanager.draw_queued();
+    } else {
+        result = Ok(());
+    }
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2092,6 +2129,21 @@ pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let result = rectmanager.set_position(rect_id, x, y);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(error) => error as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
+
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.shift_contents(rect_id, x, y);
 
     Box::into_raw(rectmanager); // Prevent Release
 
