@@ -867,9 +867,10 @@ impl RectManager {
             renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
             current_col += 1;
         }
-
-        print!("{}\x1B[0m", renderstring);
-        println!("\x1B[1;1H");
+        if (display_map.len() > 0) {
+            print!("{}\x1B[0m", renderstring);
+            println!("\x1B[1;1H");
+        }
     }
 
     fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
@@ -1214,6 +1215,10 @@ impl RectManager {
                 output = Err(error);
             }
         }
+        for child_id in child_ids.iter() {
+            self.update_child_space(*child_id);
+        }
+
         self.flag_refresh(rect_id);
 
         output
@@ -1785,9 +1790,11 @@ impl RectManager {
     fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut parent_id = 0;
+        let mut old_position = (0, 0);
         match self.get_parent_mut(old_rect_id) {
             Ok(parent) => {
                 parent_id = parent.rect_id;
+                old_position = *parent.child_positions.get(&old_rect_id).unwrap();
             }
             Err(error) => {
                 output = Err(error);
@@ -1800,6 +1807,7 @@ impl RectManager {
 
         if output.is_ok() {
             output = self.attach(new_rect_id, parent_id);
+            self.set_position(new_rect_id, old_position.0, old_position.1);
         }
 
         output
@@ -2215,6 +2223,21 @@ pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize
     }
 }
 
+#[no_mangle]
+pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: usize, new_rect_id: usize) -> u32 {
+
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.replace_with(old_rect_id, new_rect_id);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+
+    match result {
+        Ok(_) => 0,
+        Err(error) => error as u32
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn kill(ptr: *mut RectManager) {
