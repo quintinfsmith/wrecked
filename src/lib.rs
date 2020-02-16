@@ -47,7 +47,7 @@ pub struct Rect {
 
     width: isize,
     height: isize,
-    default_character: [u8; 4],
+    default_character: ([u8; 4], usize),
     parent: Option<usize>, // RectId
 
     children: Vec<usize>,
@@ -57,7 +57,7 @@ pub struct Rect {
     // Used to find a position of a box
     child_positions: HashMap<usize, (isize, isize)>,
 
-    character_space: HashMap<(isize,isize), [u8; 4]>,
+    character_space: HashMap<(isize,isize), ([u8; 4], usize)>,
 
     flag_full_refresh: bool,
     flags_pos_refresh: HashSet<(isize, isize)>,
@@ -67,8 +67,7 @@ pub struct Rect {
 
     color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
-    _cached_display: HashMap<(isize, isize), ([u8; 4], u16)>,
-
+    _cached_display: HashMap<(isize, isize), (([u8; 4], usize), u16)>,
 }
 
 impl Rect {
@@ -89,7 +88,7 @@ impl Rect {
             has_been_drawn: false,
             color: 0u16,
             _cached_display: HashMap::new(),
-            default_character: [0, 0, 0, 32]
+            default_character: ([32, 0, 0, 0], 1)
         }
     }
 
@@ -199,7 +198,7 @@ impl Rect {
             .clear();
     }
 
-    fn set_character(&mut self, x: isize, y: isize, character: [u8;4]) -> Result<(), RectError> {
+    fn set_character(&mut self, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
         let output;
         if y < self.height && y >= 0 && x < self.width && x >= 0 {
             self.character_space.entry((x, y))
@@ -769,7 +768,7 @@ impl RectManager {
         output
     }
 
-    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), ([u8; 4], u16)>, RectError> {
+    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), (([u8; 4], usize), u16)>, RectError> {
         let mut output = Ok(HashMap::new());
         let mut outhash = HashMap::new();
 
@@ -802,13 +801,13 @@ impl RectManager {
         output
     }
 
-    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), ([u8; 4], u16))>) {
+    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (([u8; 4], usize), u16))>) {
         let mut renderstring = "".to_string();
 
         let mut current_col = -1;
         let mut current_row = -1;
 
-        let mut val_a: &[u8];
+        let mut val_a: &([u8; 4], usize);
         let mut color_value: u16;
         let mut current_line_color_value: u16 = 0;
         let mut utf_char: &[u8];
@@ -854,15 +853,8 @@ impl RectManager {
             }
 
 
-            utf_char_split_index = 0;
-            for i in 0..4 {
-                if val_a[i] != 0 {
-                    utf_char_split_index = i;
-                    break;
-                }
-            }
 
-            utf_char = val_a.split_at(utf_char_split_index).1;
+            utf_char = val_a.0.split_at(val_a.1).0;
 
             renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
             current_col += 1;
@@ -1592,24 +1584,20 @@ impl RectManager {
 
     fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
         let mut output = Ok(());
-
         let mut new_characters = Vec::new();
+        let mut owned_string = String::from(string);
 
-        let mut tmp_char;
         let mut new_c: [u8; 4];
-
-
-        let owned_string = string.to_owned();
+        let mut tmp_char;
         for j in 0 .. owned_string.len() {
             match owned_string.get(j .. j + 1) {
                 Some(_tmp_char) => {
                     tmp_char = _tmp_char.as_bytes();
                     new_c = [0; 4];
-                    for i in 0..cmp::min(4, tmp_char.len()) {
-                        // Put the 0 offset first
-                        new_c[(4 - cmp::min(4, tmp_char.len())) + i] = tmp_char[i];
-                        new_characters.push(new_c);
+                    for i in 0 .. tmp_char.len() {
+                        new_c[i] = tmp_char[i];
                     }
+                    new_characters.push((new_c, tmp_char.len()));
                 }
                 None => ()
             }
@@ -1651,7 +1639,7 @@ impl RectManager {
         output
     }
 
-    fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: [u8;4]) -> Result<(), RectError> {
+    fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -2073,12 +2061,11 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
 
     let mut new_c: [u8; 4] = [0; 4];
     for i in 0..cmp::min(4, string_bytes.len()) {
-        // Put the 0 offset first
-        new_c[(4 - cmp::min(4, string_bytes.len())) + i] = string_bytes[i];
+        new_c[i] = string_bytes[i];
     }
 
 
-    let result = rectmanager.set_character(rect_id, x, y, new_c);
+    let result = rectmanager.set_character(rect_id, x, y, (new_c, string_bytes.len()));
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2257,7 +2244,7 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
     let (w, h) = rectmanager.get_rect_size(0).ok().unwrap();
     for x in 0 .. w {
         for y in 0 .. h {
-            rectmanager.set_character(0, x, y, [0, 0, 0, 0]);
+            rectmanager.set_character(0, x, y, ([0, 0, 0, 0], 1));
         }
     }
 
