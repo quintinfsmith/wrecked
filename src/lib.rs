@@ -1598,6 +1598,7 @@ impl RectManager {
         let mut tmp_char;
         let mut new_c: [u8; 4];
 
+
         let owned_string = string.to_owned();
         for j in 0 .. owned_string.len() {
             match owned_string.get(j .. j + 1) {
@@ -1634,9 +1635,7 @@ impl RectManager {
                 for character in new_characters.iter() {
                     x = i % dimensions.0;
                     y = i / dimensions.0;
-                    //if y < dimensions.1 && x < dimensions.0 {
-                        rect.set_character(x, y, *character);
-                    //}
+                    rect.set_character(x, y, *character);
                     i += 1;
                 }
             }
