@@ -1485,6 +1485,7 @@ impl RectManager {
                 output = Err(error);
             }
         };
+        self.flag_refresh(rect_id);
 
         output
     }
