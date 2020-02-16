@@ -1585,23 +1585,24 @@ impl RectManager {
     fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut new_characters = Vec::new();
-        let mut owned_string = String::from(string);
+        let mut characters: Vec<_> = string.split("").collect();
 
-        let mut new_c: [u8; 4];
         let mut tmp_char;
-        for j in 0 .. owned_string.len() {
-            match owned_string.get(j .. j + 1) {
-                Some(_tmp_char) => {
-                    tmp_char = _tmp_char.as_bytes();
-                    new_c = [0; 4];
-                    for i in 0 .. tmp_char.len() {
-                        new_c[i] = tmp_char[i];
-                    }
-                    new_characters.push((new_c, tmp_char.len()));
-                }
-                None => ()
+        let mut new_c: [u8; 4];
+        for c in characters.iter() {
+            if c.len() == 0 {
+                continue;
             }
+            new_c = [0; 4];
+            tmp_char = c.as_bytes();
+
+            for i in 0..cmp::min(4, tmp_char.len()) {
+                new_c[i] = tmp_char[i];
+            }
+            new_characters.push((new_c, tmp_char.len()));
         }
+
+
 
         let mut dimensions = (0, 0);
         match self.get_rect_size(rect_id) {
