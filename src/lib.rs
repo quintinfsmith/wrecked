@@ -156,7 +156,7 @@ impl Rect {
 
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
-                if x >= 0 && x < self.width && y >= 0 && y <= self.height {
+                if x >= 0 && x < self.width && y >= 0 && y < self.height {
                     self.child_space.entry((x, y))
                         .or_insert(Vec::new())
                         .push(rect_id);
