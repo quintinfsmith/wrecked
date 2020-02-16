@@ -88,7 +88,7 @@ impl Rect {
             has_been_drawn: false,
             color: 0u16,
             _cached_display: HashMap::new(),
-            default_character: ([32, 0, 0, 0], 1)
+            default_character: ([32, 0, 0, 0], 1) // Space
         }
     }
 
@@ -699,7 +699,6 @@ impl RectManager {
             Err(e) => {
                 output = Err(e);
             }
-
         }
 
         if output.is_ok() {
@@ -812,12 +811,14 @@ impl RectManager {
         let mut current_line_color_value: u16 = 0;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
+
         display_map.sort();
 
         for (pos, val) in display_map.iter() {
             if pos.1 != current_row || pos.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             }
+
             current_col = pos.0;
             current_row = pos.1;
 
@@ -853,12 +854,12 @@ impl RectManager {
             }
 
 
-
             utf_char = val_a.0.split_at(val_a.1).0;
 
             renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
             current_col += 1;
         }
+
         if (display_map.len() > 0) {
             print!("{}\x1B[0m", renderstring);
             println!("\x1B[1;1H");
@@ -982,6 +983,24 @@ impl RectManager {
         output
     }
 
+    fn trace_lineage(&self, rect_id: usize) -> Vec<usize> {
+        let mut lineage = Vec::new();
+        let mut working_id = rect_id;
+        loop {
+            match self.get_parent(working_id) {
+                Ok(parent) => {
+                    lineage.push(parent.rect_id);
+                    working_id = parent.rect_id;
+                }
+                Err(error) => {
+                    break;
+                }
+            }
+        }
+
+        lineage
+    }
+
     fn draw_queued(&mut self) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut to_draw = Vec::new();
@@ -990,9 +1009,13 @@ impl RectManager {
         let mut offset = (0, 0);
 
         let mut draw_queue = Vec::new();
+        let mut done_ = Vec::new();
 
         for rect_id in self.draw_queue.iter() {
-            draw_queue.push((0, 0, *rect_id));
+            if ! done_.contains(rect_id) {
+                draw_queue.push((0, 0, *rect_id));
+                done_.push(*rect_id);
+            }
         }
 
         self.draw_queue.clear();
@@ -1007,7 +1030,19 @@ impl RectManager {
             }
         };
 
+        let mut skip_rect;
         for (depth, rank, rect_id) in draw_queue.iter_mut() {
+            skip_rect = false;
+            for ancestor_id in self.trace_lineage(*rect_id).iter() {
+                if done_.contains(ancestor_id) {
+                    skip_rect = true;
+                    break;
+                }
+            }
+            if skip_rect {
+                continue;
+            }
+
             match self.get_depth(*rect_id) {
                 Ok(real_depth) => {
                     *depth = real_depth;
