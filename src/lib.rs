@@ -65,7 +65,7 @@ pub struct Rect {
     enabled: bool,
     has_been_drawn: bool,
 
-    color: u16, // { 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
+    color: u16, // { 9: Underline, 8: Bold, 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
     _cached_display: HashMap<(isize, isize), (([u8; 4], usize), u16)>,
 }
@@ -88,7 +88,7 @@ impl Rect {
             has_been_drawn: false,
             color: 0u16,
             _cached_display: HashMap::new(),
-            default_character: ([32, 0, 0, 0], 1)
+            default_character: ([32, 0, 0, 0], 1) // Space
         }
     }
 
@@ -215,6 +215,57 @@ impl Rect {
 
     fn unset_character(&mut self, x: isize, y: isize) -> Result<(), RectError> {
         self.set_character(x, y, self.default_character)
+    }
+
+    fn set_bold_flag(&mut self) {
+        let orig_color = self.color;
+        self.color |= 0b0000010000000000;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+
+    fn unset_bold_flag(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0b1111101111111111;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+
+    fn set_underline_flag(&mut self) {
+        let orig_color = self.color;
+        self.color |= 0b0000100000000000;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+    fn unset_underline_flag(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0b1111011111111111;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+    fn set_invert_flag(&mut self) {
+        let orig_color = self.color;
+        self.color |= 0b0001000000000000;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
+    }
+    fn unset_invert_flag(&mut self) {
+        let orig_color = self.color;
+        self.color &= 0b1110111111111111;
+
+        if self.color != orig_color {
+            self.flag_full_refresh = true;
+        }
     }
 
     fn unset_bg_color(&mut self) {
@@ -699,7 +750,6 @@ impl RectManager {
             Err(e) => {
                 output = Err(e);
             }
-
         }
 
         if output.is_ok() {
@@ -812,12 +862,14 @@ impl RectManager {
         let mut current_line_color_value: u16 = 0;
         let mut utf_char: &[u8];
         let mut utf_char_split_index: usize;
+
         display_map.sort();
 
         for (pos, val) in display_map.iter() {
             if pos.1 != current_row || pos.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             }
+
             current_col = pos.0;
             current_row = pos.1;
 
@@ -848,17 +900,29 @@ impl RectManager {
                     } else {
                         renderstring += &format!("\x1B[49m");
                     }
+
+                    // Bold
+                    if color_value & 0b000010000000000 > 1 {
+                        renderstring += &format!("\x1B[1m");
+                    }
+                    // Underline
+                    if color_value & 0b000100000000000 > 1 {
+                        renderstring += &format!("\x1B[4m");
+                    }
+                    // Inverted
+                    if color_value & 0b001000000000000 > 1 {
+                        renderstring += &format!("\x1B[7m");
+                    }
                 }
                 current_line_color_value = color_value;
             }
-
-
 
             utf_char = val_a.0.split_at(val_a.1).0;
 
             renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
             current_col += 1;
         }
+
         if (display_map.len() > 0) {
             print!("{}\x1B[0m", renderstring);
             println!("\x1B[1;1H");
@@ -982,6 +1046,24 @@ impl RectManager {
         output
     }
 
+    fn trace_lineage(&self, rect_id: usize) -> Vec<usize> {
+        let mut lineage = Vec::new();
+        let mut working_id = rect_id;
+        loop {
+            match self.get_parent(working_id) {
+                Ok(parent) => {
+                    lineage.push(parent.rect_id);
+                    working_id = parent.rect_id;
+                }
+                Err(error) => {
+                    break;
+                }
+            }
+        }
+
+        lineage
+    }
+
     fn draw_queued(&mut self) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut to_draw = Vec::new();
@@ -990,9 +1072,13 @@ impl RectManager {
         let mut offset = (0, 0);
 
         let mut draw_queue = Vec::new();
+        let mut done_ = Vec::new();
 
         for rect_id in self.draw_queue.iter() {
-            draw_queue.push((0, 0, *rect_id));
+            if ! done_.contains(rect_id) {
+                draw_queue.push((0, 0, *rect_id));
+                done_.push(*rect_id);
+            }
         }
 
         self.draw_queue.clear();
@@ -1007,7 +1093,19 @@ impl RectManager {
             }
         };
 
+        let mut skip_rect;
         for (depth, rank, rect_id) in draw_queue.iter_mut() {
+            skip_rect = false;
+            for ancestor_id in self.trace_lineage(*rect_id).iter() {
+                if done_.contains(ancestor_id) {
+                    skip_rect = true;
+                    break;
+                }
+            }
+            if skip_rect {
+                continue;
+            }
+
             match self.get_depth(*rect_id) {
                 Ok(real_depth) => {
                     *depth = real_depth;
@@ -1937,7 +2035,163 @@ pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -
     }
 }
 
+#[no_mangle]
+pub extern "C" fn set_invert_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.set_invert_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+#[no_mangle]
+pub extern "C" fn set_underline_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.set_underline_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn set_bold_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.set_bold_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn unset_invert_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.unset_invert_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn unset_underline_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.unset_underline_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn unset_bold_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let mut result = match rectmanager.get_rect_mut(rect_id) {
+        Ok(rect) => {
+            rect.unset_bold_flag();
+            Ok(())
+        },
+        Err(e) => {
+            Err(e)
+        }
+    };
+
+    if (result.is_ok()) {
+        result = rectmanager.flag_refresh(rect_id);
+    }
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    match result {
+        Ok(_) => 0,
+        Err(e) => e as u32
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: isize, new_height: isize) -> u32 {
