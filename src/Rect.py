@@ -143,6 +143,24 @@ class Rect(object):
         self.y = new_y
         self._screen.rect_move(self.rect_id, new_x, new_y)
 
+    def invert(self):
+        self._screen.rect_invert(self.rect_id)
+
+    def underline(self):
+        self._screen.rect_underline(self.rect_id)
+
+    def bold(self):
+        self._screen.rect_bold(self.rect_id)
+
+    def unset_invert(self):
+        self._screen.rect_unset_invert(self.rect_id)
+
+    def unset_underline(self):
+        self._screen.rect_unset_underline(self.rect_id)
+
+    def unset_bold(self):
+        self._screen.rect_unset_bold(self.rect_id)
+
     def set_fg_color(self, new_col):
         self._screen.rect_set_fg_color(self.rect_id, new_col)
 
@@ -156,7 +174,7 @@ class Rect(object):
         self._screen.rect_unset_bg_color(self.rect_id)
 
     def unset_color(self):
-        self._screen.rect_unset_bg_color(self.rect_id)
+        self._screen.rect_unset_color(self.rect_id)
 
     def empty(self):
         self._screen.rect_empty(self.rect_id)
@@ -212,6 +230,14 @@ class RectManager:
             uint32_t unset_bg_color(RectManager, uint32_t);
             uint32_t unset_fg_color(RectManager, uint32_t);
 
+            uint32_t set_bold_flag(RectManager, uint32_t);
+            uint32_t unset_bold_flag(RectManager, uint32_t);
+            uint32_t set_underline_flag(RectManager, uint32_t);
+            uint32_t unset_underline_flag(RectManager, uint32_t);
+
+            uint32_t set_invert_flag(RectManager, uint32_t);
+            uint32_t unset_invert_flag(RectManager, uint32_t);
+
             uint32_t disable_rect(RectManager, uint32_t);
             uint32_t enable_rect(RectManager, uint32_t);
 
@@ -241,6 +267,34 @@ class RectManager:
         if err:
             raise EXCEPTIONS[err]()
 
+    def rect_bold(self, rect_id):
+        err = self.lib.set_bold_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+    def rect_invert(self, rect_id):
+        err = self.lib.set_invert_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
+    def rect_unset_invert(self, rect_id):
+        err = self.lib.unset_invert_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
+    def rect_underline(self, rect_id):
+        err = self.lib.set_underline_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
+    def rect_unset_underline(self, rect_id):
+        err = self.lib.unset_underline_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
+
+    def rect_unset_bold(self, rect_id):
+        err = self.lib.unset_bold_flag(self.rectmanager, rect_id)
+        if err:
+            raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_queue_draw(self, rect_id):
         err = self.lib.queue_draw(self.rectmanager, rect_id)
