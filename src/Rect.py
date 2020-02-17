@@ -260,6 +260,10 @@ class RectManager:
 
         self.root = self.RECT_CONSTRUCTOR(0, self, width=self.width, height=self.height)
 
+    def resize(self, new_width, new_height):
+        self.width = new_width
+        self.height = new_height
+
 
     def draw_queued(self):
         err = self.lib.draw_queued(self.rectmanager)
