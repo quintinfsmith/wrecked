@@ -39,7 +39,10 @@ pub enum RectError {
 pub struct RectManager {
     idgen: usize,
     rects: HashMap<usize, Rect>,
-    draw_queue: Vec<usize>
+    draw_queue: Vec<usize>,
+    // top_cache is used to prevent redrawing the same
+    // characters at the same coordinate.
+    top_cache: HashMap<(isize, isize), (([u8; 4], usize), u16)>
 }
 
 pub struct Rect {
@@ -380,8 +383,10 @@ impl RectManager {
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
-            draw_queue: Vec::new()
+            draw_queue: Vec::new(),
+            top_cache: HashMap::new()
         };
+
         rectmanager.new_rect(None);
 
         rectmanager
@@ -856,6 +861,7 @@ impl RectManager {
 
         let mut current_col = -1;
         let mut current_row = -1;
+        let mut update_top_cache;
 
         let mut val_a: &([u8; 4], usize);
         let mut color_value: u16;
@@ -866,6 +872,28 @@ impl RectManager {
         display_map.sort();
 
         for (pos, val) in display_map.iter() {
+            update_top_cache = false;
+            match self.top_cache.get(&pos) {
+                Some(char_pair) => {
+                    if (*char_pair != *val) {
+                        update_top_cache = true;
+                    }
+                },
+                None => {
+                    update_top_cache = true;
+                }
+            }
+
+            if update_top_cache {
+                self.top_cache.entry(*pos)
+                    .and_modify(|e| { *e = *val })
+                    .or_insert(*val);
+            } else {
+                current_col = -1;
+                current_row = -1;
+                continue;
+            }
+
             if pos.1 != current_row || pos.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             }
@@ -917,10 +945,11 @@ impl RectManager {
                 current_line_color_value = color_value;
             }
 
-            utf_char = val_a.0.split_at(val_a.1).0;
-
-            renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
-            current_col += 1;
+            if update_top_cache {
+                utf_char = val_a.0.split_at(val_a.1).0;
+                renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
+                current_col += 1;
+            }
         }
 
         if (display_map.len() > 0) {
@@ -2290,7 +2319,6 @@ pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    //assert!(!c.is_null()); TODO: figure out need for this assertion.
     let c_str = unsafe { CStr::from_ptr(c) };
     let string_ = c_str.to_str().unwrap();
 
@@ -2310,7 +2338,6 @@ pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y:
 pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    //assert!(!c.is_null()); TODO: figure out need for this assertion.
     let c_str = unsafe { CStr::from_ptr(c) };
     let string_bytes = c_str.to_str().unwrap().as_bytes();
 
