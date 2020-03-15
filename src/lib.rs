@@ -66,7 +66,6 @@ pub struct Rect {
     flags_pos_refresh: HashSet<(isize, isize)>,
 
     enabled: bool,
-    has_been_drawn: bool,
 
     color: u16, // { 9: Underline, 8: Bold, 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
@@ -88,7 +87,6 @@ impl Rect {
             flag_full_refresh: true,
             flags_pos_refresh: HashSet::new(),
             enabled: true,
-            has_been_drawn: false,
             color: 0u16,
             _cached_display: HashMap::new(),
             default_character: ([32, 0, 0, 0], 1) // Space
@@ -725,7 +723,6 @@ impl RectManager {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 if rect.enabled {
-                    rect.has_been_drawn = true;
 
                     /*
                       If a full refresh is requested,
