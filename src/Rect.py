@@ -62,8 +62,8 @@ class Rect(object):
     BRIGHTCYAN = CYAN | BRIGHT
     BRIGHTWHITE = WHITE | BRIGHT
 
-    def __init__(self, n, screen, **kwargs):
-        self._screen  = screen
+    def __init__(self, n, rectmanager, **kwargs):
+        self.rectmanager  = rectmanager
         self.rect_id = n
         self.rects = {}
         self.parent = None
@@ -85,12 +85,12 @@ class Rect(object):
             position = (child_rect.x, child_rect.y)
         else:
             position = (0, 0)
-        self._screen.rect_attach(child_rect.rect_id, self.rect_id, position)
+        self.rectmanager.rect_attach(child_rect.rect_id, self.rect_id, position)
 
     def resize(self, width, height):
         self.width = width
         self.height = height
-        self._screen.rect_resize(self.rect_id, width, height)
+        self.rectmanager.rect_resize(self.rect_id, width, height)
 
     def detach(self):
         try:
@@ -98,108 +98,105 @@ class Rect(object):
         except:
             pass
 
-        self._screen.rect_detach(self.rect_id)
+        self.rectmanager.rect_detach(self.rect_id)
 
     def replace_with(self, rect):
-        self._screen.rect_replace_with(self.rect_id, rect.rect_id)
+        self.rectmanager.rect_replace_with(self.rect_id, rect.rect_id)
 
     #def fill(self, character):
-    #    self._screen.rect_fill(self.rect_id, character)
+    #    self.rectmanager.rect_fill(self.rect_id, character)
 
     def enable(self):
         self.enabled = True
-        self._screen.rect_enable(self.rect_id);
+        self.rectmanager.rect_enable(self.rect_id);
 
     def disable(self):
         self.enabled = False
-        self._screen.rect_disable(self.rect_id);
+        self.rectmanager.rect_disable(self.rect_id);
 
     def draw(self):
-        self._screen.rect_draw(self.rect_id)
+        self.rectmanager.rect_draw(self.rect_id)
 
     def queue_draw(self):
-        self._screen.rect_queue_draw(self.rect_id)
+        self.rectmanager.rect_queue_draw(self.rect_id)
 
     def draw_queued(self):
-        self._screen.draw_queued()
+        self.rectmanager.draw_queued()
 
     def refresh(self):
-        self._screen.draw()
+        self.rectmanager.draw()
 
     def remove(self):
-        self._screen.rect_remove(self.rect_id)
+        self.rectmanager.rect_remove(self.rect_id)
 
     def set_character(self, x, y, character):
-        self._screen.rect_set_character(self.rect_id, x, y, character)
+        self.rectmanager.rect_set_character(self.rect_id, x, y, character)
 
     def set_string(self, x, y, string):
-        self._screen.rect_set_string(self.rect_id, x, y, string)
+        self.rectmanager.rect_set_string(self.rect_id, x, y, string)
 
     def unset_character(self, x, y):
-        self._screen.rect_unset_character(self.rect_id, x, y)
+        self.rectmanager.rect_unset_character(self.rect_id, x, y)
 
     def move(self, new_x, new_y):
         self.x = new_x
         self.y = new_y
-        self._screen.rect_move(self.rect_id, new_x, new_y)
+        self.rectmanager.rect_move(self.rect_id, new_x, new_y)
 
     def invert(self):
-        self._screen.rect_invert(self.rect_id)
+        self.rectmanager.rect_invert(self.rect_id)
 
     def underline(self):
-        self._screen.rect_underline(self.rect_id)
+        self.rectmanager.rect_underline(self.rect_id)
 
     def bold(self):
-        self._screen.rect_bold(self.rect_id)
+        self.rectmanager.rect_bold(self.rect_id)
 
     def unset_invert(self):
-        self._screen.rect_unset_invert(self.rect_id)
+        self.rectmanager.rect_unset_invert(self.rect_id)
 
     def unset_underline(self):
-        self._screen.rect_unset_underline(self.rect_id)
+        self.rectmanager.rect_unset_underline(self.rect_id)
 
     def unset_bold(self):
-        self._screen.rect_unset_bold(self.rect_id)
+        self.rectmanager.rect_unset_bold(self.rect_id)
 
     def set_fg_color(self, new_col):
-        self._screen.rect_set_fg_color(self.rect_id, new_col)
+        self.rectmanager.rect_set_fg_color(self.rect_id, new_col)
 
     def set_bg_color(self, new_col):
-        self._screen.rect_set_bg_color(self.rect_id, new_col)
+        self.rectmanager.rect_set_bg_color(self.rect_id, new_col)
 
     def unset_fg_color(self):
-        self._screen.rect_unset_fg_color(self.rect_id)
+        self.rectmanager.rect_unset_fg_color(self.rect_id)
 
     def unset_bg_color(self):
-        self._screen.rect_unset_bg_color(self.rect_id)
+        self.rectmanager.rect_unset_bg_color(self.rect_id)
 
     def unset_color(self):
-        self._screen.rect_unset_color(self.rect_id)
+        self.rectmanager.rect_unset_color(self.rect_id)
 
     def empty(self):
-        self._screen.rect_empty(self.rect_id)
+        self.rectmanager.rect_empty(self.rect_id)
 
     def clear(self):
-        self._screen.rect_clear(self.rect_id)
+        self.rectmanager.rect_clear(self.rect_id)
 
     def new_rect(self, **kwargs):
         kwargs['parent'] = self.rect_id
-        rect = self._screen.create_rect(**kwargs)
+        rect = self.rectmanager.create_rect(**kwargs)
         self.rects[rect.rect_id] = rect
         rect.parent = self
 
         return rect
 
     def shift_contents(self, x, y):
-        self._screen.rect_shift_contents(self.rect_id, x, y)
+        self.rectmanager.rect_shift_contents(self.rect_id, x, y)
 
 
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
     SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
-    RECT_CONSTRUCTOR = Rect
-
-
 
     def __init__(self):
         ffi = FFI()
@@ -258,7 +255,8 @@ class RectManager:
         self.width, self.height = get_terminal_size()
         self.rectmanager = self.lib.init(self.width, self.height)
 
-        self.root = self.RECT_CONSTRUCTOR(0, self, width=self.width, height=self.height)
+        self.root = Rect(0, self, width=self.width, height=self.height)
+        self.root.draw()
 
     def resize(self, new_width, new_height):
         self.width = new_width
@@ -350,14 +348,14 @@ class RectManager:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
     def rect_disable(self, rect_id):
-        err = self.lib.disable(self.rectmanager, rect_id)
+        err = self.lib.disable_rect(self.rectmanager, rect_id)
 
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
 
     def rect_enable(self, rect_id):
-        err = self.lib.enable(self.rectmanager, rect_id)
+        err = self.lib.enable_rect(self.rectmanager, rect_id)
 
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
@@ -459,21 +457,22 @@ class RectManager:
 
     # TODO: Handle Errors here
     def create_rect(self, **kwargs):
-        width = 1
-        if 'width' in kwargs.keys():
-            width = kwargs['width']
+        if 'width' not in kwargs.keys():
+            kwargs['width'] = 1
 
-        height = 1
-        if 'height' in kwargs.keys():
-            height = kwargs['height']
+        if 'height' not in kwargs.keys():
+            kwargs['height'] = 1
 
-        parent = 0
-        if 'parent' in kwargs.keys():
-            parent = kwargs['parent']
+        if 'parent' not in kwargs.keys():
+            kwargs['parent'] = 0
 
-        new_rect_id = self.lib.new_rect(self.rectmanager, parent, width, height)
+        constructor = Rect
+        if 'constructor' in kwargs.keys():
+            constructor = kwargs['constructor']
 
-        return self.RECT_CONSTRUCTOR(new_rect_id, self, width=width, height=height)
+        new_rect_id = self.lib.new_rect(self.rectmanager, kwargs['parent'], kwargs['width'], kwargs['height'])
+
+        return constructor(new_rect_id, self, **kwargs)
 
 
     def rect_draw(self, rect_id):
@@ -518,42 +517,97 @@ class RectManager:
         self.rect_draw(0)
 
 
+
+class RectStage(RectManager):
+    FPS = 60
+    DELAY = 1 / FPS
+    def __init__(self):
+        super().__init__()
+        self.scenes = {}
+        self.active_scene = None
+        self.playing = False
+
+    def set_fps(self, new_fps):
+        self.FPS = new_fps
+        self.DELAY = 1 / self.FPS
+
+    def play(self):
+        self.playing = True
+        while self.playing:
+            try:
+                scene = self.scenes[self.active_scene]
+                try:
+                    scene.tick()
+                except Exception as e:
+                    pass
+            except KeyError:
+                pass
+            time.sleep(self.DELAY)
+
+    # TODO: Handle Errors here
+    def create_scene(self, key, constructor, **kwargs):
+        kwargs['width'] = self.width
+        kwargs['height'] = self.height
+        kwargs['constructor'] = constructor
+
+        output = self.create_rect(**kwargs)
+        self.scenes[key] = output
+
+        return output
+
+    def start_scene(self, new_scene_key):
+        if self.active_scene:
+            self.scenes[self.active_scene].disable()
+        self.active_scene = new_scene_key
+        self.scenes[self.active_scene].enable()
+        self.draw()
+
+    def kill(self):
+        self.playing = False
+        super().kill()
+
+
+class RectScene(Rect):
+    def __init__(self, n, rectmanager, **kwargs):
+        super().__init__(n, rectmanager, **kwargs)
+
+    def tick(self):
+        pass
+
+
 if __name__ == "__main__":
-    import time, math
-    screen = RectManager()
+    import time, math, threading
+    stage = RectStage()
+    class TestScene(RectScene):
+        def __init__(self, n, rectmanager, **kwargs):
+            super().__init__(n, rectmanager, **kwargs)
+            self.limit = 60
+            self.p = 0
+            self.done = False
 
-    rect = screen.root.new_rect(
-        width=5,
-        height=20
-    )
-    rect.set_bg_color(Rect.BLUE)
+        def tick(self):
+            if not self.done:
+                self.p += 1
+                if self.p == self.limit:
+                    self.done = True
 
-    screen.root.set_string(0, 0, "WHOOT" )
-    #screen.rect_set_character(0, 4, 0, "Y")
-    #screen.rect_set_bg_color(0, Rect.BRIGHTMAGENTA)
+                self.set_bg_color(int(self.p * 8 / self.limit))
+            self.draw()
 
-    rect.set_string(0, 0, "Yolo")
-    rect.move(3,3)
 
-    #rect.set_bg_color(Rect.BLUE)
-    #new_rect = rect.new_rect(width=5, height=5)
-    #new_rect.move(4, 4)
+    thread = threading.Thread(target = stage.play)
+    thread.start()
 
-    #new_rect.set_character(4, 0, "Z")
-    #new_rect.set_bg_color(Rect.RED)
-    #new_rect.set_fg_color(3)
 
-    ##screen.root.queue_draw()
-    ##new_rect.queue_draw()
-    ##rect.queue_draw()
+    scene = stage.create_scene(0, TestScene)
+    scene.set_string(0, 0, 'Some Test Text')
 
-    #screen.root.draw()
+    stage.start_scene(0)
 
-    screen.draw()
-    screen.root.draw()
+    while not scene.done:
+        time.sleep(.1)
 
-    input()
+    stage.kill()
 
-    screen.kill()
 
 
