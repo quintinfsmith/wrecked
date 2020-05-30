@@ -294,7 +294,7 @@ class RectManager:
     def resize(self, new_width, new_height):
         self.width = new_width
         self.height = new_height
-
+        self.root.resize(new_width, new_height)
 
     def draw_queued(self):
         err = self.lib.draw_queued(self.rectmanager)
@@ -570,9 +570,24 @@ class RectStage(RectManager):
         )
         self.play_thread.start()
 
+    def _resize_checker(self):
+        w, h = get_terminal_size()
+
+        if self.width != w or self.height != h:
+            self.resize(w, h)
+            try:
+                scene = self.scenes[self.active_scene]
+            except KeyError:
+                scene = None
+
+            if scene:
+                scene.resize(w, h)
+
     def _play(self):
         self.playing = True
         while self.playing:
+            self._resize_checker()
+
             try:
                 scene = self.scenes[self.active_scene]
             except KeyError:
@@ -645,6 +660,5 @@ if __name__ == "__main__":
     while not scene.done and stage.playing:
         time.sleep(.1)
     stage.kill()
-
 
 
