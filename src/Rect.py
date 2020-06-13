@@ -5,6 +5,9 @@ import tty, termios
 import os, time
 from localfuncs import get_terminal_size
 import json
+import threading
+import logging
+
 
 def logg(error_code, args, msg):
     strargs = '('
@@ -17,6 +20,20 @@ def logg(error_code, args, msg):
 
     with open("logg", "a") as fp:
         fp.write(newline)
+
+class RectLogger:
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        # TODO: Figure out what is needed here
+        pass
+
 
 class RectError(Exception):
     def __init__(self, **kwargs):
@@ -251,6 +268,22 @@ class RectManager:
 
         """)
 
+        sl = RectLogger(logging.getLogger('STDOUT'), logging.INFO)
+        sys.stdout = sl
+
+        sl = RectLogger(logging.getLogger('STDERR'), logging.ERROR)
+        sys.stderr = sl
+        self.log_path = 'recterr.log'
+        if os.path.isfile(self.log_path):
+            with open(self.log_path, 'w') as fp:
+                fp.write("")
+        logging.basicConfig(
+           level=logging.DEBUG,
+           format='%(message)s',
+           filename=self.log_path,
+           filemode='a'
+        )
+
         self.lib = ffi.dlopen(self.SO_PATH)
         self.width, self.height = get_terminal_size()
         self.rectmanager = self.lib.init(self.width, self.height)
@@ -261,7 +294,7 @@ class RectManager:
     def resize(self, new_width, new_height):
         self.width = new_width
         self.height = new_height
-
+        self.root.resize(new_width, new_height)
 
     def draw_queued(self):
         err = self.lib.draw_queued(self.rectmanager)
@@ -532,16 +565,39 @@ class RectStage(RectManager):
         self.DELAY = 1 / self.FPS
 
     def play(self):
-        self.playing = True
-        while self.playing:
+        self.play_thread = threading.Thread(
+            target=self._play
+        )
+        self.play_thread.start()
+
+    def _resize_checker(self):
+        w, h = get_terminal_size()
+
+        if self.width != w or self.height != h:
+            self.resize(w, h)
             try:
                 scene = self.scenes[self.active_scene]
+            except KeyError:
+                scene = None
+
+            if scene:
+                scene.resize(w, h)
+
+    def _play(self):
+        self.playing = True
+        while self.playing:
+            self._resize_checker()
+
+            try:
+                scene = self.scenes[self.active_scene]
+            except KeyError:
+                scene = None
+            if scene:
                 try:
                     scene.tick()
                 except Exception as e:
-                    pass
-            except KeyError:
-                pass
+                    self.kill()
+                    raise e
             time.sleep(self.DELAY)
 
     # TODO: Handle Errors here
@@ -588,26 +644,21 @@ if __name__ == "__main__":
         def tick(self):
             if not self.done:
                 self.p += 1
-                if self.p == self.limit:
+
+                if self.p == self.limit // 2:
+                    raise KeyError()
+                elif self.p == self.limit:
                     self.done = True
 
                 self.set_bg_color(int(self.p * 8 / self.limit))
             self.draw()
 
-
-    thread = threading.Thread(target = stage.play)
-    thread.start()
-
-
+    stage.play()
     scene = stage.create_scene(0, TestScene)
     scene.set_string(0, 0, 'Some Test Text')
-
     stage.start_scene(0)
-
-    while not scene.done:
+    while not scene.done and stage.playing:
         time.sleep(.1)
-
     stage.kill()
-
 
 
