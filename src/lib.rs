@@ -1928,6 +1928,16 @@ impl RectManager {
 
         output
     }
+    pub fn get_width(&mut self) -> usize {
+        let (width, _) = self.get_rect_size(0).ok().unwrap();
+        width
+    }
+    pub fn get_height(&mut self) -> usize {
+        let (_, height) = self.get_rect_size(0).ok().unwrap();
+        height
+    }
+
+
 }
 
 
