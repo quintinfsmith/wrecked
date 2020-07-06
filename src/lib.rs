@@ -392,7 +392,7 @@ impl RectManager {
         rectmanager
     }
 
-    fn new_rect(&mut self, parent_id: Option<usize>) -> usize {
+    pub fn new_rect(&mut self, parent_id: Option<usize>) -> usize {
         let new_id = self.idgen;
         self.idgen += 1;
 
@@ -411,7 +411,7 @@ impl RectManager {
         new_id
     }
 
-    fn get_rect(&self, rect_id: usize) -> Result<&Rect, RectError> {
+    pub fn get_rect(&self, rect_id: usize) -> Result<&Rect, RectError> {
         match self.rects.get(&rect_id) {
             Some(rect) => {
                 Ok(rect)
@@ -422,7 +422,7 @@ impl RectManager {
         }
     }
 
-    fn get_rect_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
+    pub fn get_rect_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
         match self.rects.get_mut(&rect_id) {
             Some(rect) => {
                 Ok(rect)
@@ -433,7 +433,7 @@ impl RectManager {
         }
     }
 
-    fn get_parent(&self, rect_id: usize) -> Result<&Rect, RectError> {
+    pub fn get_parent(&self, rect_id: usize) -> Result<&Rect, RectError> {
         let mut output = Err(RectError::NotFound);
         let mut has_parent = false;
         let mut parent_id = 0;
@@ -470,7 +470,7 @@ impl RectManager {
         output
     }
 
-    fn get_parent_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
+    pub fn get_parent_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
         let mut output = Err(RectError::NotFound);
         let mut has_parent = false;
         let mut parent_id = 0;
@@ -508,7 +508,7 @@ impl RectManager {
     }
 
     // Top can be the same as the given rect
-    fn get_top(&self, rect_id: usize) -> Result<&Rect, RectError> {
+    pub fn get_top(&self, rect_id: usize) -> Result<&Rect, RectError> {
         let mut current_id = rect_id;
         let mut output = Err(RectError::NotFound);
         let mut rect_defined = false;
@@ -543,7 +543,7 @@ impl RectManager {
     }
 
     // Top can be the same as the given rect
-    fn get_top_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
+    pub fn get_top_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
         let mut current_id = rect_id;
         let mut output = Err(RectError::NotFound);
         let mut rect_defined = false;
@@ -577,7 +577,7 @@ impl RectManager {
         output
     }
 
-    fn has_parent(&self, rect_id: usize) -> Result<bool, RectError> {
+    pub fn has_parent(&self, rect_id: usize) -> Result<bool, RectError> {
         let mut output;
         match self.get_rect(rect_id) {
             Ok(rect) => {
@@ -764,7 +764,7 @@ impl RectManager {
         output
     }
 
-    fn get_visible_box(&self, rect_id: usize) -> Result<(isize, isize, isize, isize), RectError> {
+    pub fn get_visible_box(&self, rect_id: usize) -> Result<(isize, isize, isize, isize), RectError> {
         let mut output = Ok((0, 0, 0, 0));
         let mut rect_box = (0, 0, 0, 0);
 
@@ -958,7 +958,7 @@ impl RectManager {
         }
     }
 
-    fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut to_draw = Vec::new();
 
@@ -1093,7 +1093,7 @@ impl RectManager {
         lineage
     }
 
-    fn draw_queued(&mut self) -> Result<(), RectError> {
+    pub fn draw_queued(&mut self) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut to_draw = Vec::new();
         let mut depth_tracker: HashMap<(isize, isize), usize> = HashMap::new();
@@ -1214,7 +1214,7 @@ impl RectManager {
         output
     }
 
-    fn get_rect_size(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
+    pub fn get_rect_size(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
         let mut output;
         match self.get_rect(rect_id) {
             Ok(rect) => {
@@ -1285,7 +1285,7 @@ impl RectManager {
         output
     }
 
-    fn resize(&mut self, rect_id: usize, width: isize, height: isize) -> Result<(), RectError> {
+    pub fn resize(&mut self, rect_id: usize, width: isize, height: isize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut pos = (0, 0);
 
@@ -1320,7 +1320,7 @@ impl RectManager {
         output
     }
 
-    fn shift_contents(&mut self, rect_id: usize, x_offset: isize, y_offset: isize) -> Result<(), RectError> {
+    pub fn shift_contents(&mut self, rect_id: usize, x_offset: isize, y_offset: isize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut child_ids = Vec::new();
         match self.get_rect_mut(rect_id) {
@@ -1343,7 +1343,7 @@ impl RectManager {
         output
     }
 
-    fn set_position(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
+    pub fn set_position(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         let mut has_parent = false;
@@ -1508,7 +1508,7 @@ impl RectManager {
         output
     }
 
-    fn disable(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn disable(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut was_enabled = false;
         match self.get_rect_mut(rect_id) {
@@ -1545,7 +1545,7 @@ impl RectManager {
         output
     }
 
-    fn enable(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn enable(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut was_enabled = false;
         match self.get_rect_mut(rect_id) {
@@ -1593,7 +1593,7 @@ impl RectManager {
     }
 
     // Remove all characters
-    fn clear(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn clear(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -1610,7 +1610,7 @@ impl RectManager {
     }
 
     // Remove All Children
-    fn empty(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn empty(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut children = Vec::new();
         let mut output = Ok(());
 
@@ -1637,7 +1637,7 @@ impl RectManager {
         output
     }
 
-    fn detach(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn detach(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut parent_id = 0;
         let mut has_parent = false;
         let mut output = Ok(());
@@ -1672,7 +1672,7 @@ impl RectManager {
         output
     }
 
-    fn attach(&mut self, rect_id: usize, new_parent_id: usize) -> Result<(), RectError> {
+    pub fn attach(&mut self, rect_id: usize, new_parent_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         output = self.detach(rect_id);
@@ -1709,7 +1709,7 @@ impl RectManager {
         output
     }
 
-    fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
+    pub fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut new_characters = Vec::new();
         let mut characters: Vec<_> = string.split("").collect();
@@ -1767,7 +1767,7 @@ impl RectManager {
         output
     }
 
-    fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
+    pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -1786,7 +1786,7 @@ impl RectManager {
         output
     }
 
-    fn unset_character(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
+    pub fn unset_character(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -1805,7 +1805,7 @@ impl RectManager {
         output
     }
 
-    fn delete_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn delete_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_parent_mut(rect_id) {
@@ -1891,7 +1891,7 @@ impl RectManager {
         output
     }
 
-    fn queue_draw(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn queue_draw(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect(rect_id) {
             Ok(_) => {
                 self.draw_queue.push(rect_id);
@@ -1903,7 +1903,7 @@ impl RectManager {
         }
     }
 
-    fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {
+    pub fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut parent_id = 0;
         let mut old_position = (0, 0);
