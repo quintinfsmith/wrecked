@@ -1952,7 +1952,7 @@ impl RectManager {
         did_resize
     }
 
-    fn set_bold_flag(&mut self, rect_id: usize) {
+    pub fn set_bold_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.set_bold_flag();
@@ -1961,7 +1961,7 @@ impl RectManager {
         }
     }
 
-    fn unset_bold_flag(&mut self, rect_id: usize) {
+    pub fn unset_bold_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.unset_bold_flag();
@@ -1970,7 +1970,7 @@ impl RectManager {
         }
     }
 
-    fn set_underline_flag(&mut self, rect_id: usize) {
+    pub fn set_underline_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.set_underline_flag();
@@ -1978,7 +1978,7 @@ impl RectManager {
             Err(e) => {}
         }
     }
-    fn unset_underline_flag(&mut self, rect_id: usize) {
+    pub fn unset_underline_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.unset_underline_flag();
@@ -1986,7 +1986,7 @@ impl RectManager {
             Err(e) => {}
         }
     }
-    fn set_invert_flag(&mut self, rect_id: usize) {
+    pub fn set_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.set_invert_flag();
@@ -1994,7 +1994,7 @@ impl RectManager {
             Err(e) => {}
         }
     }
-    fn unset_invert_flag(&mut self, rect_id: usize) {
+    pub fn unset_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.unset_invert_flag();
