@@ -1,4 +1,5 @@
 use std::ffi::CStr;
+use terminal_size::{Width, Height, terminal_size};
 use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -7,10 +8,10 @@ use std::cmp;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 
-
 /*
     TODO
     Maybe change [u8; 4] to a struct like "Character"
+    Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
 */
 
 fn logg(mut msg: String) {
@@ -73,7 +74,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    fn new(rect_id: usize) -> Rect {
+    pub fn new(rect_id: usize) -> Rect {
         Rect {
             rect_id: rect_id,
             parent: None,
@@ -377,7 +378,7 @@ impl Rect {
 }
 
 impl RectManager {
-    fn new() -> RectManager {
+    pub fn new(width: usize, height: usize) -> RectManager {
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
@@ -386,6 +387,7 @@ impl RectManager {
         };
 
         rectmanager.new_rect(None);
+        rectmanager.resize(0, width, height);
 
         rectmanager
     }
@@ -1934,10 +1936,22 @@ impl RectManager {
         height
     }
 
+    pub fn auto_resize(&mut self) -> bool {
+        let mut did_resize = false;
+        let (current_width, current_height) = self.get_rect_size(0).ok().unwrap();
+        match terminal_size() {
+            Some((Width(w), Height(h))) => {
+                if w as usize != current_width || h as usize != current_height {
+                    self.resize(0, w as usize, h as usize);
+                    did_resize = true;
+                }
+            }
+            None => ()
+        }
 
+        did_resize
+    }
 }
-
-
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
@@ -2547,12 +2561,21 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
     // Releases boxes
 }
 
-
+// TODO: Remove need for arguments
 #[no_mangle]
-pub extern "C" fn init(width: usize, height: usize) -> *mut RectManager {
-    let mut rectmanager = RectManager::new();
+pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager {
 
-    rectmanager.resize(0, width, height);
+    let mut new_width = 1;
+    let mut new_height = 1;
+    match terminal_size() {
+        Some((Width(w), Height(h))) => {
+            new_width = w as usize;
+            new_height = h as usize;
+        }
+        None => ()
+    }
+
+    let mut rectmanager = RectManager::new(new_width, new_height);
 
     print!("\x1B[?25l"); // Hide Cursor
     println!("\x1B[?1049h"); // New screen

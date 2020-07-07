@@ -285,6 +285,7 @@ class RectManager:
         )
 
         self.lib = ffi.dlopen(self.SO_PATH)
+        # TODO: get rectmanager's root node size from  cffi layer
         self.width, self.height = get_terminal_size()
         self.rectmanager = self.lib.init(self.width, self.height)
 

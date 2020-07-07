@@ -1,10 +1,13 @@
 [package]
 name = "AsciiBox"
 version = "0.1.0"
-authors = ["Quintin Smith <smith.f.quintin@gmail.com>"]
+authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+terminal_size = { git = "https://github.com/eminence/terminal-size.git" }
 
 [lib]
 name = "asciibox"
 crate-type = ["dylib"]
-
 
