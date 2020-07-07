@@ -1951,6 +1951,57 @@ impl RectManager {
 
         did_resize
     }
+
+    fn set_bold_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_bold_flag();
+            }
+            Err(e) => {}
+        }
+    }
+
+    fn unset_bold_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_bold_flag();
+            }
+            Err(e) => {}
+        }
+    }
+
+    fn set_underline_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_underline_flag();
+            }
+            Err(e) => {}
+        }
+    }
+    fn unset_underline_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_underline_flag();
+            }
+            Err(e) => {}
+        }
+    }
+    fn set_invert_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_invert_flag();
+            }
+            Err(e) => {}
+        }
+    }
+    fn unset_invert_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_invert_flag();
+            }
+            Err(e) => {}
+        }
+    }
 }
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
