@@ -2002,7 +2002,92 @@ impl RectManager {
             Err(e) => {}
         }
     }
+
+    pub fn set_bg_color(&mut self, rect_id: usize, color: u8) -> Result<(), RectError> {
+        let mut result = match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_bg_color(color);
+                Ok(())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        };
+
+        if (result.is_ok()) {
+            result = self.flag_refresh(rect_id);
+        }
+
+        result
+    }
+
+    pub fn unset_bg_color(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut result = match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_bg_color();
+                Ok(())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        };
+
+        if (result.is_ok()) {
+            result = self.flag_refresh(rect_id);
+        }
+
+        result
+    }
+
+    pub fn set_fg_color(&mut self, rect_id: usize, color: u8) -> Result<(), RectError> {
+        let mut result = match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_fg_color(color);
+                Ok(())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        };
+
+        if (result.is_ok()) {
+            result = self.flag_refresh(rect_id);
+        }
+
+        result
+    }
+
+    pub fn unset_fg_color(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut result = match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_fg_color();
+                Ok(())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        };
+
+        if (result.is_ok()) {
+            result = self.flag_refresh(rect_id);
+        }
+
+        result
+    }
+
+    pub fn unset_color(&mut self, rect_id: usize) -> Result<(), RectError>{
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_color();
+                Ok(())
+            },
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
 }
+
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
@@ -2092,15 +2177,7 @@ pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.set_fg_color(col);
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
+    let result = rectmanager.set_fg_color(rect_id, col);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2114,19 +2191,7 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -
 pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.set_bg_color(col);
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
+    let result = rectmanager.set_bg_color(rect_id, col);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2313,20 +2378,7 @@ pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: usize
 pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_bg_color();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
+    let result = rectmanager.unset_bg_color(rect_id);
     Box::into_raw(rectmanager); // Prevent Release
 
     match result {
@@ -2340,20 +2392,7 @@ pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 #[no_mangle]
 pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_fg_color();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
+    let result = rectmanager.unset_fg_color(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2368,15 +2407,7 @@ pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_color();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
+    let result = rectmanager.unset_color(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 
