@@ -378,7 +378,7 @@ impl Rect {
 }
 
 impl RectManager {
-    pub fn new(width: usize, height: usize) -> RectManager {
+    pub fn new() -> RectManager {
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
@@ -387,7 +387,7 @@ impl RectManager {
         };
 
         rectmanager.new_rect(None);
-        rectmanager.resize(0, width, height);
+        rectmanager.auto_resize();
 
         rectmanager
     }
@@ -2616,17 +2616,7 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
 #[no_mangle]
 pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager {
 
-    let mut new_width = 1;
-    let mut new_height = 1;
-    match terminal_size() {
-        Some((Width(w), Height(h))) => {
-            new_width = w as usize;
-            new_height = h as usize;
-        }
-        None => ()
-    }
-
-    let mut rectmanager = RectManager::new(new_width, new_height);
+    let mut rectmanager = RectManager::new();
 
     print!("\x1B[?25l"); // Hide Cursor
     println!("\x1B[?1049h"); // New screen
