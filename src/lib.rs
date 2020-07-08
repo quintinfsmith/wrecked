@@ -386,8 +386,12 @@ impl RectManager {
             top_cache: HashMap::new()
         };
 
+        print!("\x1B[?25l"); // Hide Cursor
+        println!("\x1B[?1049h"); // New screen
+
         rectmanager.new_rect(None);
         rectmanager.auto_resize();
+
 
         rectmanager
     }
@@ -2648,9 +2652,6 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
 pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager {
 
     let mut rectmanager = RectManager::new();
-
-    print!("\x1B[?25l"); // Hide Cursor
-    println!("\x1B[?1049h"); // New screen
 
     Box::into_raw(Box::new(rectmanager))
 }
