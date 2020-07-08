@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
 use std::cmp;
-use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::fs::File;
+use std::io::{Write};
 
 /*
     TODO
@@ -14,14 +15,16 @@ use std::io::prelude::*;
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
 */
 
-fn logg(mut msg: String) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open("rlogg")
-        .unwrap();
-
-    writeln!(file, "{}\n", msg);
+pub fn logg(mut msg: String) {
+    let path = "rlogg";
+    match File::create(path) {
+        Ok(mut file) => {
+            file.write_all(msg.as_bytes())
+        }
+        Err(e) => {
+            Err(e)
+        }
+    };
 }
 
 #[derive(PartialEq, Eq)]
@@ -386,8 +389,8 @@ impl RectManager {
             top_cache: HashMap::new()
         };
 
-        print!("\x1B[?25l"); // Hide Cursor
-        println!("\x1B[?1049h"); // New screen
+        //print!("\x1B[?25l"); // Hide Cursor
+        //println!("\x1B[?1049h"); // New screen
 
         rectmanager.new_rect(None);
         rectmanager.auto_resize();
@@ -1321,6 +1324,10 @@ impl RectManager {
             self.flag_refresh(rect_id);
         }
 
+        if output.is_err() {
+            logg("Resize fail".to_string());
+        }
+
         output
     }
 
@@ -1382,6 +1389,10 @@ impl RectManager {
 
         if output.is_ok() {
             self.flag_parent_refresh(rect_id);
+        }
+
+        if output.is_err() {
+            logg("Move fail".to_string());
         }
 
         output
@@ -1631,6 +1642,10 @@ impl RectManager {
         if (output.is_ok()) {
             for child_id in children.iter() {
                 output = self.detach(*child_id);
+                if (output.is_err()) {
+                    break;
+                }
+                output = self.delete_rect(*child_id);
                 if (output.is_err()) {
                     break;
                 }
@@ -1943,6 +1958,7 @@ impl RectManager {
     pub fn auto_resize(&mut self) -> bool {
         let mut did_resize = false;
         let (current_width, current_height) = self.get_rect_size(0).ok().unwrap();
+
         match terminal_size() {
             Some((Width(w), Height(h))) => {
                 if w as usize != current_width || h as usize != current_height {
