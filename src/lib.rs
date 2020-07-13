@@ -5,10 +5,10 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
 use std::cmp;
-use std::io::prelude::*;
 use std::fs::File;
 use std::io::{Write};
-
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 /*
     TODO
     Maybe change [u8; 4] to a struct like "Character"
@@ -17,14 +17,14 @@ use std::io::{Write};
 
 pub fn logg(mut msg: String) {
     let path = "rlogg";
-    match File::create(path) {
-        Ok(mut file) => {
-            file.write_all(msg.as_bytes())
-        }
-        Err(e) => {
-            Err(e)
-        }
-    };
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(path)
+        .unwrap();
+
+    writeln!(file, "{}",  msg);
 }
 
 #[derive(PartialEq, Eq)]
@@ -382,15 +382,15 @@ impl Rect {
 
 impl RectManager {
     pub fn new() -> RectManager {
+        //print!("\x1B[?25l"); // Hide Cursor
+        //println!("\x1B[?1049h"); // New screen
+
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
             draw_queue: Vec::new(),
             top_cache: HashMap::new()
         };
-
-        //print!("\x1B[?25l"); // Hide Cursor
-        //println!("\x1B[?1049h"); // New screen
 
         rectmanager.new_rect(None);
         rectmanager.auto_resize();
@@ -1946,10 +1946,22 @@ impl RectManager {
 
         output
     }
+
+    pub fn get_rect_width(&mut self, rect_id: usize) -> usize {
+        let (width, _) = self.get_rect_size(rect_id).ok().unwrap();
+        width
+    }
+
+    pub fn get_rect_height(&mut self, rect_id: usize) -> usize {
+        let (_, height) = self.get_rect_size(rect_id).ok().unwrap();
+        height
+    }
+
     pub fn get_width(&mut self) -> usize {
         let (width, _) = self.get_rect_size(0).ok().unwrap();
         width
     }
+
     pub fn get_height(&mut self) -> usize {
         let (_, height) = self.get_rect_size(0).ok().unwrap();
         height
