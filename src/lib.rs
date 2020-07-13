@@ -382,8 +382,8 @@ impl Rect {
 
 impl RectManager {
     pub fn new() -> RectManager {
-        //print!("\x1B[?25l"); // Hide Cursor
-        //println!("\x1B[?1049h"); // New screen
+        print!("\x1B[?25l"); // Hide Cursor
+        println!("\x1B[?1049h"); // New screen
 
         let mut rectmanager = RectManager {
             idgen: 0,
