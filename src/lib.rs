@@ -382,8 +382,8 @@ impl Rect {
 
 impl RectManager {
     pub fn new() -> RectManager {
-        //print!("\x1B[?25l"); // Hide Cursor
-        //println!("\x1B[?1049h"); // New screen
+        print!("\x1B[?25l"); // Hide Cursor
+        println!("\x1B[?1049h"); // New screen
 
         let mut rectmanager = RectManager {
             idgen: 0,
@@ -1209,6 +1209,10 @@ impl RectManager {
                             break;
                         }
                     }
+
+                    self.flag_parent_refresh(rect_id);
+
+
                 } else {
                     break;
                 }
@@ -1991,6 +1995,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
 
     pub fn unset_bold_flag(&mut self, rect_id: usize) {
@@ -2000,6 +2005,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
 
     pub fn set_underline_flag(&mut self, rect_id: usize) {
@@ -2009,6 +2015,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
     pub fn unset_underline_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
@@ -2017,6 +2024,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
     pub fn set_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
@@ -2025,6 +2033,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
     pub fn unset_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
@@ -2033,6 +2042,7 @@ impl RectManager {
             }
             Err(e) => {}
         }
+        self.flag_refresh(rect_id);
     }
 
     pub fn set_bg_color(&mut self, rect_id: usize, color: u8) -> Result<(), RectError> {
