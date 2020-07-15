@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 terminal_size = { git = "https://github.com/eminence/terminal-size.git" }
+termios = "0.3"
 
 [lib]
 name = "asciibox"

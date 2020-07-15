@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{Write};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 /*
     TODO
     Maybe change [u8; 4] to a struct like "Character"
@@ -46,7 +47,8 @@ pub struct RectManager {
     draw_queue: Vec<usize>,
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
-    top_cache: HashMap<(isize, isize), (([u8; 4], usize), u16)>
+    top_cache: HashMap<(isize, isize), (([u8; 4], usize), u16)>,
+    _termios: Termios
 }
 
 pub struct Rect {
@@ -382,15 +384,24 @@ impl Rect {
 
 impl RectManager {
     pub fn new() -> RectManager {
-        print!("\x1B[?25l"); // Hide Cursor
-        println!("\x1B[?1049h"); // New screen
+        let termios = Termios::from_fd(0).unwrap();
+
+        let mut new_termios = termios.clone();
 
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
             draw_queue: Vec::new(),
-            top_cache: HashMap::new()
+            top_cache: HashMap::new(),
+            _termios: termios
         };
+
+        new_termios.c_lflag &= !(ICANON | ECHO);
+        tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
+
+        print!("\x1B[?25l"); // Hide Cursor
+        println!("\x1B[?1049h"); // New screen
+
 
         rectmanager.new_rect(None);
         rectmanager.auto_resize();
@@ -2128,6 +2139,22 @@ impl RectManager {
             }
         }
     }
+    pub fn kill(&mut self) {
+        self.empty(0);
+
+        let (w, h) = self.get_rect_size(0).ok().unwrap();
+        for x in 0 .. w {
+            for y in 0 .. h {
+                self.set_character(0, x as isize, y as isize, ([0, 0, 0, 0], 1));
+            }
+        }
+
+        self.draw(0);
+        tcsetattr(0, TCSANOW, & self._termios).unwrap();
+        print!("\x1B[?25h"); // Show Cursor
+        println!("\x1B[?1049l"); // Return to previous screen
+
+    }
 }
 
 #[no_mangle]
@@ -2657,28 +2684,7 @@ pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: usize, new_re
 pub extern "C" fn kill(ptr: *mut RectManager) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let mut rect_ids = Vec::new();
-    for (rect_id, rect) in rectmanager.rects.iter() {
-        rect_ids.push(*rect_id);
-    }
-
-    for rect_id in rect_ids.iter() {
-        if *rect_id > 0 {
-            rectmanager.detach(*rect_id);
-        }
-    }
-
-    let (w, h) = rectmanager.get_rect_size(0).ok().unwrap();
-    for x in 0 .. w {
-        for y in 0 .. h {
-            rectmanager.set_character(0, x as isize, y as isize, ([0, 0, 0, 0], 1));
-        }
-    }
-
-    rectmanager.draw(0);
-    print!("\x1B[?25h"); // Show Cursor
-    println!("\x1B[?1049l"); // Return to previous screen
-
+    rectmanager.kill();
 
     // TODO: Figure out why releasing causes segfault
     Box::into_raw(rectmanager); // Prevent Release
