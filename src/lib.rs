@@ -16,7 +16,7 @@ use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
 */
 
-pub fn logg(mut msg: String) {
+pub fn logg(msg: String) {
     let path = "rlogg";
 
     let mut file = OpenOptions::new()
@@ -596,7 +596,7 @@ impl RectManager {
     }
 
     pub fn has_parent(&self, rect_id: usize) -> Result<bool, RectError> {
-        let mut output;
+        let output;
         match self.get_rect(rect_id) {
             Ok(rect) => {
                 match rect.parent {
@@ -1236,7 +1236,7 @@ impl RectManager {
     }
 
     pub fn get_rect_size(&self, rect_id: usize) -> Result<(usize, usize), RectError> {
-        let mut output;
+        let output;
 
         match self.get_rect(rect_id) {
             Ok(rect) => {
@@ -1254,7 +1254,7 @@ impl RectManager {
         let mut x = 0;
         let mut y = 0;
         let mut output = Ok((0, 0));
-        let mut pos;
+        let pos;
 
 
         match self.get_parent(rect_id) {
@@ -1550,7 +1550,7 @@ impl RectManager {
             }
         };
 
-        let mut offset = (0, 0);
+        let offset = (0, 0);
         let mut parent_id = 0;
 
         if was_enabled {
@@ -1745,7 +1745,7 @@ impl RectManager {
     pub fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
         let mut output = Ok(());
         let mut new_characters = Vec::new();
-        let mut characters: Vec<_> = string.split("").collect();
+        let characters: Vec<_> = string.split("").collect();
 
         let mut tmp_char;
         let mut new_c: [u8; 4];
@@ -2204,7 +2204,7 @@ pub extern "C" fn queue_draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn draw_queued(ptr: *mut RectManager) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
     let draw_queue_length = rectmanager.draw_queue.len();
-    let mut result;
+    let result;
     if draw_queue_length > 0 {
         result = rectmanager.draw_queued();
     } else {
@@ -2695,7 +2695,7 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
 #[no_mangle]
 pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager {
 
-    let mut rectmanager = RectManager::new();
+    let rectmanager = RectManager::new();
 
     Box::into_raw(Box::new(rectmanager))
 }
