@@ -131,7 +131,7 @@ impl Rect {
     }
 
     fn shift_contents(&mut self, x_offset: isize, y_offset: isize) {
-        for (child_id, position) in self.child_positions.iter_mut() {
+        for (_child_id, position) in self.child_positions.iter_mut() {
             *position = (
                 position.0 + x_offset,
                 position.1 + y_offset
@@ -414,8 +414,7 @@ impl RectManager {
         let new_id = self.idgen;
         self.idgen += 1;
 
-        let rect = self.rects.entry(new_id)
-            .or_insert(Rect::new(new_id));
+        self.rects.entry(new_id).or_insert(Rect::new(new_id));
 
         match parent_id {
             Some(unpacked) => {
@@ -884,7 +883,6 @@ impl RectManager {
         let mut color_value: u16;
         let mut current_line_color_value: u16 = 0;
         let mut utf_char: &[u8];
-        let mut utf_char_split_index: usize;
 
         display_map.sort();
 
@@ -989,20 +987,12 @@ impl RectManager {
             }
         };
 
-        let mut dimensions = (0, 0);
-        match self.get_top(rect_id) {
-            Ok(top) => {
-                dimensions = (top.width, top.height);
-            }
-            Err(e) => { }
-        };
-
         let mut boundry_box = (0, 0, 0, 0);
         match self.get_visible_box(rect_id) {
             Ok(_box) => {
                 boundry_box = _box;
             }
-            Err(e) => { }
+            Err(_e) => { }
         };
 
         if output.is_ok() {
