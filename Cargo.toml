@@ -3,7 +3,7 @@ name = "wrecked"
 version = "0.1.0"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
-description = "terminal graphics library"
+description = "A terminal graphics library"
 
 [dependencies]
 terminal_size = { git = "https://github.com/eminence/terminal-size.git" }
