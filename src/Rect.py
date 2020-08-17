@@ -213,7 +213,7 @@ class Rect(object):
 
 class RectManager:
     #SO_PATH = "/home/pent/Projects/100/target/debug/libasciibox.so"
-    SO_PATH = "/home/pent/Projects/100/target/release/libasciibox.so"
+    SO_PATH = "/home/pent/Projects/100/target/release/libwrecked.so"
 
     def __init__(self):
         ffi = FFI()

@@ -1,14 +1,15 @@
 [package]
-name = "AsciiBox"
+name = "wrecked"
 version = "0.1.0"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
+description = "terminal graphics library"
 
 [dependencies]
 terminal_size = { git = "https://github.com/eminence/terminal-size.git" }
 termios = "0.3"
 
 [lib]
-name = "asciibox"
+name = "wrecked"
 crate-type = ["dylib"]
 
