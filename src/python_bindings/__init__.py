@@ -275,7 +275,7 @@ class RectManager:
 
         sl = RectLogger(logging.getLogger('STDERR'), logging.ERROR)
         sys.stderr = sl
-        self.log_path = 'recterr.log'
+        self.log_path = '.wreckederr.log'
         if os.path.isfile(self.log_path):
             with open(self.log_path, 'w') as fp:
                 fp.write("")
