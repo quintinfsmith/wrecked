@@ -874,18 +874,13 @@ impl RectManager {
 
     fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (([u8; 4], usize), u16))>) {
         let mut renderstring = "".to_string();
-
-        let mut current_col = -1;
-        let mut current_row = -1;
-        let mut update_top_cache;
-
-        let mut val_a: &([u8; 4], usize);
-        let mut color_value: u16;
-        let mut current_line_color_value: u16 = 0;
-        let mut utf_char: &[u8];
+        let mut width = self.get_width();
 
         display_map.sort();
-
+        let mut do_updates = Vec::new();
+        // First, find which positions need to be updated and fill in
+        let mut update_top_cache;
+        let mut offset: usize;
         for (pos, val) in display_map.iter() {
             update_top_cache = false;
             match self.top_cache.get(&pos) {
@@ -893,78 +888,107 @@ impl RectManager {
                     if (*char_pair != *val) {
                         update_top_cache = true;
                     }
-                },
+                }
                 None => {
                     update_top_cache = true;
                 }
             }
 
             if update_top_cache {
+                offset = (pos.1 as usize * width) + pos.0 as usize;
                 self.top_cache.entry(*pos)
                     .and_modify(|e| { *e = *val })
                     .or_insert(*val);
-            } else {
-                current_col = -1;
-                current_row = -1;
-                continue;
+                do_updates.push((offset, *pos, *val));
             }
+        }
+
+
+        let mut val_a: &([u8; 4], usize);
+        let mut utf_char: &[u8];
+        // THEN build then ANSI string
+        let mut active_effects: u16 = 0;
+        let mut new_effects: u16;
+        let mut current_col = -1;
+        let mut current_row = -1;
+        do_updates.sort();
+
+        for (buffer_pos, pos, val) in do_updates.iter() {
+            val_a = &val.0;
+            new_effects = val.1;
+
+            if new_effects != active_effects {
+                if new_effects == 0 {
+                    renderstring += &format!("\x1B[0m");
+                } else {
+                    // ForeGround
+                    if ((new_effects >> 5) & 16) != ((active_effects >> 5) & 16) {
+                        if (new_effects >> 5) & 16 == 16 {
+                            if (new_effects >> 5) & 8 == 8 {
+                                renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
+                            } else {
+                                renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
+                            }
+                        } else {
+                            renderstring += &format!("\x1B[39m");
+                        }
+                    }
+
+                    // BackGround
+                    if (new_effects & 16) != (active_effects & 16) {
+                        if new_effects & 16 == 16 {
+                            if new_effects & 8 == 8 {
+                                renderstring += &format!("\x1B[10{}m", (new_effects & 7));
+                            } else {
+                                renderstring += &format!("\x1B[4{}m", (new_effects & 7));
+                            }
+                        } else {
+                            renderstring += &format!("\x1B[49m");
+                        }
+                    }
+
+                    // Bold
+                    let BOLDMASK = 1 << 10;
+                    if (new_effects & BOLDMASK) != (active_effects & BOLDMASK) {
+                        if new_effects & BOLDMASK > 1 {
+                            renderstring += &format!("\x1B[1m"); // On
+                        } else if active_effects & BOLDMASK > 1 {
+                            renderstring += &format!("\x1B[21m"); // Off
+                        }
+                    }
+
+                    // Underline
+                    let UNDERLINEMASK = 1 << 11;
+                    if (new_effects & UNDERLINEMASK) != (active_effects & UNDERLINEMASK) {
+                        if new_effects & UNDERLINEMASK > 1 {
+                            renderstring += &format!("\x1B[4m");
+                        } else if active_effects & UNDERLINEMASK > 1 {
+                            renderstring += &format!("\x1B[24m"); // Off
+                        }
+                    }
+
+                    // Inverted
+                    let INVERTMASK = 1 << 12;
+                    if (new_effects & INVERTMASK) != (active_effects & INVERTMASK) {
+                        if new_effects & INVERTMASK > 1 {
+                            renderstring += &format!("\x1B[7m");
+                        } else if active_effects & INVERTMASK > 1 {
+                            renderstring += &format!("\x1B[27m"); // Off
+                        }
+                    }
+                }
+            }
+            active_effects = new_effects;
 
             if pos.1 != current_row || pos.0 != current_col {
                 renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             }
-
-            current_col = pos.0;
+            current_col = pos.0 + 1;
             current_row = pos.1;
 
-            val_a = &val.0;
-            color_value = val.1;
-            if color_value != current_line_color_value {
-                if color_value == 0 {
-                    renderstring += &format!("\x1B[0m");
-                } else {
-                    // ForeGround
-                    if (color_value >> 5) & 16 == 16 {
-                        if (color_value >> 5) & 8 == 8 {
-                            renderstring += &format!("\x1B[9{}m", ((color_value >> 5) & 7));
-                        } else {
-                            renderstring += &format!("\x1B[3{}m", ((color_value >> 5) & 7));
-                        }
-                    } else {
-                        renderstring += &format!("\x1B[39m");
-                    }
 
-                    // BackGround
-                    if color_value & 16 == 16 {
-                        if color_value & 8 == 8 {
-                            renderstring += &format!("\x1B[10{}m", (color_value & 7));
-                        } else {
-                            renderstring += &format!("\x1B[4{}m", (color_value & 7));
-                        }
-                    } else {
-                        renderstring += &format!("\x1B[49m");
-                    }
-
-                    // Bold
-                    if color_value & 0b000010000000000 > 1 {
-                        renderstring += &format!("\x1B[1m");
-                    }
-                    // Underline
-                    if color_value & 0b000100000000000 > 1 {
-                        renderstring += &format!("\x1B[4m");
-                    }
-                    // Inverted
-                    if color_value & 0b001000000000000 > 1 {
-                        renderstring += &format!("\x1B[7m");
-                    }
-                }
-                current_line_color_value = color_value;
-            }
-
-            if update_top_cache {
-                utf_char = val_a.0.split_at(val_a.1).0;
-                renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
-                current_col += 1;
-            }
+            utf_char = val_a.0.split_at(val_a.1).0;
+            renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
         }
 
         if (display_map.len() > 0) {
@@ -2118,8 +2142,8 @@ impl RectManager {
         result
     }
 
-    pub fn unset_color(&mut self, rect_id: usize) -> Result<(), RectError>{
-        match self.get_rect_mut(rect_id) {
+    pub fn unset_color(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut result = match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.unset_color();
                 Ok(())
@@ -2127,7 +2151,13 @@ impl RectManager {
             Err(e) => {
                 Err(e)
             }
+        };
+
+        if (result.is_ok()) {
+            result = self.flag_refresh(rect_id);
         }
+
+        result
     }
     pub fn kill(&mut self) {
         self.empty(0);
