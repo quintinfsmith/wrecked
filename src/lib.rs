@@ -130,6 +130,10 @@ impl Rect {
         output
     }
 
+    fn get_default_character(&self) -> ([u8;4], usize) {
+        self.default_character
+    }
+
     fn shift_contents(&mut self, x_offset: isize, y_offset: isize) {
         for (_child_id, position) in self.child_positions.iter_mut() {
             *position = (
@@ -203,6 +207,24 @@ impl Rect {
         self._inverse_child_space.entry(rect_id)
             .or_insert(Vec::new())
             .clear();
+    }
+
+    fn get_character(&self, x: isize, y: isize) -> Result<([u8;4], usize), RectError> {
+        let output;
+        if y < self.height as isize && y >= 0 && x < self.width as isize && x >= 0 {
+            output = match self.character_space.get(&(x, y)) {
+                Some(character) => {
+                    Ok(character.clone())
+                }
+                None => {
+                    Ok(self.default_character)
+                }
+            };
+        } else {
+            output = Err(RectError::BadPosition);
+        }
+
+        output
     }
 
     fn set_character(&mut self, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
@@ -378,7 +400,12 @@ impl Rect {
     }
 
     fn clear(&mut self) {
-        self.character_space.clear();
+        for x in 0 .. self.width {
+            for y in 0 .. self.height {
+                self.set_character(0, 0, self.default_character);
+            }
+        }
+        //self.character_space.clear();
     }
 }
 
@@ -408,6 +435,9 @@ impl RectManager {
 
 
         rectmanager
+    }
+    pub fn clear_cache(&mut self) {
+        self.top_cache = HashMap::new();
     }
 
     pub fn new_rect(&mut self, parent_id: Option<usize>) -> usize {
@@ -917,74 +947,79 @@ impl RectManager {
             val_a = &val.0;
             new_effects = val.1;
 
-            if new_effects != active_effects {
-                if new_effects == 0 {
+            if pos.1 != current_row || pos.0 != current_col {
+                renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
+                current_col = pos.0;
+                current_row = pos.1;
+            } else {
+                current_col += 1;
+                if (current_col as usize) % width == 0 {
+                    current_col = 0;
+                    current_row += 1;
                     renderstring += &format!("\x1B[0m");
-                } else {
-                    // ForeGround
-                    if ((new_effects >> 5) & 16) != ((active_effects >> 5) & 16) {
-                        if (new_effects >> 5) & 16 == 16 {
-                            if (new_effects >> 5) & 8 == 8 {
-                                renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
-                            } else {
-                                renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
-                            }
+                }
+            }
+
+            if new_effects == 0 && active_effects != 0 {
+                renderstring += &format!("\x1B[0m");
+            } else {
+                // ForeGround
+                if true || ((new_effects >> 5) & 16) != ((active_effects >> 5) & 16) {
+                    if (new_effects >> 5) & 16 == 16 {
+                        if (new_effects >> 5) & 8 == 8 {
+                            renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
                         } else {
-                            renderstring += &format!("\x1B[39m");
+                            renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
                         }
+                    } else {
+                        renderstring += &format!("\x1B[39m");
                     }
+                }
 
-                    // BackGround
-                    if (new_effects & 16) != (active_effects & 16) {
-                        if new_effects & 16 == 16 {
-                            if new_effects & 8 == 8 {
-                                renderstring += &format!("\x1B[10{}m", (new_effects & 7));
-                            } else {
-                                renderstring += &format!("\x1B[4{}m", (new_effects & 7));
-                            }
+                // BackGround
+                if (new_effects & 16) != (active_effects & 16) {
+                    if new_effects & 16 == 16 {
+                        if new_effects & 8 == 8 {
+                            renderstring += &format!("\x1B[10{}m", (new_effects & 7));
                         } else {
-                            renderstring += &format!("\x1B[49m");
+                            renderstring += &format!("\x1B[4{}m", (new_effects & 7));
                         }
+                    } else {
+                        renderstring += &format!("\x1B[49m");
                     }
+                }
 
-                    // Bold
-                    let BOLDMASK = 1 << 10;
-                    if (new_effects & BOLDMASK) != (active_effects & BOLDMASK) {
-                        if new_effects & BOLDMASK > 1 {
-                            renderstring += &format!("\x1B[1m"); // On
-                        } else if active_effects & BOLDMASK > 1 {
-                            renderstring += &format!("\x1B[21m"); // Off
-                        }
+                // Bold
+                let BOLDMASK = 1 << 10;
+                if (new_effects & BOLDMASK) != (active_effects & BOLDMASK) {
+                    if new_effects & BOLDMASK > 1 {
+                        renderstring += &format!("\x1B[1m"); // On
+                    } else if active_effects & BOLDMASK > 1 {
+                        renderstring += &format!("\x1B[21m"); // Off
                     }
+                }
 
-                    // Underline
-                    let UNDERLINEMASK = 1 << 11;
-                    if (new_effects & UNDERLINEMASK) != (active_effects & UNDERLINEMASK) {
-                        if new_effects & UNDERLINEMASK > 1 {
-                            renderstring += &format!("\x1B[4m");
-                        } else if active_effects & UNDERLINEMASK > 1 {
-                            renderstring += &format!("\x1B[24m"); // Off
-                        }
+                // Underline
+                let UNDERLINEMASK = 1 << 11;
+                if (new_effects & UNDERLINEMASK) != (active_effects & UNDERLINEMASK) {
+                    if new_effects & UNDERLINEMASK > 1 {
+                        renderstring += &format!("\x1B[4m");
+                    } else if active_effects & UNDERLINEMASK > 1 {
+                        renderstring += &format!("\x1B[24m"); // Off
                     }
+                }
 
-                    // Inverted
-                    let INVERTMASK = 1 << 12;
-                    if (new_effects & INVERTMASK) != (active_effects & INVERTMASK) {
-                        if new_effects & INVERTMASK > 1 {
-                            renderstring += &format!("\x1B[7m");
-                        } else if active_effects & INVERTMASK > 1 {
-                            renderstring += &format!("\x1B[27m"); // Off
-                        }
+                // Inverted
+                let INVERTMASK = 1 << 12;
+                if (new_effects & INVERTMASK) != (active_effects & INVERTMASK) {
+                    if new_effects & INVERTMASK > 1 {
+                        renderstring += &format!("\x1B[7m");
+                    } else if active_effects & INVERTMASK > 1 {
+                        renderstring += &format!("\x1B[27m"); // Off
                     }
                 }
             }
             active_effects = new_effects;
-
-            if pos.1 != current_row || pos.0 != current_col {
-                renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
-            }
-            current_col = pos.0 + 1;
-            current_row = pos.1;
 
 
             utf_char = val_a.0.split_at(val_a.1).0;
@@ -1154,13 +1189,21 @@ impl RectManager {
         };
 
         let mut skip_rect;
+        let mut is_attached;
         for (depth, rank, rect_id) in draw_queue.iter_mut() {
             skip_rect = false;
+            is_attached = false;
             for ancestor_id in self.trace_lineage(*rect_id).iter() {
                 if done_.contains(ancestor_id) {
                     skip_rect = true;
                     break;
                 }
+                if *ancestor_id == 0 {
+                    is_attached = true;
+                }
+            }
+            if ! is_attached {
+                skip_rect = true;
             }
             if skip_rect {
                 continue;
@@ -1702,7 +1745,7 @@ impl RectManager {
                     output = Err(error);
                 }
             }
-        };
+        }
 
 
         if output.is_ok() {
@@ -1814,6 +1857,28 @@ impl RectManager {
         output
     }
 
+    fn get_default_character(&self, rect_id: usize) -> ([u8;4], usize) {
+        match self.get_rect(rect_id) {
+            Ok(rect) => {
+                rect.get_default_character()
+            }
+            Err(e) => {
+                ([32, 0, 0, 0], 1)
+            }
+        }
+    }
+
+    pub fn get_character(&self, rect_id: usize, x: isize, y: isize) -> Result<([u8;4], usize), RectError> {
+        match self.get_rect(rect_id) {
+            Ok(rect) => {
+                rect.get_character(x, y)
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
+
     pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
         let mut output = Ok(());
 
@@ -1854,6 +1919,24 @@ impl RectManager {
 
     pub fn delete_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
+        let mut to_delete = Vec::new();
+        let mut stack = vec![rect_id];
+        while stack.len() > 0 {
+            match stack.pop() {
+                Some(working_id) => {
+                    match self.get_rect_mut(working_id) {
+                        Ok(rect) => {
+                            stack.extend(rect.children.iter().copied());
+                        },
+                        Err(e) => {}
+                    };
+                    to_delete.push(working_id);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
 
         match self.get_parent_mut(rect_id) {
             Ok(parent) => {
@@ -1864,7 +1947,10 @@ impl RectManager {
             }
         };
 
-        self.rects.remove(&rect_id);
+        for id in to_delete.iter() {
+            self.set_bg_color(*id, 1);
+            self.rects.remove(&id);
+        }
 
         output
     }
@@ -2176,6 +2262,7 @@ impl RectManager {
 
     }
 }
+
 
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
@@ -2720,3 +2807,256 @@ pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager 
     Box::into_raw(Box::new(rectmanager))
 }
 
+#[cfg (test)]
+pub mod tests {
+    use super::*;
+    #[test]
+    fn test_init() {
+        let mut rectmanager = RectManager::new();
+        let rect_width = rectmanager.get_rect_width(0);
+        let rect_height = rectmanager.get_rect_height(0);
+        match terminal_size() {
+            Some((Width(w), Height(h))) => {
+                assert_eq!(rect_width, w as usize);
+                assert_eq!(rect_height, h as usize);
+            }
+            None => { }
+        }
+
+        rectmanager.kill()
+    }
+
+    #[test]
+    fn test_resize() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let (subwidth, subheight) = (20, 20);
+        rectmanager.resize(subrect_id, subwidth, subheight);
+
+        match rectmanager.get_rect(subrect_id) {
+            Ok(subrect) => {
+                assert_eq!(subrect.width, subwidth);
+                assert_eq!(subrect.height, subheight);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+    }
+
+    #[test]
+    fn test_add_rect() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        match rectmanager.get_rect(0) {
+            Ok(rect) => {
+                assert_eq!(rect.children.len(), 1);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        rectmanager.delete_rect(subrect_id);
+        match rectmanager.get_rect(0) {
+            Ok(rect) => {
+                assert_eq!(rect.children.len(), 0);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_detach() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
+        rectmanager.detach(subrect_id);
+
+        match rectmanager.get_rect(0) {
+            Ok(rect) => {
+                assert_eq!(rect.children.len(), 0);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        match rectmanager.get_rect(subrect_id) {
+            Ok(subrect) => {
+                assert!(true);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        match rectmanager.get_rect(subsubrect_id) {
+            Ok(subrect) => {
+                assert!(true);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_delete() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
+
+        rectmanager.delete_rect(subrect_id);
+
+        match rectmanager.get_rect(0) {
+            Ok(rect) => {
+                assert_eq!(rect.children.len(), 0);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        match rectmanager.get_rect(subrect_id) {
+            Ok(subrect) => {
+                assert!(false);
+            }
+            Err(e) => {
+                assert_eq!(e as usize, RectError::NotFound as usize);
+            }
+        }
+
+        match rectmanager.get_rect(subsubrect_id) {
+            Ok(subrect) => {
+                assert!(false);
+            }
+            Err(e) => {
+                assert_eq!(e as usize, RectError::NotFound as usize);
+            }
+        }
+
+
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_move() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
+
+        rectmanager.resize(subrect_id, 40, 40);
+        rectmanager.resize(subsubrect_id, 10, 10);
+        rectmanager.set_position(subrect_id, 10, 10);
+        rectmanager.set_position(subsubrect_id, 10, 10);
+
+        match rectmanager.get_relative_offset(subrect_id) {
+            Ok((x, y)) => {
+                assert_eq!(x, 10);
+                assert_eq!(y, 10);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        match rectmanager.get_relative_offset(subsubrect_id) {
+            Ok((x, y)) => {
+                assert_eq!(x, 10);
+                assert_eq!(y, 10);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        match rectmanager.get_absolute_offset(subsubrect_id) {
+            Ok((x, y)) => {
+                assert_eq!(x, 20);
+                assert_eq!(y, 20);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_get_parent() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
+        match rectmanager.get_parent(subsubrect_id) {
+            Ok(rect) => {
+                assert_eq!(rect.rect_id, subrect_id);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_disable_enable() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        rectmanager.disable(subrect_id);
+        match rectmanager.get_rect(subrect_id) {
+            Ok(rect) => {
+                assert!(!rect.enabled);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+        rectmanager.enable(subrect_id);
+        match rectmanager.get_rect(subrect_id) {
+            Ok(rect) => {
+                assert!(rect.enabled);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+        rectmanager.kill();
+    }
+
+    #[test]
+    fn test_set_character() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let test_character = ([65, 0, 0, 0], 1);
+        rectmanager.resize(subrect_id, 10, 10);
+        assert!(rectmanager.set_character(subrect_id, 4, 4, test_character).is_ok());
+        match rectmanager.get_character(subrect_id, 4, 4) {
+            Ok(character) => {
+                assert_eq!(character, test_character);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        let default_character = rectmanager.get_default_character(subrect_id);
+        match rectmanager.get_character(subrect_id, 4, 5) {
+            Ok(character) => {
+                assert_eq!(character, default_character);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+
+        assert!(rectmanager.get_character(subrect_id, 200, 1000).is_err());
+        assert!(rectmanager.set_character(subrect_id, 230, 1000, test_character).is_err());
+    }
+}
