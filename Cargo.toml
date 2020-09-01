@@ -1,0 +1,14 @@
+[package]
+name = "wrecked-bindings"
+version = "0.1.0"
+authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
+edition = "2018"
+description = "Bindings for the wrecked terminal graphics library"
+
+[dependencies]
+wrecked = { path = "/home/pent/Projects/wrecked/" }
+
+[lib]
+name = "wrecked-bindings"
+crate-type = ["dylib"]
+
