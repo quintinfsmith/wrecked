@@ -1,6 +1,4 @@
-use std::ffi::CStr;
 use terminal_size::{Width, Height, terminal_size};
-use std::os::raw::c_char;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
@@ -10,6 +8,9 @@ use std::io::{Write};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+
+pub mod tests;
+
 /*
     TODO
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
@@ -38,6 +39,16 @@ pub enum RectError {
     InvalidUtf8 = 6,
     InvalidChild = 7,
     ChildNotFound = 8
+}
+
+pub enum RectColor {
+    RED = 1,
+    GREEN = 2,
+    YELLOW = 3,
+    BLUE = 4,
+    MAGENTA = 5,
+    CYAN = 6,
+    WHITE = 7
 }
 
 pub struct RectManager {
@@ -1131,132 +1142,136 @@ impl RectManager {
 
     pub fn draw_queued(&mut self) -> Result<(), RectError> {
         let mut output = Ok(());
-        let mut to_draw = Vec::new();
-        let mut depth_tracker: HashMap<(isize, isize), usize> = HashMap::new();
 
-        let mut offset = (0, 0);
+        if self.draw_queue.len() > 0 {
+            let mut to_draw = Vec::new();
+            let mut depth_tracker: HashMap<(isize, isize), usize> = HashMap::new();
 
-        let mut draw_queue = Vec::new();
-        let mut done_ = Vec::new();
+            let mut offset = (0, 0);
 
-        for rect_id in self.draw_queue.iter() {
-            if ! done_.contains(rect_id) {
-                draw_queue.push((0, 0, *rect_id));
-                done_.push(*rect_id);
+            let mut draw_queue = Vec::new();
+            let mut done_ = Vec::new();
+            for rect_id in self.draw_queue.iter() {
+                if ! done_.contains(rect_id) {
+                    draw_queue.push((0, 0, *rect_id));
+                    done_.push(*rect_id);
+                }
             }
-        }
 
-        self.draw_queue.clear();
+            self.draw_queue.clear();
 
-        let mut dimensions = (0, 0);
-        match self.get_rect(0) {
-            Ok(top) => {
-                dimensions = (top.width, top.height);
-            }
-            Err(e) => {
-                output = Err(e);
-            }
-        };
+            let mut dimensions = (0, 0);
+            match self.get_rect(0) {
+                Ok(top) => {
+                    dimensions = (top.width, top.height);
+                }
+                Err(e) => {
+                    output = Err(e);
+                }
+            };
 
-        let mut skip_rect;
-        let mut is_attached;
-        for (depth, rank, rect_id) in draw_queue.iter_mut() {
-            skip_rect = false;
-            is_attached = false;
-            for ancestor_id in self.trace_lineage(*rect_id).iter() {
-                if done_.contains(ancestor_id) {
+            let mut skip_rect;
+            let mut is_attached;
+            for (depth, rank, rect_id) in draw_queue.iter_mut() {
+                skip_rect = false;
+                is_attached = false;
+                for ancestor_id in self.trace_lineage(*rect_id).iter() {
+                    if done_.contains(ancestor_id) {
+                        skip_rect = true;
+                        break;
+                    }
+                    if *ancestor_id == 0 {
+                        is_attached = true;
+                    }
+                }
+                if ! is_attached {
                     skip_rect = true;
-                    break;
                 }
-                if *ancestor_id == 0 {
-                    is_attached = true;
+                if skip_rect {
+                    continue;
                 }
-            }
-            if ! is_attached {
-                skip_rect = true;
-            }
-            if skip_rect {
-                continue;
-            }
 
-            match self.get_depth(*rect_id) {
-                Ok(real_depth) => {
-                    *depth = real_depth;
-                }
-                Err(error) => {
-                    output = Err(error);
-                    break;
-                }
-            }
-            match self.get_rank(*rect_id) {
-                Ok(real_rank) => {
-                    *rank = real_rank;
-                }
-                Err(error) => {
-                    output = Err(error);
-                    break;
-                }
-            }
-        }
-
-        if output.is_ok() && draw_queue.len() > 0 {
-
-            draw_queue.sort();
-            draw_queue.reverse();
-
-            let mut boundry_box = (0, 0, 0, 0);
-            for (depth, _rank, rect_id) in draw_queue {
-                match self.get_absolute_offset(rect_id) {
-                    Ok(_offset) => {
-                        offset = _offset;
+                match self.get_depth(*rect_id) {
+                    Ok(real_depth) => {
+                        *depth = real_depth;
                     }
-                    Err(e)=> {
-                        output = Err(e);
+                    Err(error) => {
+                        output = Err(error);
+                        break;
                     }
-                };
+                }
+                match self.get_rank(*rect_id) {
+                    Ok(real_rank) => {
+                        *rank = real_rank;
+                    }
+                    Err(error) => {
+                        output = Err(error);
+                        break;
+                    }
+                }
+            }
 
-                if output.is_ok() {
+            if output.is_ok() && draw_queue.len() > 0 {
 
-                    match self.get_visible_box(rect_id) {
-                        Ok(_box) => {
-                            boundry_box = _box;
+                draw_queue.sort();
+                draw_queue.reverse();
+
+                let mut boundry_box = (0, 0, 0, 0);
+                for (depth, _rank, rect_id) in draw_queue {
+                    match self.get_absolute_offset(rect_id) {
+                        Ok(_offset) => {
+                            offset = _offset;
                         }
-                        Err(e) => { }
+                        Err(e)=> {
+                            output = Err(e);
+                        }
                     };
 
-                    match self.get_display(rect_id) {
-                        Ok(display_map) => {
-                            for (pos, val) in display_map.iter() {
-                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
-                                    if offset.0 + pos.0 < boundry_box.0
-                                    || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
-                                    || offset.1 + pos.1 < boundry_box.1
-                                    || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
-                                        // pass
-                                    } else {
-                                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                                        depth_tracker.entry(*pos)
-                                            .and_modify(|e| { *e = depth })
-                                            .or_insert(depth);
+                    if output.is_ok() {
+
+                        match self.get_visible_box(rect_id) {
+                            Ok(_box) => {
+                                boundry_box = _box;
+                            }
+                            Err(e) => { }
+                        };
+
+                        match self.get_display(rect_id) {
+                            Ok(display_map) => {
+                                for (pos, val) in display_map.iter() {
+                                    if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
+                                        if offset.0 + pos.0 < boundry_box.0
+                                        || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
+                                        || offset.1 + pos.1 < boundry_box.1
+                                        || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
+                                            // pass
+                                        } else {
+                                            to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
+                                            depth_tracker.entry(*pos)
+                                                .and_modify(|e| { *e = depth })
+                                                .or_insert(depth);
+                                        }
                                     }
                                 }
                             }
+                            Err(e) => {
+                                output = Err(e);
+                                break;
+                            }
                         }
-                        Err(e) => {
-                            output = Err(e);
-                            break;
-                        }
+
+                        self.flag_parent_refresh(rect_id);
+
+
+                    } else {
+                        break;
                     }
-
-                    self.flag_parent_refresh(rect_id);
-
-
-                } else {
-                    break;
                 }
-            }
 
-            self._draw(&mut to_draw);
+                self._draw(&mut to_draw);
+            }
+        } else {
+            output = Ok(());
         }
 
         output
@@ -2211,865 +2226,3 @@ impl RectManager {
     }
 }
 
-
-#[no_mangle]
-pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.disable(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.enable(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn queue_draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.queue_draw(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn draw_queued(ptr: *mut RectManager) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-    let draw_queue_length = rectmanager.draw_queue.len();
-    let result;
-    if draw_queue_length > 0 {
-        result = rectmanager.draw_queued();
-    } else {
-        result = Ok(());
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result;
-    let draw_queue_length = rectmanager.draw_queue.len();
-    if draw_queue_length > 0 {
-        result = rectmanager.queue_draw(rect_id);
-        if (result.is_ok()) {
-            result = rectmanager.draw_queued()
-        }
-    } else {
-        result = rectmanager.draw(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.set_fg_color(rect_id, col);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.set_bg_color(rect_id, col);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn set_invert_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.set_invert_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-#[no_mangle]
-pub extern "C" fn set_underline_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.set_underline_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn set_bold_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.set_bold_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_invert_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_invert_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn unset_underline_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_underline_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_bold_flag(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let mut result = match rectmanager.get_rect_mut(rect_id) {
-        Ok(rect) => {
-            rect.unset_bold_flag();
-            Ok(())
-        },
-        Err(e) => {
-            Err(e)
-        }
-    };
-
-    if (result.is_ok()) {
-        result = rectmanager.flag_refresh(rect_id);
-    }
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: usize, new_height: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.resize(rect_id, new_width, new_height);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.unset_bg_color(rect_id);
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-
-#[no_mangle]
-pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-    let result = rectmanager.unset_fg_color(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.unset_color(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let c_str = unsafe { CStr::from_ptr(c) };
-    let string_ = c_str.to_str().unwrap();
-
-    let result = rectmanager.set_string(rect_id, x, y, string_);
-
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let c_str = unsafe { CStr::from_ptr(c) };
-    let character = c_str.to_str().unwrap().chars().next().unwrap();
-
-    let result = rectmanager.set_character(rect_id, x, y, character);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.unset_character(rect_id, x, y);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.delete_rect(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: usize, height: usize) -> usize {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let new_rect_id = rectmanager.new_rect(Some(parent_id));
-    rectmanager.resize(new_rect_id, width, height);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    new_rect_id
-}
-
-#[no_mangle]
-pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.set_position(rect_id, x, y);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.shift_contents(rect_id, x, y);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn clear(ptr: *mut RectManager, rect_id: usize)  -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.clear(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn empty(ptr: *mut RectManager, rect_id: usize)  -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.empty(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize)  -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.detach(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize) -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.attach(rect_id, parent_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: usize, new_rect_id: usize) -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.replace_with(old_rect_id, new_rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn kill(ptr: *mut RectManager) {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    rectmanager.kill();
-
-    // TODO: Figure out why releasing causes segfault
-    Box::into_raw(rectmanager); // Prevent Release
-    // Releases boxes
-}
-
-// TODO: Remove need for arguments
-#[no_mangle]
-pub extern "C" fn init(old_width: usize, old_height: usize) -> *mut RectManager {
-
-    let rectmanager = RectManager::new();
-
-    Box::into_raw(Box::new(rectmanager))
-}
-
-#[cfg (test)]
-pub mod tests {
-    use super::*;
-    #[test]
-    fn test_init() {
-        let mut rectmanager = RectManager::new();
-        let rect_width = rectmanager.get_rect_width(0);
-        let rect_height = rectmanager.get_rect_height(0);
-        match terminal_size() {
-            Some((Width(w), Height(h))) => {
-                assert_eq!(rect_width, w as usize);
-                assert_eq!(rect_height, h as usize);
-            }
-            None => { }
-        }
-
-        rectmanager.kill()
-    }
-
-    #[test]
-    fn test_resize() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let (subwidth, subheight) = (20, 20);
-        rectmanager.resize(subrect_id, subwidth, subheight);
-
-        match rectmanager.get_rect(subrect_id) {
-            Ok(subrect) => {
-                assert_eq!(subrect.width, subwidth);
-                assert_eq!(subrect.height, subheight);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-    }
-
-    #[test]
-    fn test_add_rect() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        match rectmanager.get_rect(0) {
-            Ok(rect) => {
-                assert_eq!(rect.children.len(), 1);
-                assert!(rect.has_child(subrect_id));
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        rectmanager.delete_rect(subrect_id);
-        match rectmanager.get_rect(0) {
-            Ok(rect) => {
-                assert_eq!(rect.children.len(), 0);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-
-        rectmanager.kill();
-    }
-
-    #[test]
-    fn test_detach() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
-        rectmanager.detach(subrect_id);
-
-        match rectmanager.get_rect(0) {
-            Ok(rect) => {
-                assert_eq!(rect.children.len(), 0);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        match rectmanager.get_rect(subrect_id) {
-            Ok(subrect) => {
-                assert!(true);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        match rectmanager.get_rect(subsubrect_id) {
-            Ok(subrect) => {
-                assert!(true);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        rectmanager.kill();
-    }
-
-    #[test]
-    fn test_delete() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
-
-        rectmanager.delete_rect(subrect_id);
-
-        match rectmanager.get_rect(0) {
-            Ok(rect) => {
-                assert_eq!(rect.children.len(), 0);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        match rectmanager.get_rect(subrect_id) {
-            Ok(subrect) => {
-                assert!(false);
-            }
-            Err(e) => {
-                assert_eq!(e as usize, RectError::NotFound as usize);
-            }
-        }
-
-        match rectmanager.get_rect(subsubrect_id) {
-            Ok(subrect) => {
-                assert!(false);
-            }
-            Err(e) => {
-                assert_eq!(e as usize, RectError::NotFound as usize);
-            }
-        }
-
-
-        rectmanager.kill();
-    }
-
-
-    #[test]
-    fn test_move() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
-
-        rectmanager.resize(subrect_id, 40, 40);
-        rectmanager.resize(subsubrect_id, 10, 10);
-        rectmanager.set_position(subrect_id, 10, 10);
-        rectmanager.set_position(subsubrect_id, 10, 10);
-
-        match rectmanager.get_relative_offset(subrect_id) {
-            Ok((x, y)) => {
-                assert_eq!(x, 10);
-                assert_eq!(y, 10);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        match rectmanager.get_relative_offset(subsubrect_id) {
-            Ok((x, y)) => {
-                assert_eq!(x, 10);
-                assert_eq!(y, 10);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        match rectmanager.get_absolute_offset(subsubrect_id) {
-            Ok((x, y)) => {
-                assert_eq!(x, 20);
-                assert_eq!(y, 20);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-        rectmanager.kill();
-    }
-
-    #[test]
-    fn test_get_parent() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let subsubrect_id = rectmanager.new_rect(Some(subrect_id));
-        match rectmanager.get_parent(subsubrect_id) {
-            Ok(rect) => {
-                assert_eq!(rect.rect_id, subrect_id);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-        rectmanager.kill();
-    }
-
-    #[test]
-    fn test_disable_enable() {
-        let mut rectmanager = RectManager::new();
-
-        // non-existant rects should return false
-        assert!(! rectmanager.is_rect_enabled(99));
-
-        let subrect_id = rectmanager.new_rect(Some(0));
-
-        rectmanager.disable(subrect_id);
-        assert!(! rectmanager.is_rect_enabled(subrect_id));
-
-        rectmanager.enable(subrect_id);
-        assert!(rectmanager.is_rect_enabled(subrect_id));
-
-        rectmanager.kill();
-    }
-
-    #[test]
-    fn test_set_character() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let test_character = ([65, 0, 0, 0], 1);
-        rectmanager.resize(subrect_id, 10, 10);
-        assert!(rectmanager.set_character(subrect_id, 4, 4, test_character).is_ok());
-        match rectmanager.get_character(subrect_id, 4, 4) {
-            Ok(character) => {
-                assert_eq!(character, test_character);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-        rectmanager.unset_character(subrect_id, 4, 4);
-
-        let default_character = rectmanager.get_default_character(subrect_id);
-        match rectmanager.get_character(subrect_id, 4, 4) {
-            Ok(character) => {
-                assert_eq!(character, default_character);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-
-        assert!(rectmanager.get_character(subrect_id, 200, 1000).is_err());
-        assert!(rectmanager.set_character(subrect_id, 230, 1000, test_character).is_err());
-    }
-
-    #[test]
-    fn test_shift_contents() {
-        let mut rectmanager = RectManager::new();
-        let subrect_id = rectmanager.new_rect(Some(0));
-        let test_character = ([65, 0, 0, 0], 1);
-        rectmanager.set_position(subrect_id, 10, 10);
-        rectmanager.shift_contents(0, 3, 3);
-        match rectmanager.get_relative_offset(subrect_id) {
-            Ok((x, y)) => {
-                assert_eq!(13, x);
-                assert_eq!(13, y);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
-    }
-
-    #[test]
-    fn test_clear() {
-        let mut rectmanager = RectManager::new();
-        let test_character = ([65, 0, 0, 0], 1);
-        let mut width = rectmanager.get_rect_width(0);
-        let mut height = rectmanager.get_rect_height(0);
-
-        for y in 0 .. height {
-            for x in 0 .. width {
-                rectmanager.set_character(0, x as isize, y as isize, test_character);
-            }
-        }
-
-        let default_character = rectmanager.get_default_character(0);
-        rectmanager.clear(0);
-
-        for y in 0 .. height {
-            for x in 0 .. width {
-                match rectmanager.get_character(0, x as isize, y as isize) {
-                    Ok(character) => {
-                        assert_eq!(character, default_character);
-                    }
-                    Err(e) => {
-                        assert!(false);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_set_string() {
-        let mut rectmanager = RectManager::new();
-        let test_string = "Test String".to_string();
-        rectmanager.set_string(0, 0, 0, &test_string);
-        let mut x;
-        let mut y;
-        let mut width = rectmanager.get_rect_width(0);
-        for (i, c) in test_string.as_bytes().iter().enumerate() {
-            x = (i % width) as isize;
-            y = (i / width) as isize;
-            match rectmanager.get_character(0, x, y) {
-                Ok((bytes, length)) => {
-                    assert_eq!([*c,0,0,0], bytes);
-                    assert_eq!(length, 1);
-                }
-                Err(e) => {
-                    assert!(false);
-                }
-            }
-        }
-
-        rectmanager.kill();
-    }
-
-}
