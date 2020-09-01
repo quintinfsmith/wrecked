@@ -12,7 +12,6 @@ use std::io::prelude::*;
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 /*
     TODO
-    Maybe change [u8; 4] to a struct like "Character"
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
 */
 
@@ -47,8 +46,9 @@ pub struct RectManager {
     draw_queue: Vec<usize>,
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
-    top_cache: HashMap<(isize, isize), (([u8; 4], usize), u16)>,
-    _termios: Termios
+    top_cache: HashMap<(isize, isize), (char, u16)>,
+    _termios: Termios,
+    default_character: char
 }
 
 pub struct Rect {
@@ -56,7 +56,7 @@ pub struct Rect {
 
     width: usize,
     height: usize,
-    default_character: ([u8; 4], usize),
+    default_character: char,
     parent: Option<usize>, // RectId
 
     children: Vec<usize>,
@@ -66,7 +66,7 @@ pub struct Rect {
     // Used to find a position of a box
     child_positions: HashMap<usize, (isize, isize)>,
 
-    character_space: HashMap<(isize,isize), ([u8; 4], usize)>,
+    character_space: HashMap<(isize,isize), char>,
 
     flag_full_refresh: bool,
     flags_pos_refresh: HashSet<(isize, isize)>,
@@ -75,7 +75,7 @@ pub struct Rect {
 
     color: u16, // { 9: Underline, 8: Bold, 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
 
-    _cached_display: HashMap<(isize, isize), (([u8; 4], usize), u16)>,
+    _cached_display: HashMap<(isize, isize), (char, u16)>,
 }
 
 impl Rect {
@@ -95,7 +95,7 @@ impl Rect {
             enabled: true,
             color: 0u16,
             _cached_display: HashMap::new(),
-            default_character: ([32, 0, 0, 0], 1) // Space
+            default_character: ' ' // Space
         }
     }
 
@@ -130,7 +130,7 @@ impl Rect {
         output
     }
 
-    fn get_default_character(&self) -> ([u8;4], usize) {
+    fn get_default_character(&self) -> char {
         self.default_character
     }
 
@@ -209,7 +209,7 @@ impl Rect {
             .clear();
     }
 
-    fn get_character(&self, x: isize, y: isize) -> Result<([u8;4], usize), RectError> {
+    fn get_character(&self, x: isize, y: isize) -> Result<char, RectError> {
         let output;
         if y < self.height as isize && y >= 0 && x < self.width as isize && x >= 0 {
             output = match self.character_space.get(&(x, y)) {
@@ -227,7 +227,7 @@ impl Rect {
         output
     }
 
-    fn set_character(&mut self, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
+    fn set_character(&mut self, x: isize, y: isize, character: char) -> Result<(), RectError> {
         let output;
         if y < self.height as isize && y >= 0 && x < self.width as isize && x >= 0 {
             self.character_space.entry((x, y))
@@ -388,7 +388,7 @@ impl Rect {
             .or_insert((x, y));
     }
 
-    fn has_child(&mut self, child_id: usize) -> bool {
+    fn has_child(&self, child_id: usize) -> bool {
         let mut output = false;
         for connected_child_id in self.children.iter() {
             if *connected_child_id == child_id {
@@ -400,12 +400,7 @@ impl Rect {
     }
 
     fn clear(&mut self) {
-        for x in 0 .. self.width {
-            for y in 0 .. self.height {
-                self.set_character(0, 0, self.default_character);
-            }
-        }
-        //self.character_space.clear();
+        self.character_space.clear();
     }
 }
 
@@ -420,7 +415,8 @@ impl RectManager {
             rects: HashMap::new(),
             draw_queue: Vec::new(),
             top_cache: HashMap::new(),
-            _termios: termios
+            _termios: termios,
+            default_character: ' '
         };
 
         new_termios.c_lflag &= !(ICANON | ECHO);
@@ -435,9 +431,6 @@ impl RectManager {
 
 
         rectmanager
-    }
-    pub fn clear_cache(&mut self) {
-        self.top_cache = HashMap::new();
     }
 
     pub fn new_rect(&mut self, parent_id: Option<usize>) -> usize {
@@ -619,27 +612,6 @@ impl RectManager {
 
         if rect_defined {
             output = self.get_rect_mut(current_id);
-        }
-
-        output
-    }
-
-    pub fn has_parent(&self, rect_id: usize) -> Result<bool, RectError> {
-        let output;
-        match self.get_rect(rect_id) {
-            Ok(rect) => {
-                match rect.parent {
-                    Some(_) => {
-                        output = Ok(true);
-                    }
-                    None => {
-                        output = Ok(false);
-                    }
-                }
-            }
-            Err(e) => {
-                output = Err(e);
-            }
         }
 
         output
@@ -869,7 +841,7 @@ impl RectManager {
         output
     }
 
-    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), (([u8; 4], usize), u16)>, RectError> {
+    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), (char, u16)>, RectError> {
         let mut output = Ok(HashMap::new());
         let mut outhash = HashMap::new();
 
@@ -902,7 +874,7 @@ impl RectManager {
         output
     }
 
-    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (([u8; 4], usize), u16))>) {
+    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (char, u16))>) {
         let mut renderstring = "".to_string();
         let mut width = self.get_width();
 
@@ -934,7 +906,7 @@ impl RectManager {
         }
 
 
-        let mut val_a: &([u8; 4], usize);
+        let mut val_a: &char;
         let mut utf_char: &[u8];
         // THEN build then ANSI string
         let mut active_effects: u16 = 0;
@@ -1021,9 +993,7 @@ impl RectManager {
             }
             active_effects = new_effects;
 
-
-            utf_char = val_a.0.split_at(val_a.1).0;
-            renderstring += &format!("{}", str::from_utf8(utf_char).unwrap());
+            renderstring += &format!("{}", val_a);
         }
 
         if (display_map.len() > 0) {
@@ -1664,18 +1634,15 @@ impl RectManager {
         output
     }
 
-    fn is_rect_enabled(&self, rect_id: usize) -> Result<bool, RectError> {
-        let mut output = Ok(false);
+    fn is_rect_enabled(&self, rect_id: usize) -> bool {
         match self.get_rect(rect_id) {
             Ok(rect) => {
-                output = Ok(rect.enabled);
+                rect.enabled
             }
             Err(e) => {
-                output = Err(e);
+                false
             }
         }
-
-        output
     }
 
     // Remove all characters
@@ -1801,25 +1768,6 @@ impl RectManager {
 
     pub fn set_string(&mut self, rect_id: usize, start_x: isize, start_y: isize, string: &str) -> Result<(), RectError> {
         let mut output = Ok(());
-        let mut new_characters = Vec::new();
-        let characters: Vec<_> = string.split("").collect();
-
-        let mut tmp_char;
-        let mut new_c: [u8; 4];
-        for c in characters.iter() {
-            if c.len() == 0 {
-                continue;
-            }
-            new_c = [0; 4];
-            tmp_char = c.as_bytes();
-
-            for i in 0..cmp::min(4, tmp_char.len()) {
-                new_c[i] = tmp_char[i];
-            }
-            new_characters.push((new_c, tmp_char.len()));
-        }
-
-
 
         let mut dimensions = (0, 0);
         match self.get_rect_size(rect_id) {
@@ -1838,10 +1786,10 @@ impl RectManager {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 let mut i = start_offset;
-                for character in new_characters.iter() {
+                for character in string.chars() {
                     x = i % dimensions.0;
                     y = i / dimensions.0;
-                    rect.set_character(x, y, *character);
+                    rect.set_character(x, y, character);
                     i += 1;
                 }
             }
@@ -1857,18 +1805,18 @@ impl RectManager {
         output
     }
 
-    fn get_default_character(&self, rect_id: usize) -> ([u8;4], usize) {
+    fn get_default_character(&self, rect_id: usize) -> char {
         match self.get_rect(rect_id) {
             Ok(rect) => {
                 rect.get_default_character()
             }
             Err(e) => {
-                ([32, 0, 0, 0], 1)
+                self.default_character
             }
         }
     }
 
-    pub fn get_character(&self, rect_id: usize, x: isize, y: isize) -> Result<([u8;4], usize), RectError> {
+    pub fn get_character(&self, rect_id: usize, x: isize, y: isize) -> Result<char, RectError> {
         match self.get_rect(rect_id) {
             Ok(rect) => {
                 rect.get_character(x, y)
@@ -1879,7 +1827,7 @@ impl RectManager {
         }
     }
 
-    pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: ([u8;4], usize)) -> Result<(), RectError> {
+    pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: char) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
@@ -2251,7 +2199,7 @@ impl RectManager {
         let (w, h) = self.get_rect_size(0).ok().unwrap();
         for x in 0 .. w {
             for y in 0 .. h {
-                self.set_character(0, x as isize, y as isize, ([0, 0, 0, 0], 1));
+                self.set_character(0, x as isize, y as isize, ' ');
             }
         }
 
@@ -2618,15 +2566,9 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let c_str = unsafe { CStr::from_ptr(c) };
-    let string_bytes = c_str.to_str().unwrap().as_bytes();
+    let character = c_str.to_str().unwrap().chars().next().unwrap();
 
-    let mut new_c: [u8; 4] = [0; 4];
-    for i in 0..cmp::min(4, string_bytes.len()) {
-        new_c[i] = string_bytes[i];
-    }
-
-
-    let result = rectmanager.set_character(rect_id, x, y, (new_c, string_bytes.len()));
+    let result = rectmanager.set_character(rect_id, x, y, character);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -2851,6 +2793,7 @@ pub mod tests {
         match rectmanager.get_rect(0) {
             Ok(rect) => {
                 assert_eq!(rect.children.len(), 1);
+                assert!(rect.has_child(subrect_id));
             }
             Err(e) => {
                 assert!(false);
@@ -2866,6 +2809,7 @@ pub mod tests {
                 assert!(false);
             }
         }
+
 
         rectmanager.kill();
     }
@@ -2946,6 +2890,7 @@ pub mod tests {
         rectmanager.kill();
     }
 
+
     #[test]
     fn test_move() {
         let mut rectmanager = RectManager::new();
@@ -3008,25 +2953,18 @@ pub mod tests {
     #[test]
     fn test_disable_enable() {
         let mut rectmanager = RectManager::new();
+
+        // non-existant rects should return false
+        assert!(! rectmanager.is_rect_enabled(99));
+
         let subrect_id = rectmanager.new_rect(Some(0));
+
         rectmanager.disable(subrect_id);
-        match rectmanager.get_rect(subrect_id) {
-            Ok(rect) => {
-                assert!(!rect.enabled);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
+        assert!(! rectmanager.is_rect_enabled(subrect_id));
+
         rectmanager.enable(subrect_id);
-        match rectmanager.get_rect(subrect_id) {
-            Ok(rect) => {
-                assert!(rect.enabled);
-            }
-            Err(e) => {
-                assert!(false);
-            }
-        }
+        assert!(rectmanager.is_rect_enabled(subrect_id));
+
         rectmanager.kill();
     }
 
@@ -3045,9 +2983,10 @@ pub mod tests {
                 assert!(false);
             }
         }
+        rectmanager.unset_character(subrect_id, 4, 4);
 
         let default_character = rectmanager.get_default_character(subrect_id);
-        match rectmanager.get_character(subrect_id, 4, 5) {
+        match rectmanager.get_character(subrect_id, 4, 4) {
             Ok(character) => {
                 assert_eq!(character, default_character);
             }
@@ -3059,4 +2998,78 @@ pub mod tests {
         assert!(rectmanager.get_character(subrect_id, 200, 1000).is_err());
         assert!(rectmanager.set_character(subrect_id, 230, 1000, test_character).is_err());
     }
+
+    #[test]
+    fn test_shift_contents() {
+        let mut rectmanager = RectManager::new();
+        let subrect_id = rectmanager.new_rect(Some(0));
+        let test_character = ([65, 0, 0, 0], 1);
+        rectmanager.set_position(subrect_id, 10, 10);
+        rectmanager.shift_contents(0, 3, 3);
+        match rectmanager.get_relative_offset(subrect_id) {
+            Ok((x, y)) => {
+                assert_eq!(13, x);
+                assert_eq!(13, y);
+            }
+            Err(e) => {
+                assert!(false);
+            }
+        }
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut rectmanager = RectManager::new();
+        let test_character = ([65, 0, 0, 0], 1);
+        let mut width = rectmanager.get_rect_width(0);
+        let mut height = rectmanager.get_rect_height(0);
+
+        for y in 0 .. height {
+            for x in 0 .. width {
+                rectmanager.set_character(0, x as isize, y as isize, test_character);
+            }
+        }
+
+        let default_character = rectmanager.get_default_character(0);
+        rectmanager.clear(0);
+
+        for y in 0 .. height {
+            for x in 0 .. width {
+                match rectmanager.get_character(0, x as isize, y as isize) {
+                    Ok(character) => {
+                        assert_eq!(character, default_character);
+                    }
+                    Err(e) => {
+                        assert!(false);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_set_string() {
+        let mut rectmanager = RectManager::new();
+        let test_string = "Test String".to_string();
+        rectmanager.set_string(0, 0, 0, &test_string);
+        let mut x;
+        let mut y;
+        let mut width = rectmanager.get_rect_width(0);
+        for (i, c) in test_string.as_bytes().iter().enumerate() {
+            x = (i % width) as isize;
+            y = (i / width) as isize;
+            match rectmanager.get_character(0, x, y) {
+                Ok((bytes, length)) => {
+                    assert_eq!([*c,0,0,0], bytes);
+                    assert_eq!(length, 1);
+                }
+                Err(e) => {
+                    assert!(false);
+                }
+            }
+        }
+
+        rectmanager.kill();
+    }
+
 }
