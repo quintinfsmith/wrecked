@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{Write};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::ops::{BitOrAssign, BitAnd, Not};
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
 pub mod tests;
@@ -41,14 +42,52 @@ pub enum RectError {
     ChildNotFound = 8
 }
 
+#[derive(PartialEq, Eq)]
+pub enum RectEffect {
+    BOLD = 1 << 10,
+    UNDERLINE = 1 << 11,
+    INVERT = 1 << 12,
+
+}
+
+impl Not for RectEffect {
+    type Output = u16;
+    fn not(self) -> u16 {
+        !(self as u16)
+    }
+}
+
+impl BitOrAssign<RectEffect> for u16 {
+    fn bitor_assign(&mut self, rhs: RectEffect) {
+        *self |= rhs as u16;
+    }
+}
+
+impl BitAnd<RectEffect> for u16 {
+    type Output = u16;
+    fn bitand(self, rhs: RectEffect) -> u16 {
+        self & (rhs as u16)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum RectColor {
+    BLACK = 0,
     RED = 1,
     GREEN = 2,
     YELLOW = 3,
     BLUE = 4,
     MAGENTA = 5,
     CYAN = 6,
-    WHITE = 7
+    WHITE = 7,
+    BRIGHTBLACK = 8 | 0,
+    BRIGHTRED = 8 | 1,
+    BRIGHTGREEN = 8 | 2,
+    BRIGHTYELLOW = 8 | 3,
+    BRIGHTBLUE = 8 | 4,
+    BRIGHTMAGENTA = 8 | 5,
+    BRIGHTCYAN = 8 | 6,
+    BRIGHTWHITE = 8 | 7
 }
 
 pub struct RectManager {
@@ -257,9 +296,21 @@ impl Rect {
         self.set_character(x, y, self.default_character)
     }
 
+    fn is_bold(&self) -> bool {
+        (self.color & RectEffect::BOLD) > 0
+    }
+
+    fn is_underlined(&self) -> bool {
+        (self.color & RectEffect::UNDERLINE) > 0
+    }
+
+    fn is_inverted(&self) -> bool {
+        (self.color & RectEffect::INVERT) > 0
+    }
+
     fn set_bold_flag(&mut self) {
         let orig_color = self.color;
-        self.color |= 0b0000010000000000;
+        self.color |= RectEffect::BOLD;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
@@ -268,7 +319,7 @@ impl Rect {
 
     fn unset_bold_flag(&mut self) {
         let orig_color = self.color;
-        self.color &= 0b1111101111111111;
+        self.color &= !RectEffect::BOLD;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
@@ -277,31 +328,34 @@ impl Rect {
 
     fn set_underline_flag(&mut self) {
         let orig_color = self.color;
-        self.color |= 0b0000100000000000;
+        self.color |= RectEffect::UNDERLINE;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
         }
     }
+
     fn unset_underline_flag(&mut self) {
         let orig_color = self.color;
-        self.color &= 0b1111011111111111;
+        self.color &= !RectEffect::UNDERLINE;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
         }
     }
+
     fn set_invert_flag(&mut self) {
         let orig_color = self.color;
-        self.color |= 0b0001000000000000;
+        self.color |= RectEffect::INVERT;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
         }
     }
+
     fn unset_invert_flag(&mut self) {
         let orig_color = self.color;
-        self.color &= 0b1110111111111111;
+        self.color &= !RectEffect::INVERT;
 
         if self.color != orig_color {
             self.flag_full_refresh = true;
@@ -885,15 +939,100 @@ impl RectManager {
         output
     }
 
-    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (char, u16))>) {
+    fn build_ansi_string(&mut self, display_map: Vec<((isize, isize), (char, u16))>) -> String {
         let mut renderstring = "".to_string();
         let mut width = self.get_width();
 
-        display_map.sort();
+        let mut val_a: &char;
+        let mut utf_char: &[u8];
+        let mut active_effects: u16 = 0;
+        let mut new_effects: u16 = 0;
+        let mut current_col = -10;
+        let mut current_row = -10;
+
+        // THEN build then ANSI string
+        for (pos, val) in display_map.iter() {
+            renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
+            if pos.1 != current_row || pos.0 != current_col {
+                current_col = pos.0;
+                current_row = pos.1;
+            }
+
+            val_a = &val.0;
+            new_effects = val.1;
+
+            if new_effects == 0 && active_effects != 0 {
+                renderstring += "\x1B[0m";
+            } else if new_effects != 0 {
+                // ForeGround
+                if (new_effects & 992) != (active_effects & 992) {
+                    if new_effects & 512 == 512 {
+                        if new_effects & 256 == 256 {
+                            renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
+                        } else {
+                            renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[39m");
+                    }
+                }
+
+                // BackGround
+                if (new_effects & 31) != (active_effects & 31) {
+                    if new_effects & 16 == 16 {
+                        if new_effects & 8 == 8 {
+                            renderstring += &format!("\x1B[10{}m", (new_effects & 7));
+                        } else {
+                            renderstring += &format!("\x1B[4{}m", (new_effects & 7));
+                        }
+                    } else {
+                        renderstring += &format!("\x1B[49m");
+                    }
+                }
+
+                // Bold
+                if (new_effects & RectEffect::BOLD) != (active_effects & RectEffect::BOLD) {
+                    if (new_effects & RectEffect::BOLD) > 1 {
+                        renderstring += &format!("\x1B[1m"); // On
+                    } else if (active_effects & RectEffect::BOLD) > 1 {
+                        renderstring += &format!("\x1B[21m"); // Off
+                    }
+                }
+
+                // Underline
+                if (new_effects & RectEffect::UNDERLINE) != (active_effects & RectEffect::UNDERLINE) {
+                    if (new_effects & RectEffect::UNDERLINE) > 1 {
+                        renderstring += &format!("\x1B[4m");
+                    } else if (active_effects & RectEffect::UNDERLINE) > 1 {
+                        renderstring += &format!("\x1B[24m"); // Off
+                    }
+                }
+
+                // Inverted
+                if (new_effects & RectEffect::INVERT) != (active_effects & RectEffect::INVERT) {
+                    if (new_effects & RectEffect::INVERT) > 1 {
+                        renderstring += &format!("\x1B[7m");
+                    } else if (active_effects & RectEffect::INVERT) > 1 {
+                        renderstring += &format!("\x1B[27m"); // Off
+                    }
+                }
+            }
+
+            active_effects = new_effects;
+
+            renderstring += &format!("{}", val_a);
+
+            current_col += 1;
+        }
+
+        renderstring
+    }
+
+    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (char, u16))>) {
         let mut do_updates = Vec::new();
+
         // First, find which positions need to be updated and fill in
         let mut update_top_cache;
-        let mut offset: usize;
         for (pos, val) in display_map.iter() {
             update_top_cache = false;
             match self.top_cache.get(&pos) {
@@ -908,106 +1047,20 @@ impl RectManager {
             }
 
             if update_top_cache {
-                offset = (pos.1 as usize * width) + pos.0 as usize;
                 self.top_cache.entry(*pos)
                     .and_modify(|e| { *e = *val })
                     .or_insert(*val);
-                do_updates.push((offset, *pos, *val));
+
+                do_updates.push((*pos, *val));
             }
         }
 
 
-        let mut val_a: &char;
-        let mut utf_char: &[u8];
-        // THEN build then ANSI string
-        let mut active_effects: u16 = 0;
-        let mut new_effects: u16;
-        let mut current_col = -1;
-        let mut current_row = -1;
-        do_updates.sort();
+        if (do_updates.len() > 0) {
+            // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
+            do_updates.sort();
 
-        for (buffer_pos, pos, val) in do_updates.iter() {
-            val_a = &val.0;
-            new_effects = val.1;
-
-            if pos.1 != current_row || pos.0 != current_col {
-                renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
-                current_col = pos.0;
-                current_row = pos.1;
-            } else {
-                current_col += 1;
-                if (current_col as usize) % width == 0 {
-                    current_col = 0;
-                    current_row += 1;
-                    renderstring += &format!("\x1B[0m");
-                }
-            }
-
-            if new_effects == 0 && active_effects != 0 {
-                renderstring += &format!("\x1B[0m");
-            } else {
-                // ForeGround
-                if true || ((new_effects >> 5) & 16) != ((active_effects >> 5) & 16) {
-                    if (new_effects >> 5) & 16 == 16 {
-                        if (new_effects >> 5) & 8 == 8 {
-                            renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
-                        } else {
-                            renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
-                        }
-                    } else {
-                        renderstring += &format!("\x1B[39m");
-                    }
-                }
-
-                // BackGround
-                if (new_effects & 16) != (active_effects & 16) {
-                    if new_effects & 16 == 16 {
-                        if new_effects & 8 == 8 {
-                            renderstring += &format!("\x1B[10{}m", (new_effects & 7));
-                        } else {
-                            renderstring += &format!("\x1B[4{}m", (new_effects & 7));
-                        }
-                    } else {
-                        renderstring += &format!("\x1B[49m");
-                    }
-                }
-
-                // Bold
-                let BOLDMASK = 1 << 10;
-                if (new_effects & BOLDMASK) != (active_effects & BOLDMASK) {
-                    if new_effects & BOLDMASK > 1 {
-                        renderstring += &format!("\x1B[1m"); // On
-                    } else if active_effects & BOLDMASK > 1 {
-                        renderstring += &format!("\x1B[21m"); // Off
-                    }
-                }
-
-                // Underline
-                let UNDERLINEMASK = 1 << 11;
-                if (new_effects & UNDERLINEMASK) != (active_effects & UNDERLINEMASK) {
-                    if new_effects & UNDERLINEMASK > 1 {
-                        renderstring += &format!("\x1B[4m");
-                    } else if active_effects & UNDERLINEMASK > 1 {
-                        renderstring += &format!("\x1B[24m"); // Off
-                    }
-                }
-
-                // Inverted
-                let INVERTMASK = 1 << 12;
-                if (new_effects & INVERTMASK) != (active_effects & INVERTMASK) {
-                    if new_effects & INVERTMASK > 1 {
-                        renderstring += &format!("\x1B[7m");
-                    } else if active_effects & INVERTMASK > 1 {
-                        renderstring += &format!("\x1B[27m"); // Off
-                    }
-                }
-            }
-            active_effects = new_effects;
-
-            renderstring += &format!("{}", val_a);
-        }
-
-        if (display_map.len() > 0) {
+            let renderstring = self.build_ansi_string(do_updates);
             print!("{}\x1B[0m", renderstring);
             println!("\x1B[1;1H");
         }
@@ -2208,6 +2261,7 @@ impl RectManager {
 
         result
     }
+
     pub fn kill(&mut self) {
         self.empty(0);
 
@@ -2222,7 +2276,6 @@ impl RectManager {
         tcsetattr(0, TCSANOW, & self._termios).unwrap();
         print!("\x1B[?25h"); // Show Cursor
         println!("\x1B[?1049l"); // Return to previous screen
-
     }
 }
 

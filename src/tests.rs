@@ -1,6 +1,7 @@
 #[cfg (test)]
-
 use super::*;
+use std::{thread, time};
+
 #[test]
 fn test_init() {
     let mut rectmanager = RectManager::new();
@@ -319,3 +320,31 @@ fn test_set_string() {
     rectmanager.kill();
 }
 
+
+#[test]
+fn test_draw() {
+    let mut rectmanager = RectManager::new();
+    let mut quarters = Vec::new();
+    let mut working_id;
+    let height = rectmanager.get_height();
+    let width = rectmanager.get_width();
+    let colors = vec![ RectColor::RED, RectColor::BLUE, RectColor::GREEN, RectColor::MAGENTA ];
+
+    for y in 0 .. 2 {
+        for x in 0 .. 2 {
+            working_id = rectmanager.new_rect(Some(0));
+            quarters.push(working_id);
+            rectmanager.set_position(working_id, (x * (width / 2)) as isize, (y * (height / 2)) as isize);
+            rectmanager.resize(working_id, width / 2, height / 2);
+            rectmanager.set_bg_color(working_id, colors[(y * 2) + x] as u8);
+        }
+    }
+
+    rectmanager.draw(0);
+    let delay = time::Duration::from_millis(1000);
+    let now = time::Instant::now();
+
+    thread::sleep(delay);
+
+    rectmanager.kill();
+}
