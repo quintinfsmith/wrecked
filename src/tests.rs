@@ -320,31 +320,243 @@ fn test_set_string() {
     rectmanager.kill();
 }
 
-
 #[test]
-fn test_draw() {
+fn test_draw_map() {
     let mut rectmanager = RectManager::new();
-    let mut quarters = Vec::new();
-    let mut working_id;
+    let mut rect_a = rectmanager.new_rect(Some(0));
+
     let height = rectmanager.get_height();
     let width = rectmanager.get_width();
-    let colors = vec![ RectColor::RED, RectColor::BLUE, RectColor::GREEN, RectColor::MAGENTA ];
 
-    for y in 0 .. 2 {
-        for x in 0 .. 2 {
-            working_id = rectmanager.new_rect(Some(0));
-            quarters.push(working_id);
-            rectmanager.set_position(working_id, (x * (width / 2)) as isize, (y * (height / 2)) as isize);
-            rectmanager.resize(working_id, width / 2, height / 2);
-            rectmanager.set_bg_color(working_id, colors[(y * 2) + x] as u8);
+    let mut x_offset: usize = 1;
+    let mut y_offset: usize = 1;
+    let mut size: (usize, usize) = (5,5);
+    rectmanager.resize(rect_a, size.0, size.1);
+    rectmanager.set_position(rect_a, x_offset as isize, y_offset as isize);
+
+    for i in 0 .. 4 {
+        let mut working_id = rectmanager.new_rect(Some(rect_a));
+        rectmanager.resize(working_id, 1, 1);
+        rectmanager.set_position(working_id, i, 0);
+        match i {
+            0 => {
+                rectmanager.set_bold_flag(working_id);
+            }
+            1 => {
+                rectmanager.set_invert_flag(working_id);
+            }
+            2 => {
+                rectmanager.set_underline_flag(working_id);
+            }
+            3 => {
+                // block parent effects with childs'
+                rectmanager.set_underline_flag(working_id);
+                let mut subrect = rectmanager.new_rect(Some(working_id));
+                rectmanager.resize(subrect, 1, 1);
+                rectmanager.set_character(subrect, 0, 0, 'X');
+                rectmanager.set_position(subrect, 0, 0);
+            }
+            _ => {}
         }
     }
 
-    rectmanager.draw(0);
-    let delay = time::Duration::from_millis(1000);
-    let now = time::Instant::now();
 
-    thread::sleep(delay);
+    let mut working_flags;
+    let mut working_char;
+    let mut expected_map = Vec::new();
+    for y in 0 .. size.1 {
+        for x in 0 .. size.0 {
+            working_char = match (x, y) {
+                (3,0) => {
+                    'X'
+                }
+                _ => { ' ' }
+            };
+            working_flags = match (x,y) {
+                (0, 0) => {
+                    RectEffect::BOLD as u16
+                }
+                (1, 0) => {
+                    RectEffect::INVERT as u16
+                }
+                (2, 0) => {
+                    RectEffect::UNDERLINE as u16
+                }
+                _ => { 0 }
+            };
+            expected_map.push((((x + x_offset) as isize, (y + y_offset) as isize), (working_char, working_flags)));
+        }
+    }
+    expected_map.sort();
+
+    let mut actual_map = rectmanager.build_draw_map(rect_a);
+    actual_map.sort();
+
+    assert_eq!(expected_map, actual_map);
+
+    rectmanager.kill();
+}
+
+#[test]
+fn test_lineage() {
+    let mut rectmanager = RectManager::new();
+    let mut rect_a = rectmanager.new_rect(Some(0));
+    let mut rect_b = rectmanager.new_rect(Some(rect_a));
+    let mut rect_c = rectmanager.new_rect(Some(rect_b));
+
+    let expected_lineage = vec![rect_b, rect_a, 0];
+    assert_eq!(rectmanager.trace_lineage(rect_c), expected_lineage);
+
+    match rectmanager.get_top(rect_c) {
+        Ok(top) => {
+            assert_eq!(0, top.rect_id);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    };
+
+    match rectmanager.get_top_mut(rect_c) {
+        Ok(top) => {
+            assert_eq!(0, top.rect_id);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    };
+    rectmanager.kill();
+}
+
+#[test]
+fn test_replace() {
+    let mut rectmanager = RectManager::new();
+    let mut rect_a = rectmanager.new_rect(Some(0));
+    let mut rect_a_a = rectmanager.new_rect(Some(rect_a));
+    let mut rect_b = rectmanager.new_rect(Some(0));
+    let mut rect_b_a = rectmanager.new_rect(Some(rect_b));
+    rectmanager.detach(rect_b);
+
+    rectmanager.replace_with(rect_a, rect_b);
+
+    match rectmanager.get_rect(0) {
+        Ok(top_rect) => {
+            assert!(top_rect.has_child(rect_b));
+            assert!(!top_rect.has_child(rect_a));
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    match rectmanager.get_top(rect_a_a) {
+        Ok(rect) => {
+            assert_eq!(rect.rect_id, rect_a);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    match rectmanager.get_top(rect_b_a) {
+        Ok(rect) => {
+            assert_eq!(rect.rect_id, 0);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.kill();
+}
+
+#[test]
+fn test_get_visible_box() {
+    let mut rectmanager = RectManager::new();
+    let mut subrect = rectmanager.new_rect(Some(0));
+
+    let width = rectmanager.get_width();
+    let height = rectmanager.get_height();
+    rectmanager.set_position(subrect, 0, 0);
+    rectmanager.resize(subrect, width * 2, height * 2);
+
+    let expected_box = (0 as isize, 0 as isize, width as isize, height as isize);
+    let visible_box = rectmanager.get_visible_box(subrect).ok().unwrap();
+    assert_eq!(visible_box, expected_box);
+    rectmanager.kill();
+}
+
+
+#[test]
+fn test_set_effects() {
+    let mut rectmanager = RectManager::new();
+    rectmanager.set_bold_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.unset_bold_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_underline_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(rect.is_underlined());
+            assert!(!rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.unset_underline_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_invert_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.unset_invert_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
 
     rectmanager.kill();
 }

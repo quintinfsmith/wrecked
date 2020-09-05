@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
 use std::cmp;
+use std::cmp::{PartialOrd,Ordering};
 use std::fs::File;
 use std::io::{Write};
 use std::fs::OpenOptions;
@@ -70,7 +71,7 @@ impl BitAnd<RectEffect> for u16 {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub enum RectColor {
     BLACK = 0,
     RED = 1,
@@ -87,16 +88,47 @@ pub enum RectColor {
     BRIGHTBLUE = 8 | 4,
     BRIGHTMAGENTA = 8 | 5,
     BRIGHTCYAN = 8 | 6,
-    BRIGHTWHITE = 8 | 7
+    BRIGHTWHITE = 8 | 7,
+    NONE = 255
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct RectEffectsHandler {
+    bold: bool,
+    underline: bool,
+    invert: bool,
+    italics: bool,
+    background_color: RectColor,
+    foreground_color: RectColor
+}
+
+impl RectEffectsHandler {
+    pub fn new() -> RectEffectsHandler {
+        RectEffectsHandler {
+            bold: false,
+            underline: false,
+            invert: false,
+            italics: false,
+            background_color: RectColor::NONE,
+            foreground_color: RectColor::NONE
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        !self.bold
+        && !self.underline
+        && !self.invert
+        && !self.italics
+        && self.background_color != RectColor::NONE
+        && self.foreground_color != RectColor::NONE
+    }
+}
 pub struct RectManager {
     idgen: usize,
     rects: HashMap<usize, Rect>,
     draw_queue: Vec<usize>,
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
-    top_cache: HashMap<(isize, isize), (char, u16)>,
+    top_cache: HashMap<(isize, isize), (char, RectEffectsHandler)>,
     _termios: Termios,
     default_character: char
 }
@@ -123,9 +155,9 @@ pub struct Rect {
 
     enabled: bool,
 
-    color: u16, // { 9: Underline, 8: Bold, 7: USEFG, 6-4: FG, 3: USEBG, 2-0: BG }
+    effects: RectEffectsHandler,
 
-    _cached_display: HashMap<(isize, isize), (char, u16)>,
+    _cached_display: HashMap<(isize, isize), (char, RectEffectsHandler)>,
 }
 
 impl Rect {
@@ -143,7 +175,9 @@ impl Rect {
             flag_full_refresh: true,
             flags_pos_refresh: HashSet::new(),
             enabled: true,
-            color: 0u16,
+
+            effects: RectEffectsHandler::new(),
+
             _cached_display: HashMap::new(),
             default_character: ' ' // Space
         }
@@ -297,121 +331,112 @@ impl Rect {
     }
 
     fn is_bold(&self) -> bool {
-        (self.color & RectEffect::BOLD) > 0
+        self.effects.bold
     }
 
     fn is_underlined(&self) -> bool {
-        (self.color & RectEffect::UNDERLINE) > 0
+        self.effects.underline
     }
 
     fn is_inverted(&self) -> bool {
-        (self.color & RectEffect::INVERT) > 0
+        self.effects.invert
+    }
+
+    fn is_italicized(&self) -> bool {
+        self.effects.italics
     }
 
     fn set_bold_flag(&mut self) {
-        let orig_color = self.color;
-        self.color |= RectEffect::BOLD;
-
-        if self.color != orig_color {
+        if ! self.effects.bold {
             self.flag_full_refresh = true;
         }
+
+        self.effects.bold = true;
     }
 
     fn unset_bold_flag(&mut self) {
-        let orig_color = self.color;
-        self.color &= !RectEffect::BOLD;
-
-        if self.color != orig_color {
+        if self.effects.bold {
             self.flag_full_refresh = true;
         }
+
+        self.effects.bold = false;
     }
-
     fn set_underline_flag(&mut self) {
-        let orig_color = self.color;
-        self.color |= RectEffect::UNDERLINE;
-
-        if self.color != orig_color {
+        if ! self.effects.underline {
             self.flag_full_refresh = true;
         }
+
+        self.effects.underline = true;
     }
 
     fn unset_underline_flag(&mut self) {
-        let orig_color = self.color;
-        self.color &= !RectEffect::UNDERLINE;
-
-        if self.color != orig_color {
+        if self.effects.underline {
             self.flag_full_refresh = true;
         }
+
+        self.effects.underline = false;
     }
 
     fn set_invert_flag(&mut self) {
-        let orig_color = self.color;
-        self.color |= RectEffect::INVERT;
-
-        if self.color != orig_color {
+        if ! self.effects.invert {
             self.flag_full_refresh = true;
         }
+
+        self.effects.invert = true;
     }
 
     fn unset_invert_flag(&mut self) {
-        let orig_color = self.color;
-        self.color &= !RectEffect::INVERT;
-
-        if self.color != orig_color {
+        if self.effects.invert {
             self.flag_full_refresh = true;
         }
+
+        self.effects.invert = false;
     }
 
-    fn unset_bg_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0b1111111111100000;
-
-        if self.color != orig_color {
+    fn set_italics_flag(&mut self) {
+        if ! self.effects.italics {
             self.flag_full_refresh = true;
         }
+
+        self.effects.italics = true;
+    }
+
+    fn unset_italics_flag(&mut self) {
+        if self.effects.italics {
+            self.flag_full_refresh = true;
+        }
+
+        self.effects.italics = false;
+    }
+
+
+    fn unset_bg_color(&mut self) {
+        self.set_bg_color(RectColor::NONE);
     }
 
     fn unset_fg_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0b1111110000011111;
-
-        if self.color != orig_color {
-            self.flag_full_refresh = true;
-        }
+        self.set_fg_color(RectColor::NONE);
     }
 
     fn unset_color(&mut self) {
-        let orig_color = self.color;
-        self.color &= 0;
-        if orig_color == 0 {
-            self.flag_full_refresh = true;
-        }
+        self.unset_bg_color();
+        self.unset_fg_color();
     }
 
-    fn set_bg_color(&mut self, n: u8) {
-        let orig_color = self.color;
-        let mut modded_n: u16 = n as u16;
-        modded_n &= 0b01111;
-        modded_n |= 0b10000;
-        self.color &= 0b1111111111100000;
-        self.color |= modded_n;
-
-        if self.color != orig_color {
+    fn set_bg_color(&mut self, color: RectColor) {
+        if self.effects.background_color != color {
             self.flag_full_refresh = true;
         }
+
+        self.effects.background_color = color;
     }
 
-    fn set_fg_color(&mut self, n: u8) {
-        let orig_color = self.color;
-        let mut modded_n: u16 = n as u16;
-        modded_n &= 0b01111;
-        modded_n |= 0b10000;
-        self.color &= 0b1111110000011111;
-        self.color |= modded_n << 5;
-
-        if self.color != orig_color {
+    fn set_fg_color(&mut self, color: RectColor) {
+        if self.effects.foreground_color != color {
             self.flag_full_refresh = true;
         }
+
+        self.effects.foreground_color = color;
     }
 
     fn add_child(&mut self, child_id: usize) {
@@ -695,7 +720,7 @@ impl RectManager {
         let mut x: isize;
         let mut y: isize;
         let mut tmp_chr;
-        let mut tmp_color;
+        let mut tmp_fx;
         let mut new_values = Vec::new();
 
         let mut output = Ok(());
@@ -708,14 +733,14 @@ impl RectManager {
 
                     if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
                         // Make sure at least default character is present
-                        tmp_color = rect.color;
+                        tmp_fx = rect.effects;
 
                         tmp_chr = rect.character_space.entry((x, y))
                             .or_insert(rect.default_character);
 
                         rect._cached_display.entry((x,y))
-                            .and_modify(|e| {*e = (*tmp_chr, tmp_color)})
-                            .or_insert((*tmp_chr, tmp_color));
+                            .and_modify(|e| {*e = (*tmp_chr, tmp_fx)})
+                            .or_insert((*tmp_chr, tmp_fx));
 
                     } else {
                         match rect.child_space.get(&(x, y)) {
@@ -881,7 +906,7 @@ impl RectManager {
 
                 }
                 Err(error) => {
-                    if error == RectError::ParentNotFound || error == RectError::NotFound {
+                    if error != RectError::NoParent {
                         output = Err(error);
                     }
                     break;
@@ -906,7 +931,7 @@ impl RectManager {
         output
     }
 
-    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), (char, u16)>, RectError> {
+    fn get_display(&mut self, rect_id: usize) -> Result<HashMap<(isize, isize), (char, RectEffectsHandler)>, RectError> {
         let mut output = Ok(HashMap::new());
         let mut outhash = HashMap::new();
 
@@ -921,8 +946,8 @@ impl RectManager {
             match self.get_rect(rect_id) {
                 Ok(rect) => {
                     if rect.enabled {
-                        for ((x, y), (new_c, color)) in rect._cached_display.iter() {
-                            outhash.insert((*x, *y), (*new_c, *color));
+                        for ((x, y), (new_c, effects)) in rect._cached_display.iter() {
+                            outhash.insert((*x, *y), (*new_c, *effects));
                         }
                     }
                 }
@@ -939,14 +964,14 @@ impl RectManager {
         output
     }
 
-    fn build_ansi_string(&mut self, display_map: Vec<((isize, isize), (char, u16))>) -> String {
+    fn build_ansi_string(&mut self, display_map: Vec<((isize, isize), (char, RectEffectsHandler))>) -> String {
         let mut renderstring = "".to_string();
         let mut width = self.get_width();
 
         let mut val_a: &char;
         let mut utf_char: &[u8];
-        let mut active_effects: u16 = 0;
-        let mut new_effects: u16 = 0;
+        let mut active_effects = RectEffectsHandler::new();
+        let mut new_effects;
         let mut current_col = -10;
         let mut current_row = -10;
 
@@ -961,16 +986,18 @@ impl RectManager {
             val_a = &val.0;
             new_effects = val.1;
 
-            if new_effects == 0 && active_effects != 0 {
+            if new_effects.is_empty() && ! active_effects.is_empty() {
                 renderstring += "\x1B[0m";
-            } else if new_effects != 0 {
+            } else if !new_effects.is_empty() {
+                let mut tmp_color_n;
                 // ForeGround
-                if (new_effects & 992) != (active_effects & 992) {
-                    if new_effects & 512 == 512 {
-                        if new_effects & 256 == 256 {
-                            renderstring += &format!("\x1B[9{}m", ((new_effects >> 5) & 7));
+                if new_effects.foreground_color != active_effects.foreground_color {
+                    if new_effects.foreground_color != RectColor::NONE {
+                        tmp_color_n = new_effects.foreground_color as u8; 
+                        if tmp_color_n & 8 == 8 {
+                            renderstring += &format!("\x1B[9{}m", tmp_color_n & 7);
                         } else {
-                            renderstring += &format!("\x1B[3{}m", ((new_effects >> 5) & 7));
+                            renderstring += &format!("\x1B[3{}m", tmp_color_n & 7);
                         }
                     } else {
                         renderstring += &format!("\x1B[39m");
@@ -978,12 +1005,13 @@ impl RectManager {
                 }
 
                 // BackGround
-                if (new_effects & 31) != (active_effects & 31) {
-                    if new_effects & 16 == 16 {
-                        if new_effects & 8 == 8 {
-                            renderstring += &format!("\x1B[10{}m", (new_effects & 7));
+                if new_effects.background_color != active_effects.background_color {
+                    if new_effects.background_color != RectColor::NONE {
+                        tmp_color_n = new_effects.background_color as u8;
+                        if tmp_color_n & 8 == 8 {
+                            renderstring += &format!("\x1B[10{}m", (tmp_color_n & 7));
                         } else {
-                            renderstring += &format!("\x1B[4{}m", (new_effects & 7));
+                            renderstring += &format!("\x1B[4{}m", (tmp_color_n & 7));
                         }
                     } else {
                         renderstring += &format!("\x1B[49m");
@@ -991,28 +1019,28 @@ impl RectManager {
                 }
 
                 // Bold
-                if (new_effects & RectEffect::BOLD) != (active_effects & RectEffect::BOLD) {
-                    if (new_effects & RectEffect::BOLD) > 1 {
+                if new_effects.bold != active_effects.bold {
+                    if new_effects.bold {
                         renderstring += &format!("\x1B[1m"); // On
-                    } else if (active_effects & RectEffect::BOLD) > 1 {
+                    } else {
                         renderstring += &format!("\x1B[21m"); // Off
                     }
                 }
 
                 // Underline
-                if (new_effects & RectEffect::UNDERLINE) != (active_effects & RectEffect::UNDERLINE) {
-                    if (new_effects & RectEffect::UNDERLINE) > 1 {
+                if new_effects.underline != active_effects.underline {
+                    if new_effects.underline {
                         renderstring += &format!("\x1B[4m");
-                    } else if (active_effects & RectEffect::UNDERLINE) > 1 {
+                    } else {
                         renderstring += &format!("\x1B[24m"); // Off
                     }
                 }
 
                 // Inverted
-                if (new_effects & RectEffect::INVERT) != (active_effects & RectEffect::INVERT) {
-                    if (new_effects & RectEffect::INVERT) > 1 {
+                if new_effects.invert != active_effects.invert {
+                    if new_effects.invert {
                         renderstring += &format!("\x1B[7m");
-                    } else if (active_effects & RectEffect::INVERT) > 1 {
+                    } else {
                         renderstring += &format!("\x1B[27m"); // Off
                     }
                 }
@@ -1028,7 +1056,7 @@ impl RectManager {
         renderstring
     }
 
-    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (char, u16))>) {
+    fn _draw(&mut self, display_map: &mut Vec<((isize, isize), (char, RectEffectsHandler))>) {
         let mut do_updates = Vec::new();
 
         // First, find which positions need to be updated and fill in
@@ -1066,8 +1094,7 @@ impl RectManager {
         }
     }
 
-    pub fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
-        let mut output = Ok(());
+    pub fn build_draw_map(&mut self, rect_id: usize) -> Vec<((isize, isize), (char, RectEffectsHandler))> {
         let mut to_draw = Vec::new();
 
         let mut offset = (0, 0);
@@ -1076,7 +1103,6 @@ impl RectManager {
                 offset = _offset;
             }
             Err(e)=> {
-                output = Err(e);
             }
         };
 
@@ -1088,31 +1114,32 @@ impl RectManager {
             Err(_e) => { }
         };
 
-        if output.is_ok() {
-            match self.get_display(rect_id) {
-                Ok(display_map) => {
-                    for (pos, val) in display_map.iter() {
-                        if offset.0 + pos.0 < boundry_box.0
-                        || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
-                        || offset.1 + pos.1 < boundry_box.1
-                        || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
-                            // pass
-                        } else {
-                            to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                        }
+        match self.get_display(rect_id) {
+            Ok(display_map) => {
+                for (pos, val) in display_map.iter() {
+                    if offset.0 + pos.0 < boundry_box.0
+                    || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
+                    || offset.1 + pos.1 < boundry_box.1
+                    || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
+                        // pass
+                    } else {
+                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
                     }
                 }
-                Err(e) => {
-                    output = Err(e);
-                }
+            }
+            Err(e) => {
             }
         }
 
-        if output.is_ok() {
-            self._draw(&mut to_draw);
-        }
+        to_draw
+    }
 
-        output
+    pub fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut draw_map = self.build_draw_map(rect_id);
+
+        self._draw(&mut draw_map);
+
+        Ok(())
     }
 
     // Get n where n is the position in sibling array
@@ -1964,7 +1991,6 @@ impl RectManager {
         };
 
         for id in to_delete.iter() {
-            self.set_bg_color(*id, 1);
             self.rects.remove(&id);
         }
 
@@ -2172,7 +2198,7 @@ impl RectManager {
         self.flag_refresh(rect_id);
     }
 
-    pub fn set_bg_color(&mut self, rect_id: usize, color: u8) -> Result<(), RectError> {
+    pub fn set_bg_color(&mut self, rect_id: usize, color: RectColor) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.set_bg_color(color);
@@ -2208,7 +2234,7 @@ impl RectManager {
         result
     }
 
-    pub fn set_fg_color(&mut self, rect_id: usize, color: u8) -> Result<(), RectError> {
+    pub fn set_fg_color(&mut self, rect_id: usize, color: RectColor) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.set_fg_color(color);
