@@ -43,33 +43,6 @@ pub enum RectError {
     ChildNotFound = 8
 }
 
-#[derive(PartialEq, Eq)]
-pub enum RectEffect {
-    BOLD = 1 << 10,
-    UNDERLINE = 1 << 11,
-    INVERT = 1 << 12,
-
-}
-
-impl Not for RectEffect {
-    type Output = u16;
-    fn not(self) -> u16 {
-        !(self as u16)
-    }
-}
-
-impl BitOrAssign<RectEffect> for u16 {
-    fn bitor_assign(&mut self, rhs: RectEffect) {
-        *self |= rhs as u16;
-    }
-}
-
-impl BitAnd<RectEffect> for u16 {
-    type Output = u16;
-    fn bitand(self, rhs: RectEffect) -> u16 {
-        self & (rhs as u16)
-    }
-}
 
 #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub enum RectColor {
