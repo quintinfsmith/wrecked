@@ -366,23 +366,24 @@ fn test_draw_map() {
     let mut expected_map = Vec::new();
     for y in 0 .. size.1 {
         for x in 0 .. size.0 {
+            working_flags = RectEffectsHandler::new();
             working_char = match (x, y) {
                 (3,0) => {
                     'X'
                 }
                 _ => { ' ' }
             };
-            working_flags = match (x,y) {
+            match (x,y) {
                 (0, 0) => {
-                    RectEffect::BOLD as u16
+                    working_flags.bold = true;
                 }
                 (1, 0) => {
-                    RectEffect::INVERT as u16
+                    working_flags.invert = true
                 }
                 (2, 0) => {
-                    RectEffect::UNDERLINE as u16
+                    working_flags.underline = true
                 }
-                _ => { 0 }
+                _ => { }
             };
             expected_map.push((((x + x_offset) as isize, (y + y_offset) as isize), (working_char, working_flags)));
         }

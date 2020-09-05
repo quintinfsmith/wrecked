@@ -10,6 +10,7 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::ops::{BitOrAssign, BitAnd, Not};
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+use std::fmt;
 
 pub mod tests;
 
@@ -64,6 +65,32 @@ pub enum RectColor {
     BRIGHTWHITE = 8 | 7,
     NONE = 255
 }
+impl fmt::Debug for RectColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            RectColor::BLACK => { "Black" }
+            RectColor::RED => { "Red" }
+            RectColor::GREEN => { "Green" }
+            RectColor::YELLOW => { "Yellow" }
+            RectColor::BLUE => { "Blue" }
+            RectColor::MAGENTA => { "Magenta" }
+            RectColor::CYAN => { "Cyan" }
+            RectColor::WHITE => { "White" }
+            RectColor::BRIGHTBLACK => { "BrightBlack" }
+            RectColor::BRIGHTRED => { "BrightRed" }
+            RectColor::BRIGHTGREEN => { "BrightGreen" }
+            RectColor::BRIGHTYELLOW => { "BrightYellow" }
+            RectColor::BRIGHTBLUE => { "BrightBlue" }
+            RectColor::BRIGHTMAGENTA => { "BrightMagenta" }
+            RectColor::BRIGHTCYAN => { "BrightCyan" }
+            RectColor::BRIGHTWHITE => { "BrightWhite" }
+            RectColor::NONE => { "None" }
+            _ => { "Invalid Color" }
+        };
+
+        write!(f, "{}", name)
+    }
+}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct RectEffectsHandler {
@@ -73,6 +100,17 @@ pub struct RectEffectsHandler {
     italics: bool,
     background_color: RectColor,
     foreground_color: RectColor
+}
+impl fmt::Debug for RectEffectsHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RectEffectsHandler")
+         .field("bold", &self.bold)
+         .field("underline", &self.underline)
+         .field("invert", &self.invert)
+         .field("background_color", &self.background_color)
+         .field("foreground_color", &self.foreground_color)
+         .finish()
+    }
 }
 
 impl RectEffectsHandler {
