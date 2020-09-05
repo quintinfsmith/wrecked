@@ -3,7 +3,7 @@ use std::os::raw::c_char;
 use std::str;
 use std::io::prelude::*;
 
-use wrecked::{RectManager, Rect};
+use wrecked::{RectManager, Rect, RectColor, RectError};
 
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
@@ -76,10 +76,19 @@ pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
+pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.set_fg_color(rect_id, col);
+    let colors = [RectColor::BLACK, RectColor::RED, RectColor::GREEN, RectColor::YELLOW, RectColor::BLUE, RectColor::MAGENTA, RectColor::CYAN, RectColor::WHITE, RectColor::BRIGHTBLACK, RectColor::BRIGHTRED, RectColor::BRIGHTGREEN, RectColor::BRIGHTYELLOW, RectColor::BRIGHTBLUE, RectColor::BRIGHTMAGENTA, RectColor::BRIGHTCYAN, RectColor::BRIGHTWHITE];
+
+    let result = match colors.get(color_n as usize) {
+        Some(color) => {
+            rectmanager.set_fg_color(rect_id, *color)
+        }
+        None => {
+            Err(RectError::BadColor)
+        }
+    };
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -90,10 +99,17 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -
 }
 
 #[no_mangle]
-pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, col: u8) -> u32 {
+pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.set_bg_color(rect_id, col);
+    let colors = [RectColor::BLACK, RectColor::RED, RectColor::GREEN, RectColor::YELLOW, RectColor::BLUE, RectColor::MAGENTA, RectColor::CYAN, RectColor::WHITE, RectColor::BRIGHTBLACK, RectColor::BRIGHTRED, RectColor::BRIGHTGREEN, RectColor::BRIGHTYELLOW, RectColor::BRIGHTBLUE, RectColor::BRIGHTMAGENTA, RectColor::BRIGHTCYAN, RectColor::BRIGHTWHITE];
+    let result = match colors.get(color_n as usize) {
+        Some(color) => {
+            rectmanager.set_bg_color(rect_id, *color)
+        }
+        None => {
+            Err(RectError::BadColor)
+        }
+    };
 
     Box::into_raw(rectmanager); // Prevent Release
 

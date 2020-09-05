@@ -215,7 +215,7 @@ class Rect(object):
 
 
 class RectManager:
-    SO_PATH = "/usr/lib/libwrecked.so"
+    SO_PATH = "/usr/lib/libwrecked_bindings.so"
 
     def __init__(self):
         ffi = FFI()
@@ -520,7 +520,6 @@ class RectManager:
         if err:
             raise EXCEPTIONS[err](
                 rect_id=rect_id,
-                dimensions=(width, height)
             )
 
     def rect_remove(self, rect_id):

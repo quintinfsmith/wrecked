@@ -1,5 +1,5 @@
 [package]
-name = "wrecked-bindings"
+name = "wrecked_bindings"
 version = "0.1.0"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
@@ -9,6 +9,6 @@ description = "Bindings for the wrecked terminal graphics library"
 wrecked = { path = "/home/pent/Projects/wrecked/" }
 
 [lib]
-name = "wrecked-bindings"
+name = "wrecked_bindings"
 crate-type = ["dylib"]
 
