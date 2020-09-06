@@ -495,6 +495,8 @@ fn test_set_effects() {
             assert!(rect.is_bold());
             assert!(!rect.is_underlined());
             assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
         }
         Err(e) => {
             assert!(false);
@@ -507,6 +509,8 @@ fn test_set_effects() {
             assert!(!rect.is_bold());
             assert!(!rect.is_underlined());
             assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
         }
         Err(e) => {
             assert!(false);
@@ -519,6 +523,8 @@ fn test_set_effects() {
             assert!(!rect.is_bold());
             assert!(rect.is_underlined());
             assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
         }
         Err(e) => {
             assert!(false);
@@ -530,6 +536,8 @@ fn test_set_effects() {
             assert!(!rect.is_bold());
             assert!(!rect.is_underlined());
             assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
         }
         Err(e) => {
             assert!(false);
@@ -542,6 +550,8 @@ fn test_set_effects() {
             assert!(!rect.is_bold());
             assert!(!rect.is_underlined());
             assert!(rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
         }
         Err(e) => {
             assert!(false);
@@ -553,6 +563,84 @@ fn test_set_effects() {
             assert!(!rect.is_bold());
             assert!(!rect.is_underlined());
             assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_italics_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+            assert!(rect.is_italicized());
+            assert!(!rect.is_striken());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.unset_italics_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_strike_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(rect.is_striken());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.unset_strike_flag(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(!rect.is_bold());
+            assert!(!rect.is_underlined());
+            assert!(!rect.is_inverted());
+            assert!(!rect.is_italicized());
+            assert!(!rect.is_striken());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_bg_color(0, RectColor::BLUE);
+    rectmanager.set_fg_color(0, RectColor::RED);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert_eq!(rect.get_bg_color(), RectColor::BLUE);
+            assert_eq!(rect.get_fg_color(), RectColor::RED);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.unset_color(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert_eq!(rect.get_bg_color(), RectColor::NONE);
+            assert_eq!(rect.get_fg_color(), RectColor::NONE);
         }
         Err(e) => {
             assert!(false);
@@ -560,4 +648,24 @@ fn test_set_effects() {
     }
 
     rectmanager.kill();
+}
+
+#[test]
+fn test_failures() {
+    let mut rectmanager = RectManager::new();
+    let mut bad_id = 55;
+
+    assert_eq!(rectmanager.get_rect(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_rect_mut(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.get_parent(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_parent(0).err().unwrap(), RectError::NoParent);
+
+    assert_eq!(rectmanager.get_parent_mut(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_parent_mut(0).err().unwrap(), RectError::NoParent);
+
+    assert_eq!(rectmanager.get_top(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_top_mut(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.get_visible_box(bad_id).err().unwrap(), RectError::NotFound);
 }
