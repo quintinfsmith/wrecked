@@ -156,7 +156,6 @@ impl RectEffectsHandler {
 pub struct RectManager {
     idgen: usize,
     rects: HashMap<usize, Rect>,
-    draw_queue: Vec<usize>,
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, RectEffectsHandler)>,
@@ -541,7 +540,6 @@ impl RectManager {
         let mut rectmanager = RectManager {
             idgen: 0,
             rects: HashMap::new(),
-            draw_queue: Vec::new(),
             top_cache: HashMap::new(),
             _termios: termios,
             default_character: ' '
@@ -1281,140 +1279,6 @@ impl RectManager {
         lineage
     }
 
-    pub fn draw_queued(&mut self) -> Result<(), RectError> {
-        let mut output = Ok(());
-
-
-        let mut to_draw = Vec::new();
-        let mut depth_tracker: HashMap<(isize, isize), usize> = HashMap::new();
-
-        let mut offset = (0, 0);
-
-        let mut draw_queue = Vec::new();
-        let mut done_ = Vec::new();
-        for rect_id in self.draw_queue.iter() {
-            if ! done_.contains(rect_id) {
-                draw_queue.push((0, 0, *rect_id));
-                done_.push(*rect_id);
-            }
-        }
-
-        self.draw_queue.clear();
-
-        let mut dimensions = (0, 0);
-        match self.get_rect(0) {
-            Ok(top) => {
-                dimensions = (top.width, top.height);
-            }
-            Err(e) => {
-                output = Err(e);
-            }
-        };
-
-        let mut skip_rect;
-        let mut is_attached;
-        for (depth, rank, rect_id) in draw_queue.iter_mut() {
-            skip_rect = false;
-            is_attached = false;
-            for ancestor_id in self.trace_lineage(*rect_id).iter() {
-                if done_.contains(ancestor_id) {
-                    skip_rect = true;
-                    break;
-                }
-                if *ancestor_id == 0 {
-                    is_attached = true;
-                }
-            }
-            if ! is_attached {
-                skip_rect = true;
-            }
-            if skip_rect {
-                continue;
-            }
-
-            match self.get_depth(*rect_id) {
-                Ok(real_depth) => {
-                    *depth = real_depth;
-                }
-                Err(error) => {
-                    output = Err(error);
-                    break;
-                }
-            }
-            match self.get_rank(*rect_id) {
-                Ok(real_rank) => {
-                    *rank = real_rank;
-                }
-                Err(error) => {
-                    output = Err(error);
-                    break;
-                }
-            }
-        }
-
-        if output.is_ok() && draw_queue.len() > 0 {
-
-            draw_queue.sort();
-            draw_queue.reverse();
-
-            let mut boundry_box = (0, 0, 0, 0);
-            for (depth, _rank, rect_id) in draw_queue {
-                match self.get_absolute_offset(rect_id) {
-                    Ok(_offset) => {
-                        offset = _offset;
-                    }
-                    Err(e)=> {
-                        output = Err(e);
-                    }
-                };
-
-                if output.is_ok() {
-
-                    match self.get_visible_box(rect_id) {
-                        Ok(_box) => {
-                            boundry_box = _box;
-                        }
-                        Err(e) => { }
-                    };
-
-                    match self.get_display(rect_id) {
-                        Ok(display_map) => {
-                            for (pos, val) in display_map.iter() {
-                                if ! depth_tracker.contains_key(pos) || *depth_tracker.get(pos).unwrap() <= depth {
-                                    if offset.0 + pos.0 < boundry_box.0
-                                    || offset.0 + pos.0 >= boundry_box.0 + boundry_box.2
-                                    || offset.1 + pos.1 < boundry_box.1
-                                    || offset.1 + pos.1 >= boundry_box.1 + boundry_box.3 {
-                                        // pass
-                                    } else {
-                                        to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), *val));
-                                        depth_tracker.entry(*pos)
-                                            .and_modify(|e| { *e = depth })
-                                            .or_insert(depth);
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            output = Err(e);
-                            break;
-                        }
-                    }
-
-                    self.flag_parent_refresh(rect_id);
-
-
-                } else {
-                    break;
-                }
-            }
-
-            self._draw(&mut to_draw);
-        }
-
-        output
-    }
-
     pub fn get_rect_size(&self, rect_id: usize) -> Result<(usize, usize), RectError> {
         let output;
 
@@ -1520,7 +1384,7 @@ impl RectManager {
         }
 
         if output.is_err() {
-            logg("Resize fail".to_string());
+            //logg("Resize fail".to_string());
         }
 
         output
@@ -1942,7 +1806,13 @@ impl RectManager {
                 for character in string.chars() {
                     x = i % dimensions.0;
                     y = i / dimensions.0;
-                    rect.set_character(x, y, character);
+                    match rect.set_character(x, y, character) {
+                        Ok(_)=> {}
+                        Err(e) => {
+                            output = Err(e);
+                            break;
+                        }
+                    }
                     i += 1;
                 }
             }
@@ -2028,10 +1898,12 @@ impl RectManager {
                     match self.get_rect_mut(working_id) {
                         Ok(rect) => {
                             stack.extend(rect.children.iter().copied());
+                            to_delete.push(working_id);
                         },
+                        // don't throw an error here. it may be the case that the
+                        // parent still needs to be deleted even though the children are missing
                         Err(e) => {}
                     };
-                    to_delete.push(working_id);
                 }
                 None => {
                     break;
@@ -2122,18 +1994,6 @@ impl RectManager {
         }
 
         output
-    }
-
-    pub fn queue_draw(&mut self, rect_id: usize) -> Result<(), RectError> {
-        match self.get_rect(rect_id) {
-            Ok(_) => {
-                self.draw_queue.push(rect_id);
-                Ok(())
-            }
-            Err(error) => {
-                Err(error)
-            }
-        }
     }
 
     pub fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {

@@ -636,6 +636,21 @@ fn test_set_effects() {
             assert!(false);
         }
     }
+
+    rectmanager.unset_bg_color(0);
+    rectmanager.unset_fg_color(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert_eq!(rect.get_bg_color(), RectColor::NONE);
+            assert_eq!(rect.get_fg_color(), RectColor::NONE);
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+    rectmanager.set_bg_color(0, RectColor::BLUE);
+    rectmanager.set_fg_color(0, RectColor::RED);
     rectmanager.unset_color(0);
     match rectmanager.get_rect(0) {
         Ok(rect) => {
@@ -654,6 +669,8 @@ fn test_set_effects() {
 fn test_failures() {
     let mut rectmanager = RectManager::new();
     let mut bad_id = 55;
+    let mut good_id = rectmanager.new_rect(Some(0));
+    rectmanager.resize(good_id, 10, 10);
 
     assert_eq!(rectmanager.get_rect(bad_id).err().unwrap(), RectError::NotFound);
     assert_eq!(rectmanager.get_rect_mut(bad_id).err().unwrap(), RectError::NotFound);
@@ -668,4 +685,63 @@ fn test_failures() {
     assert_eq!(rectmanager.get_top_mut(bad_id).err().unwrap(), RectError::NotFound);
 
     assert_eq!(rectmanager.get_visible_box(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.set_bg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.set_fg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.unset_bg_color(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.unset_fg_color(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.unset_color(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.unset_bold_flag(bad_id), ());
+    assert_eq!(rectmanager.unset_invert_flag(bad_id), ());
+    assert_eq!(rectmanager.unset_underline_flag(bad_id), ());
+    assert_eq!(rectmanager.unset_strike_flag(bad_id), ());
+    assert_eq!(rectmanager.unset_italics_flag(bad_id), ());
+
+    assert_eq!(rectmanager.set_bold_flag(bad_id), ());
+    assert_eq!(rectmanager.set_invert_flag(bad_id), ());
+    assert_eq!(rectmanager.set_underline_flag(bad_id), ());
+    assert_eq!(rectmanager.set_strike_flag(bad_id), ());
+    assert_eq!(rectmanager.set_italics_flag(bad_id), ());
+
+    assert_eq!(rectmanager.replace_with(bad_id, good_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.replace_with(0, bad_id).err().unwrap(), RectError::NoParent);
+    //assert_eq!(rectmanager.replace_with(good_id, bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.clear_child_space(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.update_child_space(bad_id).err().unwrap(), RectError::NotFound);
+    //assert!(rectmanager.update_child_space(0).is_ok());
+
+    assert_eq!(rectmanager.delete_rect(bad_id).err().unwrap(), RectError::NotFound);
+
+    assert_eq!(rectmanager.set_character(bad_id, 0, 0, 'x').err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.set_character(good_id, 1, 100, 'x').err().unwrap(), RectError::BadPosition);
+    assert_eq!(rectmanager.unset_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.unset_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition);
+
+    assert_eq!(rectmanager.get_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition);
+
+    assert_eq!(rectmanager.set_string(bad_id, 0, 0, &"BOOP").err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.set_string(good_id, 3000, 0, &"afnwjeklnawjekflnawjekflnawejfklanwejfklnawejfklawnefjkawlnefjkawlenfjawkelfnajwkelfafawefBOOP").err().unwrap(), RectError::BadPosition);
+    rectmanager.kill();
+}
+
+#[test]
+fn test_default_character() {
+    let mut rectmanager = RectManager::new();
+    let mut bad_id = 55;
+    assert_eq!(rectmanager.get_default_character(bad_id), rectmanager.default_character);
+    let mut test_character = 'Q';
+    match rectmanager.get_rect_mut(0) {
+        Ok(rect) => {
+            rect.default_character = test_character;
+        }
+        Err(e) => {}
+    }
+
+    assert_eq!(rectmanager.get_default_character(0), test_character);
+
+    rectmanager.kill();
 }
