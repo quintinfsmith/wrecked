@@ -34,32 +34,6 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn queue_draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.queue_draw(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn draw_queued(ptr: *mut RectManager) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-    let result = rectmanager.draw_queued();
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
-}
 
 #[no_mangle]
 pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {

@@ -137,12 +137,6 @@ class Rect(object):
     def draw(self):
         self.rectmanager.rect_draw(self.rect_id)
 
-    def queue_draw(self):
-        self.rectmanager.rect_queue_draw(self.rect_id)
-
-    def draw_queued(self):
-        self.rectmanager.draw_queued()
-
     def refresh(self):
         self.rectmanager.draw()
 
@@ -228,7 +222,6 @@ class RectManager:
 
             uint32_t new_rect(RectManager, uint32_t, uint32_t, uint32_t);
             uint32_t delete_rect(RectManager, uint32_t);
-            uint32_t draw_queued(RectManager);
 
 
             uint32_t set_position(RectManager, uint32_t, int32_t, int32_t);
@@ -261,7 +254,6 @@ class RectManager:
             uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
 
             uint32_t draw(RectManager, uint32_t);
-            uint32_t queue_draw(RectManager, uint32_t);
 
             uint32_t replace_with(RectManager, uint32_t, uint32_t);
 
@@ -300,12 +292,6 @@ class RectManager:
         self.height = new_height
         self.root.resize(new_width, new_height)
 
-    def draw_queued(self):
-        err = self.lib.draw_queued(self.rectmanager)
-
-        if err:
-            raise EXCEPTIONS[err]()
-
     def rect_bold(self, rect_id):
         err = self.lib.set_bold_flag(self.rectmanager, rect_id)
         if err:
@@ -335,14 +321,6 @@ class RectManager:
         err = self.lib.unset_bold_flag(self.rectmanager, rect_id)
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
-
-    def rect_queue_draw(self, rect_id):
-        err = self.lib.queue_draw(self.rectmanager, rect_id)
-
-
-        if err:
-            raise EXCEPTIONS[err](rect_id=rect_id)
-
 
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
