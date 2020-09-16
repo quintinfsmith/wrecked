@@ -725,6 +725,10 @@ fn test_failures() {
 
     assert_eq!(rectmanager.set_string(bad_id, 0, 0, &"BOOP").err().unwrap(), RectError::NotFound);
     assert_eq!(rectmanager.set_string(good_id, 3000, 0, &"afnwjeklnawjekflnawjekflnawejfklanwejfklnawejfklawnefjkawlnefjkawlenfjawkelfnajwkelfafawefBOOP").err().unwrap(), RectError::BadPosition);
+
+    assert_eq!(rectmanager.get_rank(bad_id).err().unwrap(), RectError::NotFound);
+    assert_eq!(rectmanager.get_depth(bad_id).err().unwrap(), RectError::NotFound);
+
     rectmanager.kill();
 }
 
@@ -745,3 +749,42 @@ fn test_default_character() {
 
     rectmanager.kill();
 }
+
+#[test]
+fn test_get_depth() {
+    let mut rectmanager = RectManager::new();
+    let mut test_depth = 4;
+    let mut prev_id = 0;
+    for i in 0 .. test_depth {
+        prev_id = rectmanager.new_rect(Some(prev_id));
+    }
+    let mut real_depth = rectmanager.get_depth(prev_id).ok().unwrap();
+    assert_eq!(real_depth, test_depth, "get_depth() is broken");
+
+    rectmanager.kill();
+}
+
+#[test]
+fn test_get_rank() {
+    let mut rectmanager = RectManager::new();
+    let mut test_children = 5;
+    let mut child_ids: Vec<(usize, usize)> = Vec::new();
+    for i in 0 .. test_children {
+        child_ids.push((i, rectmanager.new_rect(Some(0))));
+    }
+
+    for (test_rank, working_id) in child_ids.iter() {
+        match rectmanager.get_rank(*working_id) {
+            Ok(real_rank) => {
+                assert_eq!(real_rank, *test_rank, "get_rank() isn't returning correct value");
+            }
+            Err(e) => {
+                assert_ne!(e, RectError::ChildNotFound, "Somehow a child is being deleted, but not detached from its parent.");
+                assert!(false);
+            }
+        }
+    }
+
+    rectmanager.kill();
+}
+
