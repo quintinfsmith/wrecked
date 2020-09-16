@@ -115,6 +115,7 @@ pub struct RectEffectsHandler {
     invert: bool,
     italics: bool,
     strike: bool,
+    blink: bool,
     background_color: RectColor,
     foreground_color: RectColor
 }
@@ -125,6 +126,7 @@ impl fmt::Debug for RectEffectsHandler {
          .field("underline", &self.underline)
          .field("invert", &self.invert)
          .field("strike", &self.strike)
+         .field("blink", &self.blink)
          .field("background_color", &self.background_color)
          .field("foreground_color", &self.foreground_color)
          .finish()
@@ -139,6 +141,7 @@ impl RectEffectsHandler {
             invert: false,
             italics: false,
             strike: false,
+            blink: false,
             background_color: RectColor::NONE,
             foreground_color: RectColor::NONE
         }
@@ -149,8 +152,19 @@ impl RectEffectsHandler {
         && !self.invert
         && !self.italics
         && !self.strike
+        && !self.blink
         && self.background_color != RectColor::NONE
         && self.foreground_color != RectColor::NONE
+    }
+    pub fn clear(&mut self) {
+        self.bold = false;
+        self.underline = false;
+        self.invert = false;
+        self.italics = false;
+        self.strike = false;
+        self.blink = false;
+        self.background_color = RectColor::NONE;
+        self.foreground_color = RectColor::NONE;
     }
 }
 pub struct RectManager {
@@ -361,6 +375,10 @@ impl Rect {
         self.effects.strike
     }
 
+    fn is_blinking(&self) -> bool {
+        self.effects.blink
+    }
+
     fn set_bold_flag(&mut self) {
         if ! self.effects.bold {
             self.flag_full_refresh = true;
@@ -438,6 +456,22 @@ impl Rect {
         }
 
         self.effects.strike = false;
+    }
+
+    fn set_blink_flag(&mut self) {
+        if ! self.effects.blink {
+            self.flag_full_refresh = true;
+        }
+
+        self.effects.blink = true;
+    }
+
+    fn unset_blink_flag(&mut self) {
+        if self.effects.blink {
+            self.flag_full_refresh = true;
+        }
+
+        self.effects.blink = false;
     }
 
     fn unset_bg_color(&mut self) {
@@ -1018,8 +1052,8 @@ impl RectManager {
 
         // THEN build then ANSI string
         for (pos, val) in display_map.iter() {
-            renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
             if pos.1 != current_row || pos.0 != current_col {
+                renderstring += &format!("\x1B[{};{}H", pos.1 + 1, pos.0 + 1);
                 current_col = pos.0;
                 current_row = pos.1;
             }
@@ -1027,21 +1061,20 @@ impl RectManager {
             val_a = &val.0;
             new_effects = val.1;
 
-            if new_effects.is_empty() && ! active_effects.is_empty() {
-                renderstring += "\x1B[0m";
-            } else if !new_effects.is_empty() {
+            if new_effects != active_effects {
                 let mut tmp_color_n;
+                let mut ansi_code_list: Vec<u8> = vec![];
                 // ForeGround
                 if new_effects.foreground_color != active_effects.foreground_color {
                     if new_effects.foreground_color != RectColor::NONE {
-                        tmp_color_n = new_effects.foreground_color as u8; 
+                        tmp_color_n = new_effects.foreground_color as u8;
                         if tmp_color_n & 8 == 8 {
-                            renderstring += &format!("\x1B[9{}m", tmp_color_n & 7);
+                            ansi_code_list.push(90 + (tmp_color_n & 7));
                         } else {
-                            renderstring += &format!("\x1B[3{}m", tmp_color_n & 7);
+                            ansi_code_list.push(30 + (tmp_color_n & 7));
                         }
                     } else {
-                        renderstring += &format!("\x1B[39m");
+                        ansi_code_list.push(39);
                     }
                 }
 
@@ -1050,59 +1083,68 @@ impl RectManager {
                     if new_effects.background_color != RectColor::NONE {
                         tmp_color_n = new_effects.background_color as u8;
                         if tmp_color_n & 8 == 8 {
-                            renderstring += &format!("\x1B[10{}m", (tmp_color_n & 7));
+                            ansi_code_list.push(100 + (tmp_color_n & 7));
                         } else {
-                            renderstring += &format!("\x1B[4{}m", (tmp_color_n & 7));
+                            ansi_code_list.push(40 + (tmp_color_n & 7));
                         }
                     } else {
-                        renderstring += &format!("\x1B[49m");
+                        ansi_code_list.push(49);
                     }
                 }
 
                 // Bold
                 if new_effects.bold != active_effects.bold {
                     if new_effects.bold {
-                        renderstring += &format!("\x1B[1m"); // On
+                        ansi_code_list.push(1); // on
                     } else {
-                        renderstring += &format!("\x1B[21m"); // Off
+                        ansi_code_list.push(21); // off
                     }
                 }
 
                 // Underline
                 if new_effects.underline != active_effects.underline {
                     if new_effects.underline {
-                        renderstring += &format!("\x1B[4m");
+                        ansi_code_list.push(4); // on
                     } else {
-                        renderstring += &format!("\x1B[24m"); // Off
+                        ansi_code_list.push(24); // off
                     }
                 }
 
                 // Inverted
                 if new_effects.invert != active_effects.invert {
                     if new_effects.invert {
-                        renderstring += &format!("\x1B[7m");
+                        ansi_code_list.push(7); // on
                     } else {
-                        renderstring += &format!("\x1B[27m"); // Off
+                        ansi_code_list.push(27); // off
                     }
                 }
 
                 // Italics
                 if new_effects.italics != active_effects.italics {
                     if new_effects.italics {
-                        renderstring += &format!("\x1B[3m");
+                        ansi_code_list.push(3); // on
                     } else {
-                        renderstring += &format!("\x1B[23m"); // Off
+                        ansi_code_list.push(23); // off
                     }
                 }
 
                 // Strike
-                if new_effects.strike != active_effects.strike {
-                    if new_effects.strike {
-                        renderstring += &format!("\x1B[9m");
+                if new_effects.blink != active_effects.blink {
+                    if new_effects.blink {
+                        ansi_code_list.push(5); // on
                     } else {
-                        renderstring += &format!("\x1B[29m"); // Off
+                        ansi_code_list.push(25); // off
                     }
                 }
+
+                renderstring += "\x1B[";
+                for (i, n) in ansi_code_list.iter().enumerate() {
+                    if i > 0 {
+                        renderstring += ";";
+                    }
+                    renderstring += &format!("{}", n);
+                }
+                renderstring += "m";
             }
 
             active_effects = new_effects;
@@ -1111,7 +1153,7 @@ impl RectManager {
 
             current_col += 1;
         }
-
+        logg(renderstring.to_string());
         renderstring
     }
 
@@ -1192,6 +1234,7 @@ impl RectManager {
         if (filtered_map.len() > 0) {
             // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
             filtered_map.sort();
+            filtered_map.sort_by(|a,b|(a.0).1.cmp(&(b.0).1));
 
             let renderstring = self.build_ansi_string(filtered_map);
             print!("{}\x1B[0m", renderstring);
@@ -1711,6 +1754,27 @@ impl RectManager {
         output
     }
 
+    pub fn clear_effects(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let mut output = Ok(());
+
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.effects.clear();
+            }
+            Err(error) => {
+                output = Err(error);
+            }
+        };
+
+        if output.is_ok() {
+            self.flag_refresh(rect_id);
+        }
+
+
+        output
+    }
+
+
     pub fn detach(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut parent_id = 0;
         let mut has_parent = false;
@@ -2150,6 +2214,25 @@ impl RectManager {
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.unset_strike_flag();
+            }
+            Err(e) => {}
+        }
+        self.flag_refresh(rect_id);
+    }
+    pub fn set_blink_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.set_blink_flag();
+            }
+            Err(e) => {}
+        }
+        self.flag_refresh(rect_id);
+    }
+
+    pub fn unset_blink_flag(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Ok(rect) => {
+                rect.unset_blink_flag();
             }
             Err(e) => {}
         }
