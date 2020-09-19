@@ -788,3 +788,58 @@ fn test_get_rank() {
     rectmanager.kill();
 }
 
+#[test]
+fn test_update_child_space() {
+    let mut rectmanager = RectManager::new();
+    let mut first_child = rectmanager.new_rect(Some(0));
+    let mut second_child = rectmanager.new_rect(Some(0));
+
+    rectmanager.resize(first_child, 1, 1);
+    rectmanager.set_position(first_child, 0, 0);
+    rectmanager.resize(second_child, 1, 1);
+    rectmanager.set_position(second_child, 0, 0);
+
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            match rect.child_space.get(&(0, 0)) {
+                Some(child_space) => {
+                    assert_eq!(*child_space, vec![first_child, second_child]);
+                }
+                None => {
+                    assert!(false);
+                }
+            }
+        }
+        Err(e) => { assert!(false); }
+    }
+
+    //Move the second child first, so it is the first to be added to
+    // the child_space
+    rectmanager.set_position(second_child, 3, 0);
+    rectmanager.set_position(first_child, 3, 0);
+
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            // previous child_space should be empty
+            match rect.child_space.get(&(0, 0)) {
+                Some(child_space) => {
+                    assert_eq!(child_space.len(), 0);
+                }
+                None => {
+                    assert!(false);
+                }
+            }
+            // current child_space should still have the first child before the second
+            match rect.child_space.get(&(3, 0)) {
+                Some(child_space) => {
+                    assert_eq!(*child_space, vec![first_child, second_child]);
+                }
+                None => {
+                    assert!(false);
+                }
+            }
+        }
+        Err(e) => { assert!(false); }
+    }
+}
+

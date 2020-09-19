@@ -191,6 +191,7 @@ pub struct Rect {
     _inverse_child_space: HashMap<usize, Vec<(isize, isize)>>,
     // Used to find a position of a box
     child_positions: HashMap<usize, (isize, isize)>,
+    _child_ranks: HashMap<usize, usize>,
 
     character_space: HashMap<(isize,isize), char>,
 
@@ -215,6 +216,7 @@ impl Rect {
             child_space: HashMap::new(),
             _inverse_child_space: HashMap::new(),
             child_positions: HashMap::new(),
+            _child_ranks: HashMap::new(),
             character_space: HashMap::new(),
             flag_full_refresh: true,
             flags_pos_refresh: HashSet::new(),
@@ -274,12 +276,23 @@ impl Rect {
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize)) {
         self.clear_child_space(rect_id);
 
+        let child_ranks = &self._child_ranks;
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
                 if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
                     self.child_space.entry((x, y))
-                        .or_insert(Vec::new())
-                        .push(rect_id);
+                        .or_insert(Vec::new());
+
+                    match self.child_space.get_mut(&(x, y)) {
+                        Some(child_list) => {
+                            child_list.push(rect_id);
+                            child_list.sort_by(|a, b| {
+                                child_ranks[a].cmp(&child_ranks[b])
+                            });
+                        }
+                        None => ()
+                    }
+
 
                     self._inverse_child_space.entry(rect_id)
                         .or_insert(Vec::new())
@@ -507,6 +520,15 @@ impl Rect {
         self.children.push(child_id);
         self._inverse_child_space.insert(child_id, Vec::new());
         self.set_child_position(child_id, 0, 0);
+        self.update_child_ranks();
+    }
+
+    // Needed for quick access to child ranks
+    fn update_child_ranks(&mut self) {
+        self._child_ranks.drain();
+        for (new_rank, child_id) in self.children.iter().enumerate() {
+            self._child_ranks.insert(*child_id, new_rank);
+        }
     }
 
     fn set_parent(&mut self, rect_id: usize) {
@@ -607,7 +629,6 @@ impl RectManager {
         };
         self.flag_refresh(new_id);
 
-
         new_id
     }
 
@@ -621,7 +642,6 @@ impl RectManager {
             }
         }
     }
-
     pub fn get_rect_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
         match self.rects.get_mut(&rect_id) {
             Some(rect) => {
@@ -924,7 +944,9 @@ impl RectManager {
                             any children that cover the requested positions
                         */
                         for pos in rect.flags_pos_refresh.iter() {
-                            flags_pos_refresh.insert((pos.0 as isize, pos.1 as isize));
+                            if pos.0 >= 0 && pos.1 >= 0 && pos.0 < rect.width as isize && pos.1 < rect.height as isize {
+                                flags_pos_refresh.insert((pos.0 as isize, pos.1 as isize));
+                            }
                         }
                     }
                     rect.flags_pos_refresh.clear();
@@ -1153,7 +1175,7 @@ impl RectManager {
 
             current_col += 1;
         }
-        logg(renderstring.to_string());
+
         renderstring
     }
 
@@ -1368,7 +1390,6 @@ impl RectManager {
         let mut working_id = rect_id;
         let mut pos;
         let mut output = Ok((0, 0));
-
 
         loop {
             match self.get_parent(working_id) {
@@ -2034,6 +2055,7 @@ impl RectManager {
             };
 
         }
+
         if output.is_ok() {
             self.flag_parent_refresh(child_id);
         }
