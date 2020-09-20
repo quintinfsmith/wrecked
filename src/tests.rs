@@ -280,7 +280,7 @@ fn test_clear() {
     }
 
     let default_character = rectmanager.get_default_character(0);
-    rectmanager.clear(0);
+    rectmanager.clear_characters(0);
 
     for y in 0 .. height {
         for x in 0 .. width {

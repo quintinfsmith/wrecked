@@ -575,8 +575,9 @@ impl Rect {
         output
     }
 
-    fn clear(&mut self) {
+    fn clear_characters(&mut self) {
         self.character_space.clear();
+        self._cached_display.clear();
     }
 
     fn get_fg_color(&self) -> RectColor {
@@ -820,7 +821,9 @@ impl RectManager {
                 for (_x, _y) in positions.iter() {
                     x = *_x;
                     y = *_y;
-
+                    if (x < 0 || x >= rect.width as isize || y < 0 || y >= rect.height as isize) {
+                        continue;
+                    }
                     if !rect.child_space.contains_key(&(x, y)) || rect.child_space[&(x, y)].is_empty() {
                         // Make sure at least default character is present
                         tmp_fx = rect.effects;
@@ -931,6 +934,7 @@ impl RectManager {
                     */
                     if rect.flag_full_refresh {
                         rect.flag_full_refresh = false;
+                        rect._cached_display.clear();
 
                         for y in 0 .. rect.height {
                             for x in 0 .. rect.width {
@@ -1419,6 +1423,10 @@ impl RectManager {
         let mut output = Ok(());
         let mut pos = (0, 0);
 
+        let old_width = self.get_rect_width(rect_id);
+        let old_height = self.get_rect_height(rect_id);
+
+
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
                 rect.resize(width, height);
@@ -1727,12 +1735,12 @@ impl RectManager {
     }
 
     // Remove all characters
-    pub fn clear(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn clear_characters(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
             Ok(rect) => {
-                rect.clear();
+                rect.clear_characters();
             }
             Err(error) => {
                 output = Err(error);
@@ -1744,7 +1752,7 @@ impl RectManager {
     }
 
     // Remove All Children
-    pub fn empty(&mut self, rect_id: usize) -> Result<(), RectError> {
+    pub fn clear_children(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut children = Vec::new();
         let mut output = Ok(());
 
@@ -2354,7 +2362,7 @@ impl RectManager {
     }
 
     pub fn kill(&mut self) {
-        self.empty(0);
+        self.clear_children(0);
 
         let (w, h) = self.get_rect_size(0).ok().unwrap();
         for x in 0 .. w {
