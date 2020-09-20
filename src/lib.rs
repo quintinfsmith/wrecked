@@ -320,11 +320,11 @@ pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize
 }
 
 #[no_mangle]
-pub extern "C" fn clear(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: usize)  -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.clear(rect_id);
+    let result = rectmanager.clear_characters(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -335,11 +335,11 @@ pub extern "C" fn clear(ptr: *mut RectManager, rect_id: usize)  -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn empty(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+pub extern "C" fn clear_children(ptr: *mut RectManager, rect_id: usize)  -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.empty(rect_id);
+    let result = rectmanager.clear_children(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 

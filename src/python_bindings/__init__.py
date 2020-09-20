@@ -190,11 +190,11 @@ class Rect(object):
     def unset_color(self):
         self.rectmanager.rect_unset_color(self.rect_id)
 
-    def empty(self):
-        self.rectmanager.rect_empty(self.rect_id)
+    def clear_children(self):
+        self.rectmanager.rect_clear_children(self.rect_id)
 
-    def clear(self):
-        self.rectmanager.rect_clear(self.rect_id)
+    def clear_characters(self):
+        self.rectmanager.rect_clear_characters(self.rect_id)
 
     def new_rect(self, **kwargs):
         kwargs['parent'] = self.rect_id
@@ -229,8 +229,8 @@ class RectManager:
             uint32_t attach(RectManager, uint32_t, uint32_t);
             uint32_t detach(RectManager, uint32_t);
 
-            uint32_t empty(RectManager, uint32_t);
-            uint32_t clear(RectManager, uint32_t);
+            uint32_t clear_children(RectManager, uint32_t);
+            uint32_t clear_characters(RectManager, uint32_t);
 
 
             uint32_t unset_color(RectManager, uint32_t);
@@ -351,14 +351,14 @@ class RectManager:
                 new_rect_id=new_id
             )
 
-    def rect_empty(self, rect_id):
-        err = self.lib.empty(self.rectmanager, rect_id)
+    def rect_clear_children(self, rect_id):
+        err = self.lib.clear_children(self.rectmanager, rect_id)
 
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
 
-    def rect_clear(self, rect_id):
-        err = self.lib.clear(self.rectmanager, rect_id)
+    def rect_clear_characters(self, rect_id):
+        err = self.lib.clear_characters(self.rectmanager, rect_id)
 
         if err:
             raise EXCEPTIONS[err]( rect_id=rect_id )
