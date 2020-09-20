@@ -1769,10 +1769,6 @@ impl RectManager {
 
         if (output.is_ok()) {
             for child_id in children.iter() {
-                output = self.detach(*child_id);
-                if (output.is_err()) {
-                    break;
-                }
                 output = self.delete_rect(*child_id);
                 if (output.is_err()) {
                     break;
