@@ -2,6 +2,7 @@
 use super::*;
 use std::{thread, time};
 
+
 #[test]
 fn test_init() {
     let mut rectmanager = RectManager::new();
@@ -267,7 +268,51 @@ fn test_shift_contents() {
 }
 
 #[test]
-fn test_clear() {
+fn test_clear_children() {
+    let mut rectmanager = RectManager::new();
+    for i in 0 .. 4 {
+        rectmanager.new_rect(Some(0));
+    }
+
+    rectmanager.clear_children(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert_eq!(0, rect.children.len());
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+    rectmanager.kill();
+}
+
+#[test]
+fn test_clear_effects() {
+    let mut rectmanager = RectManager::new();
+
+    rectmanager.set_bg_color(0, RectColor::RED);
+    rectmanager.set_fg_color(0, RectColor::BLACK);
+    rectmanager.set_bold_flag(0);
+    rectmanager.set_strike_flag(0);
+    rectmanager.set_underline_flag(0);
+
+    rectmanager.clear_effects(0);
+    match rectmanager.get_rect(0) {
+        Ok(rect) => {
+            assert!(rect.is_plain())
+        }
+        Err(e) => {
+            assert!(false);
+        }
+    }
+
+
+
+    rectmanager.kill();
+}
+
+#[test]
+fn test_clear_characters() {
     let mut rectmanager = RectManager::new();
     let test_character = 'A';
     let mut width = rectmanager.get_rect_width(0);
@@ -294,6 +339,7 @@ fn test_clear() {
             }
         }
     }
+    rectmanager.kill();
 }
 
 #[test]

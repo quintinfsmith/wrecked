@@ -13,7 +13,6 @@ use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 use std::fmt;
 
 pub mod tests;
-
 /*
     TODO
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
@@ -153,8 +152,8 @@ impl RectEffectsHandler {
         && !self.italics
         && !self.strike
         && !self.blink
-        && self.background_color != RectColor::NONE
-        && self.foreground_color != RectColor::NONE
+        && self.background_color == RectColor::NONE
+        && self.foreground_color == RectColor::NONE
     }
     pub fn clear(&mut self) {
         self.bold = false;
@@ -366,6 +365,10 @@ impl Rect {
 
     fn unset_character(&mut self, x: isize, y: isize) -> Result<(), RectError> {
         self.set_character(x, y, self.default_character)
+    }
+
+    pub fn is_plain(&self) -> bool {
+        self.effects.is_empty()
     }
 
     fn is_bold(&self) -> bool {
