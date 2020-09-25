@@ -80,6 +80,7 @@ pub enum RectColor {
     BRIGHTWHITE = 8 | 7,
     NONE = 255
 }
+
 impl fmt::Debug for RectColor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
@@ -118,6 +119,7 @@ pub struct RectEffectsHandler {
     background_color: RectColor,
     foreground_color: RectColor
 }
+
 impl fmt::Debug for RectEffectsHandler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RectEffectsHandler")
@@ -166,6 +168,7 @@ impl RectEffectsHandler {
         self.foreground_color = RectColor::NONE;
     }
 }
+
 pub struct RectManager {
     idgen: usize,
     rects: HashMap<usize, Rect>,
@@ -176,6 +179,7 @@ pub struct RectManager {
     default_character: char
 }
 
+#[derive(Debug)]
 pub struct Rect {
     rect_id: usize,
 
@@ -636,110 +640,74 @@ impl RectManager {
         new_id
     }
 
-    pub fn get_rect(&self, rect_id: usize) -> Result<&Rect, RectError> {
-        match self.rects.get(&rect_id) {
-            Some(rect) => {
-                Ok(rect)
-            }
-            None => {
-                Err(RectError::NotFound)
-            }
-        }
+    pub fn get_rect(&self, rect_id: usize) -> Option<&Rect> {
+        self.rects.get(&rect_id)
     }
-    pub fn get_rect_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
-        match self.rects.get_mut(&rect_id) {
-            Some(rect) => {
-                Ok(rect)
-            }
-            None => {
-                Err(RectError::NotFound)
-            }
-        }
+    pub fn get_rect_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
+        self.rects.get_mut(&rect_id)
     }
 
-    pub fn get_parent(&self, rect_id: usize) -> Result<&Rect, RectError> {
-        let mut output = Err(RectError::NotFound);
+    pub fn get_parent(&self, rect_id: usize) -> Option<&Rect> {
+        let mut output = None;
         let mut has_parent = false;
         let mut parent_id = 0;
 
         match self.get_rect(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 match rect.parent {
                     Some(pid) => {
                         has_parent = true;
                         parent_id = pid;
                     }
-                    None => {
-                        output = Err(RectError::NoParent);
-                    }
+                    None => ()
                 };
             },
-            Err(e) => {
-                output = Err(e);
-            }
+            None => ()
         };
 
 
         if has_parent {
-            match self.get_rect(parent_id) {
-                Ok(parent) => {
-                    output = Ok(parent);
-                },
-                Err(e) => {
-                    output = Err(RectError::ParentNotFound);
-                }
-            }
+            output = self.get_rect(parent_id);
         }
 
         output
     }
 
-    pub fn get_parent_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
-        let mut output = Err(RectError::NotFound);
+    pub fn get_parent_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
+        let mut output = None;
         let mut has_parent = false;
         let mut parent_id = 0;
 
         match self.get_rect(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 match rect.parent {
                     Some(pid) => {
                         has_parent = true;
                         parent_id = pid;
                     }
-                    None => {
-                        output = Err(RectError::NoParent);
-                    }
+                    None => ()
                 };
-            },
-            Err(e) => {
-                output = Err(e);
             }
+            None => ()
         };
 
 
         if has_parent {
-            match self.get_rect_mut(parent_id) {
-                Ok(parent) => {
-                    output = Ok(parent);
-                },
-                Err(e) => {
-                    output = Err(RectError::ParentNotFound);
-                }
-            }
+            output = self.get_rect_mut(parent_id);
         }
 
         output
     }
 
     // Top can be the same as the given rect
-    pub fn get_top(&self, rect_id: usize) -> Result<&Rect, RectError> {
+    pub fn get_top(&self, rect_id: usize) -> Option<&Rect> {
         let mut current_id = rect_id;
-        let mut output = Err(RectError::NotFound);
+        let mut output = None;
         let mut rect_defined = false;
 
         loop {
             match self.get_rect(current_id) {
-                Ok(current_rect) => {
+                Some(current_rect) => {
                     rect_defined = true;
                     match current_rect.parent {
                         Some(parent_id) => {
@@ -750,10 +718,9 @@ impl RectManager {
                         }
                     }
                 }
-                Err(e) => {
+                None => {
                     // Should only happen on first loop, indicating that the
                     // queried rect doesn't exist
-                    output = Err(e);
                     break;
                 }
             }
@@ -767,14 +734,14 @@ impl RectManager {
     }
 
     // Top can be the same as the given rect
-    pub fn get_top_mut(&mut self, rect_id: usize) -> Result<&mut Rect, RectError> {
+    pub fn get_top_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
         let mut current_id = rect_id;
-        let mut output = Err(RectError::NotFound);
+        let mut output = None;
         let mut rect_defined = false;
 
         loop {
             match self.get_rect_mut(current_id) {
-                Ok(current_rect) => {
+                Some(current_rect) => {
                     rect_defined = true;
                     match current_rect.parent {
                         Some(parent_id) => {
@@ -785,10 +752,9 @@ impl RectManager {
                         }
                     }
                 }
-                Err(e) => {
+                None => {
                     // Should only happen on first loop, indicating that the
                     // queried rect doesn't exist
-                    output = Err(e);
                     break;
                 }
             }
@@ -820,7 +786,7 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 for (_x, _y) in positions.iter() {
                     x = *_x;
                     y = *_y;
@@ -865,8 +831,8 @@ impl RectManager {
                     }
                 }
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         }
 
@@ -879,7 +845,7 @@ impl RectManager {
 
                     if output.is_ok() {
                         match self.get_rect_mut(*child_id) {
-                            Ok(child) => {
+                            Some(child) => {
                                 for (x, y) in coords.iter() {
                                     match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
                                         Some(new_value) => {
@@ -889,8 +855,8 @@ impl RectManager {
                                     };
                                 }
                             }
-                            Err(e) => {
-                                output = Err(e);
+                            None => {
+                                output = Err(RectError::NotFound);
                                 break;
                             }
                         }
@@ -902,15 +868,15 @@ impl RectManager {
 
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
-                Ok(rect) => {
+                Some(rect) => {
                     for (new_value, x, y) in new_values.iter() {
                         rect._cached_display.entry((*x, *y))
                             .and_modify(|e| { *e = *new_value })
                             .or_insert(*new_value);
                     }
                 }
-                Err(e) => {
-                    output = Err(e);
+                None => {
+                    output = Err(RectError::NotFound);
                 }
             };
         }
@@ -928,7 +894,7 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 if rect.enabled {
 
                     /*
@@ -959,8 +925,8 @@ impl RectManager {
                     rect.flags_pos_refresh.clear();
                 }
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         }
 
@@ -976,53 +942,48 @@ impl RectManager {
         let mut rect_box = (0, 0, 0, 0);
 
         match self.get_rect_size(rect_id) {
-            Ok(_dim) => {
+            Some(_dim) => {
                 rect_box.2 = _dim.0 as isize;
                 rect_box.3 = _dim.1 as isize;
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
         if output.is_ok() {
             match self.get_absolute_offset(rect_id) {
-                Ok(offset) => {
+                Some(offset) => {
                     rect_box.0 = offset.0;
                     rect_box.1 = offset.1;
                 }
-                Err(e) => {
-                    output = Err(e);
-                }
+                None => ()
             }
 
             let mut working_id = rect_id;
             let mut parent_dim = (0, 0);
             loop {
                 match self.get_parent(working_id) {
-                    Ok(parent) => {
+                    Some(parent) => {
                         parent_dim = (parent.width, parent.height);
                         working_id = parent.rect_id;
 
                     }
-                    Err(error) => {
-                        if error != RectError::NoParent {
-                            output = Err(error);
-                        }
+                    None => {
                         break;
                     }
                 }
 
                 if output.is_ok() {
                     match self.get_absolute_offset(working_id) {
-                        Ok(offset) => {
+                        Some(offset) => {
                             rect_box.0 = cmp::max(rect_box.0, offset.0);
                             rect_box.1 = cmp::max(rect_box.1, offset.1);
                             rect_box.2 = cmp::min((offset.0 + parent_dim.0 as isize) - rect_box.0, rect_box.2);
                             rect_box.3 = cmp::min((offset.1 + parent_dim.1 as isize) - rect_box.1, rect_box.3);
                         }
-                        Err(e) => {
-                            output = Err(e);
+                        None => {
+                            output = Err(RectError::NotFound);
                         }
                     }
                 }
@@ -1048,15 +1009,15 @@ impl RectManager {
 
         if output.is_ok() {
             match self.get_rect(rect_id) {
-                Ok(rect) => {
+                Some(rect) => {
                     if rect.enabled {
                         for ((x, y), (new_c, effects)) in rect._cached_display.iter() {
                             outhash.insert((*x, *y), (*new_c, *effects));
                         }
                     }
                 }
-                Err(e) => {
-                    output = Err(e);
+                None => {
+                    output = Err(RectError::NotFound);
                 }
             }
         }
@@ -1220,11 +1181,10 @@ impl RectManager {
 
         let mut offset = (0, 0);
         match self.get_absolute_offset(rect_id) {
-            Ok(_offset) => {
+            Some(_offset) => {
                 offset = _offset;
             }
-            Err(e)=> {
-            }
+            None => ()
         };
 
         let mut boundry_box = (0, 0, 0, 0);
@@ -1278,7 +1238,7 @@ impl RectManager {
         let mut output = Ok(0);
         let mut rank = 0;
         match self.get_parent(rect_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 let mut _rank = 0;
                 for i in parent.children.iter() {
                     if *i == rect_id {
@@ -1293,10 +1253,8 @@ impl RectManager {
                 }
 
             }
-            Err(error) => {
-                if error != RectError::NoParent {
-                    output = Err(error);
-                }
+            None => {
+                output = Err(RectError::NotFound);
             }
         }
 
@@ -1307,27 +1265,34 @@ impl RectManager {
         output
     }
 
-    fn get_depth(&self, rect_id: usize) -> Result<usize, RectError> {
-        let mut output = Ok(0);
-        let mut depth = 0;
-        let mut working_id = rect_id;
-        loop {
-            match self.get_parent(working_id) {
-                Ok(parent) => {
-                    working_id = parent.rect_id;
-                    depth += 1
-                }
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
+    fn get_depth(&self, rect_id: usize) -> Option<usize> {
+
+
+        let mut output = match self.get_rect(rect_id) {
+            Some(_) => {
+                Some(0)
+            }
+            None => {
+                None
+            }
+        };
+
+        if output.is_some() {
+            let mut depth = 0;
+            let mut working_id = rect_id;
+            loop {
+                match self.get_parent(working_id) {
+                    Some(parent) => {
+                        working_id = parent.rect_id;
+                        depth += 1
                     }
-                    break;
+                    None => {
+                        break;
+                    }
                 }
             }
-        }
 
-        if output.is_ok() {
-            output = Ok(depth);
+            output = Some(depth);
         }
 
         output
@@ -1338,11 +1303,11 @@ impl RectManager {
         let mut working_id = rect_id;
         loop {
             match self.get_parent(working_id) {
-                Ok(parent) => {
+                Some(parent) => {
                     lineage.push(parent.rect_id);
                     working_id = parent.rect_id;
                 }
-                Err(error) => {
+                None => {
                     break;
                 }
             }
@@ -1351,72 +1316,72 @@ impl RectManager {
         lineage
     }
 
-    pub fn get_rect_size(&self, rect_id: usize) -> Result<(usize, usize), RectError> {
-        let output;
-
+    pub fn get_rect_size(&self, rect_id: usize) -> Option<(usize, usize)> {
         match self.get_rect(rect_id) {
-            Ok(rect) => {
-                output = Ok((rect.width, rect.height));
+            Some(rect) => {
+                Some((rect.width, rect.height))
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                None
+            }
+        }
+    }
+
+    fn get_relative_offset(&self, rect_id: usize) -> Option<(isize, isize)> {
+
+        let mut found = true;
+        match self.get_rect(rect_id) {
+            Some(_) => {}
+            None => {
+                found = false;
             }
         }
 
-        output
-    }
-
-    fn get_relative_offset(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
-        let mut x = 0;
-        let mut y = 0;
-        let mut output = Ok((0, 0));
-        let pos;
-
-
+        let mut output = None;
         match self.get_parent(rect_id) {
-            Ok(parent) => {
-                pos = parent.get_child_position(rect_id);
-                x += pos.0;
-                y += pos.1;
+            Some(parent) => {
+                let pos = parent.get_child_position(rect_id);
+                output = Some((pos.0, pos.1));
             },
-            Err(error) => {
-                output = Err(error);
+            None => {
+               output = Some((0, 0));
             }
-        };
-
-        if output.is_ok() {
-           output = Ok((x, y));
         }
 
         output
     }
 
-    fn get_absolute_offset(&self, rect_id: usize) -> Result<(isize, isize), RectError> {
-        let mut x = 0;
-        let mut y = 0;
-        let mut working_id = rect_id;
-        let mut pos;
-        let mut output = Ok((0, 0));
+    fn get_absolute_offset(&self, rect_id: usize) -> Option<(isize, isize)> {
+        let mut output = None;
 
-        loop {
-            match self.get_parent(working_id) {
-                Ok(parent) => {
-                    pos = parent.get_child_position(working_id);
-                    x += pos.0;
-                    y += pos.1;
-                    working_id = parent.rect_id;
-                },
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
-                    }
-                    break;
-                }
-            };
+        let mut found = true;
+        match self.get_rect(rect_id) {
+            Some(_) => {}
+            None => {
+                found = false;
+            }
         }
 
-        if output.is_ok() {
-           output = Ok((x, y));
+        if found {
+            let mut x = 0;
+            let mut y = 0;
+            let mut working_id = rect_id;
+            let mut pos;
+            loop {
+                match self.get_parent(working_id) {
+                    Some(parent) => {
+                        pos = parent.get_child_position(working_id);
+                        x += pos.0;
+                        y += pos.1;
+                        working_id = parent.rect_id;
+                    },
+                    None => {
+                        break;
+                    }
+                };
+            }
+
+            output = Some((x, y));
         }
 
         output
@@ -1431,29 +1396,23 @@ impl RectManager {
 
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.resize(width, height);
             },
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
 
         if output.is_ok() {
             match self.get_parent_mut(rect_id) {
-                Ok(parent) => {
+                Some(parent) => {
                     pos = parent.get_child_position(rect_id);
                 }
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
-                    }
-                }
+                None => ()
             };
-        }
 
-        if output.is_ok() {
             output = self.set_position(rect_id, pos.0, pos.1);
             self.flag_refresh(rect_id);
         }
@@ -1469,14 +1428,14 @@ impl RectManager {
         let mut output = Ok(());
         let mut child_ids = Vec::new();
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.shift_contents(x_offset, y_offset);
                 for child_id in rect.children.iter() {
                     child_ids.push(*child_id);
                 }
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         }
         for child_id in child_ids.iter() {
@@ -1495,7 +1454,7 @@ impl RectManager {
         let mut did_move = true;
 
         match self.get_parent_mut(rect_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 match parent.child_positions.get(&rect_id) {
                     Some((xx, yy)) => {
                         if *xx == x && *yy == y {
@@ -1509,11 +1468,9 @@ impl RectManager {
                 }
                 has_parent = true;
             }
-            Err(error) => {
+            None => {
                 did_move = false;
-                if error != RectError::NoParent {
-                    output = Err(error);
-                }
+                output = Err(RectError::NoParent);
             }
         };
 
@@ -1538,11 +1495,11 @@ impl RectManager {
 
         let mut dimensions = (0, 0);
         match self.get_rect_size(rect_id) {
-            Ok(_dim) => {
+            Some(_dim) => {
                 dimensions = _dim;
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1552,22 +1509,17 @@ impl RectManager {
         if output.is_ok() {
             loop {
                 match self.get_relative_offset(working_id) {
-                    Ok(rel_offset) => {
+                    Some(rel_offset) => {
                         offset = (
                             offset.0 + rel_offset.0,
                             offset.1 + rel_offset.1
                         );
                     }
-                    Err(error) => {
-                        if error != RectError::NoParent {
-                            output = Err(error);
-                        }
-                        break;
-                    }
+                    None => ()
                 };
 
                 match self.get_parent_mut(working_id) {
-                    Ok(parent) => {
+                    Some(parent) => {
                         for x in 0 .. dimensions.0 {
                             for y in 0 .. dimensions.1 {
                                 parent.flags_pos_refresh.insert((offset.0 + x as isize, offset.1 + y as isize));
@@ -1575,10 +1527,7 @@ impl RectManager {
                         }
                         working_id = parent.rect_id;
                     }
-                    Err(error) => {
-                        if error != RectError::NoParent {
-                            output = Err(error);
-                        }
+                    None => {
                         break;
                     }
                 };
@@ -1592,11 +1541,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.flags_pos_refresh.insert((x, y));
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1607,27 +1556,19 @@ impl RectManager {
             let mut working_id = rect_id;
             loop {
                 match self.get_relative_offset(rect_id) {
-                    Ok(offs) => {
+                    Some(offs) => {
                         x_out += offs.0;
                         y_out += offs.1;
                     }
-                    Err(error) => {
-                        if error != RectError::NoParent {
-                            output = Err(error);
-                        }
-                        break;
-                    }
+                    None => ()
                 };
 
                 match self.get_parent_mut(working_id) {
-                    Ok(parent) => {
+                    Some(parent) => {
                         parent.flags_pos_refresh.insert((x_out, y_out));
                         working_id = parent.rect_id;
                     }
-                    Err(error) => {
-                        if error != RectError::NoParent {
-                            output = Err(error);
-                        }
+                    None => {
                         break;
                     }
                 };
@@ -1641,11 +1582,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.flag_refresh();
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1660,12 +1601,12 @@ impl RectManager {
         let mut output = Ok(());
         let mut was_enabled = false;
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 was_enabled = rect.enabled;
                 rect.disable();
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1674,14 +1615,12 @@ impl RectManager {
 
         if was_enabled {
             match self.get_parent_mut(rect_id) {
-                Ok(parent) => {
+                Some(parent) => {
                     parent.clear_child_space(rect_id);
                     parent_id = parent.rect_id;
                 }
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
-                    }
+                None => {
+                    output = Err(RectError::NotFound);
                 }
             }
 
@@ -1697,26 +1636,22 @@ impl RectManager {
         let mut output = Ok(());
         let mut was_enabled = false;
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 was_enabled = rect.enabled;
                 rect.enable();
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
 
         if ! was_enabled {
             match self.get_parent_mut(rect_id) {
-                Ok(parent) => {
+                Some(parent) => {
                     parent.clear_child_space(rect_id);
                 }
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
-                    }
-                }
+                None => ()
             }
             if output.is_ok() {
                 output = self.flag_refresh(rect_id);
@@ -1728,10 +1663,10 @@ impl RectManager {
 
     fn is_rect_enabled(&self, rect_id: usize) -> bool {
         match self.get_rect(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.enabled
             }
-            Err(e) => {
+            None => {
                 false
             }
         }
@@ -1742,11 +1677,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.clear_characters();
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
         self.flag_refresh(rect_id);
@@ -1760,13 +1695,13 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 for child_id in rect.children.iter() {
                     children.push(*child_id);
                 }
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1786,11 +1721,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.effects.clear();
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1811,26 +1746,22 @@ impl RectManager {
         output = self.clear_child_space(rect_id);
 
         match self.get_parent_mut(rect_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 parent.detach_child(rect_id);
                 parent_id = parent.rect_id;
                 has_parent = true;
             }
-            Err(error) => {
-                if error != RectError::NoParent {
-                    output = Err(error);
-                }
-            }
+            None => ()
         }
 
 
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
-                Ok(rect) => {
+                Some(rect) => {
                     rect.unset_parent();
                 },
-                Err(error) => {
-                    output = Err(error);
+                None => {
+                    output = Err(RectError::NotFound);
                 }
             };
         }
@@ -1846,22 +1777,22 @@ impl RectManager {
 
         if output.is_ok() {
             match self.get_rect_mut(rect_id) {
-                Ok(rect) => {
+                Some(rect) => {
                     rect.set_parent(new_parent_id);
                 },
-                Err(error) => {
-                    output = Err(error);
+                None => {
+                    output = Err(RectError::NotFound);
                 }
             };
         }
 
         if output.is_ok() {
             match self.get_rect_mut(new_parent_id) {
-                Ok(parent) => {
+                Some(parent) => {
                     parent.add_child(rect_id);
                 }
-                Err(error) => {
-                    output = Err(error);
+                None => {
+                    output = Err(RectError::ParentNotFound);
                 }
             };
         }
@@ -1880,11 +1811,11 @@ impl RectManager {
 
         let mut dimensions = (0, 0);
         match self.get_rect_size(rect_id) {
-            Ok(_dim) => {
+            Some(_dim) => {
                 dimensions = (_dim.0 as isize, _dim.1 as isize);
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1893,7 +1824,7 @@ impl RectManager {
         let start_offset = (start_y * dimensions.0) + start_x;
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 let mut i = start_offset;
                 for character in string.chars() {
                     x = i % dimensions.0;
@@ -1908,8 +1839,8 @@ impl RectManager {
                     i += 1;
                 }
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1922,10 +1853,10 @@ impl RectManager {
 
     fn get_default_character(&self, rect_id: usize) -> char {
         match self.get_rect(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.get_default_character()
             }
-            Err(e) => {
+            None => {
                 self.default_character
             }
         }
@@ -1933,11 +1864,11 @@ impl RectManager {
 
     pub fn get_character(&self, rect_id: usize, x: isize, y: isize) -> Result<char, RectError> {
         match self.get_rect(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.get_character(x, y)
             }
-            Err(e) => {
-                Err(e)
+            None => {
+                Err(RectError::NotFound)
             }
         }
     }
@@ -1946,11 +1877,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 output = rect.set_character(x, y, character);
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1965,11 +1896,11 @@ impl RectManager {
         let mut output = Ok(());
 
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 output = rect.unset_character(x, y);
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -1988,13 +1919,13 @@ impl RectManager {
             match stack.pop() {
                 Some(working_id) => {
                     match self.get_rect_mut(working_id) {
-                        Ok(rect) => {
+                        Some(rect) => {
                             stack.extend(rect.children.iter().copied());
                             to_delete.push(working_id);
-                        },
+                        }
                         // don't throw an error here. it may be the case that the
                         // parent still needs to be deleted even though the children are missing
-                        Err(e) => {}
+                        None => ()
                     };
                 }
                 None => {
@@ -2004,11 +1935,11 @@ impl RectManager {
         }
 
         match self.get_parent_mut(rect_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 parent.detach_child(rect_id);
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
@@ -2024,29 +1955,27 @@ impl RectManager {
 
         let mut dimensions = (0, 0);
         match self.get_rect_size(child_id) {
-            Ok(_dim) => {
+            Some(_dim) => {
                 dimensions = (_dim.0 as isize, _dim.1 as isize);
             }
-            Err(e) => {
-                output = Err(e);
+            None => {
+                output = Err(RectError::NotFound);
             }
         };
 
         let mut position = (0, 0);
         if output.is_ok() {
             match self.get_relative_offset(child_id) {
-                Ok(_pos) => {
+                Some(_pos) => {
                     position = _pos;
                 }
-                Err(e) => {
-                    output = Err(e);
-                }
-            };
+                None => ()
+            }
         }
 
         if output.is_ok() {
             match self.get_parent_mut(child_id) {
-                Ok(rect) => {
+                Some(rect) => {
                     rect.update_child_space(child_id, (
                         position.0,
                         position.1,
@@ -2054,11 +1983,7 @@ impl RectManager {
                         position.1 + dimensions.1
                     ));
                 }
-                Err(error) => {
-                    if error != RectError::NoParent {
-                        output = Err(error);
-                    }
-                }
+                None => ()
             };
 
         }
@@ -2076,14 +2001,10 @@ impl RectManager {
         self.flag_parent_refresh(child_id);
 
         match self.get_parent_mut(child_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 parent.clear_child_space(child_id);
             }
-            Err(error) => {
-                if error != RectError::NoParent {
-                    output = Err(error);
-                }
-            }
+            None => ()
         }
 
         output
@@ -2094,12 +2015,12 @@ impl RectManager {
         let mut parent_id = 0;
         let mut old_position = (0, 0);
         match self.get_parent_mut(old_rect_id) {
-            Ok(parent) => {
+            Some(parent) => {
                 parent_id = parent.rect_id;
                 old_position = *parent.child_positions.get(&old_rect_id).unwrap();
             }
-            Err(error) => {
-                output = Err(error);
+            None => {
+                output = Err(RectError::NotFound);
             }
         }
 
@@ -2116,28 +2037,28 @@ impl RectManager {
     }
 
     pub fn get_rect_width(&mut self, rect_id: usize) -> usize {
-        let (width, _) = self.get_rect_size(rect_id).ok().unwrap();
+        let (width, _) = self.get_rect_size(rect_id).unwrap();
         width
     }
 
     pub fn get_rect_height(&mut self, rect_id: usize) -> usize {
-        let (_, height) = self.get_rect_size(rect_id).ok().unwrap();
+        let (_, height) = self.get_rect_size(rect_id).unwrap();
         height
     }
 
     pub fn get_width(&mut self) -> usize {
-        let (width, _) = self.get_rect_size(0).ok().unwrap();
+        let (width, _) = self.get_rect_size(0).unwrap();
         width
     }
 
     pub fn get_height(&mut self) -> usize {
-        let (_, height) = self.get_rect_size(0).ok().unwrap();
+        let (_, height) = self.get_rect_size(0).unwrap();
         height
     }
 
     pub fn auto_resize(&mut self) -> bool {
         let mut did_resize = false;
-        let (current_width, current_height) = self.get_rect_size(0).ok().unwrap();
+        let (current_width, current_height) = self.get_rect_size(0).unwrap();
 
         match terminal_size() {
             Some((Width(w), Height(h))) => {
@@ -2154,116 +2075,116 @@ impl RectManager {
 
     pub fn set_bold_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_bold_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn unset_bold_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_bold_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn set_underline_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_underline_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
     pub fn unset_underline_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_underline_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
     pub fn set_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_invert_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn unset_invert_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_invert_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn set_italics_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_italics_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn unset_italics_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_italics_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
     pub fn set_strike_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_strike_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn unset_strike_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_strike_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
     pub fn set_blink_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_blink_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
 
     pub fn unset_blink_flag(&mut self, rect_id: usize) {
         match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_blink_flag();
             }
-            Err(e) => {}
+            None => ()
         }
         self.flag_refresh(rect_id);
     }
@@ -2272,12 +2193,12 @@ impl RectManager {
 
     pub fn set_bg_color(&mut self, rect_id: usize, color: RectColor) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_bg_color(color);
                 Ok(())
             },
-            Err(e) => {
-                Err(e)
+            None => {
+                Err(RectError::NotFound)
             }
         };
 
@@ -2290,12 +2211,12 @@ impl RectManager {
 
     pub fn unset_bg_color(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_bg_color();
                 Ok(())
             },
-            Err(e) => {
-                Err(e)
+            None => {
+                Err(RectError::NotFound)
             }
         };
 
@@ -2308,12 +2229,12 @@ impl RectManager {
 
     pub fn set_fg_color(&mut self, rect_id: usize, color: RectColor) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.set_fg_color(color);
                 Ok(())
-            },
-            Err(e) => {
-                Err(e)
+            }
+            None => {
+                Err(RectError::NotFound)
             }
         };
 
@@ -2326,12 +2247,12 @@ impl RectManager {
 
     pub fn unset_fg_color(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_fg_color();
                 Ok(())
-            },
-            Err(e) => {
-                Err(e)
+            }
+            None => {
+                Err(RectError::NotFound)
             }
         };
 
@@ -2344,12 +2265,12 @@ impl RectManager {
 
     pub fn unset_color(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut result = match self.get_rect_mut(rect_id) {
-            Ok(rect) => {
+            Some(rect) => {
                 rect.unset_color();
                 Ok(())
-            },
-            Err(e) => {
-                Err(e)
+            }
+            None => {
+                Err(RectError::NotFound)
             }
         };
 
@@ -2363,7 +2284,7 @@ impl RectManager {
     pub fn kill(&mut self) {
         self.clear_children(0);
 
-        let (w, h) = self.get_rect_size(0).ok().unwrap();
+        let (w, h) = self.get_rect_size(0).unwrap();
         for x in 0 .. w {
             for y in 0 .. h {
                 self.set_character(0, x as isize, y as isize, ' ');
