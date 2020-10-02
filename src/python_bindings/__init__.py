@@ -209,7 +209,7 @@ class Rect(object):
 
 
 class RectManager:
-    SO_PATH = "/usr/lib/libwrecked_bindings.so"
+    SO_PATH = "libwrecked_bindings.so"
 
     def __init__(self):
         ffi = FFI()
