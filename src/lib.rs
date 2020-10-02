@@ -1483,7 +1483,7 @@ impl RectManager {
         }
 
         if output.is_err() {
-            logg("Move fail".to_string());
+            //logg("Move fail".to_string());
         }
 
         output
