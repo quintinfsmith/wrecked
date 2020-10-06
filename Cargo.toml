@@ -10,5 +10,5 @@ wrecked = { path = "/home/pent/Projects/wrecked/" }
 
 [lib]
 name = "wrecked_bindings"
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
