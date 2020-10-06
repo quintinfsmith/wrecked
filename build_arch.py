@@ -70,7 +70,6 @@ os.system("mkdir %s/usr/lib/%s -p" % (folder, name))
 os.system("mkdir %s/usr/lib/python3.8/wrecked/ -p" % folder)
 os.system("cp ../src/python_bindings/* %s/usr/lib/python3.8/wrecked -r" % folder)
 os.system("cp ../target/release/lib%s.so %s/usr/lib/ -p" % (name, folder))
-os.system("cp ../target/release/libwrecked.so %s/usr/lib/ " % (folder))
 
 os.system("tar --create --file \"%s.tar.gz\" %s" % (folder, folder))
 os.system("rm \"%s\" -rf" % folder)
