@@ -6,8 +6,8 @@ edition = "2018"
 description = "A terminal graphics library"
 
 [dependencies]
-terminal_size = { git = "https://github.com/eminence/terminal-size.git" }
 termios = "0.3"
+libc = "0.2"
 
 [lib]
 name = "wrecked"
