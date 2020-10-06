@@ -1,4 +1,3 @@
-use terminal_size::{Width, Height, terminal_size};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
@@ -12,11 +11,29 @@ use std::ops::{BitOrAssign, BitAnd, Not};
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 use std::fmt;
 
+
 pub mod tests;
 /*
     TODO
     Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
 */
+
+pub fn get_terminal_size() -> (u16, u16) {
+    use libc::{winsize, TIOCGWINSZ, ioctl};
+    let mut output = (0, 0);
+    let mut t = winsize {
+        ws_row: 0,
+        ws_col: 0,
+        ws_xpixel: 0,
+        ws_ypixel: 0
+    };
+
+    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
+        output = (t.ws_col, t.ws_row);
+    }
+
+    output
+}
 
 pub fn logg(msg: String) {
     let path = "rlogg";
@@ -1483,7 +1500,7 @@ impl RectManager {
         }
 
         if output.is_err() {
-            logg("Move fail".to_string());
+            //logg("Move fail".to_string());
         }
 
         output
@@ -2060,14 +2077,10 @@ impl RectManager {
         let mut did_resize = false;
         let (current_width, current_height) = self.get_rect_size(0).unwrap();
 
-        match terminal_size() {
-            Some((Width(w), Height(h))) => {
-                if w as usize != current_width || h as usize != current_height {
-                    self.resize(0, w as usize, h as usize);
-                    did_resize = true;
-                }
-            }
-            None => ()
+        let (w, h) = get_terminal_size();
+        if w as usize != current_width || h as usize != current_height {
+            self.resize(0, w as usize, h as usize);
+            did_resize = true;
         }
 
         did_resize
