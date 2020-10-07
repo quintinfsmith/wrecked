@@ -626,8 +626,11 @@ impl RectManager {
             default_character: ' '
         };
 
-        new_termios.c_lflag &= !(ICANON | ECHO);
-        tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
+        #[cfg(not(debug_assertions))]
+        {
+            new_termios.c_lflag &= !(ICANON | ECHO);
+            tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
+        }
 
         print!("\x1B[?25l"); // Hide Cursor
         println!("\x1B[?1049h"); // New screen
@@ -2305,7 +2308,10 @@ impl RectManager {
         }
 
         self.draw(0);
-        tcsetattr(0, TCSANOW, & self._termios).unwrap();
+
+        #[cfg(not(debug_assertions))]
+        { tcsetattr(0, TCSANOW, & self._termios).unwrap(); }
+
         print!("\x1B[?25h"); // Show Cursor
         println!("\x1B[?1049l"); // Return to previous screen
     }
