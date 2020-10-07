@@ -8,13 +8,9 @@ fn test_init() {
     let mut rectmanager = RectManager::new();
     let rect_width = rectmanager.get_rect_width(0);
     let rect_height = rectmanager.get_rect_height(0);
-    match terminal_size() {
-        Some((Width(w), Height(h))) => {
-            assert_eq!(rect_width, w as usize);
-            assert_eq!(rect_height, h as usize);
-        }
-        None => { }
-    }
+    let (w, h) = get_terminal_size();
+    assert_eq!(rect_width, w as usize);
+    assert_eq!(rect_height, h as usize);
 
     rectmanager.kill()
 }
