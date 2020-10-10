@@ -4,7 +4,7 @@ A library for terminal-based graphics and UI.
 ## Table of Contents
 * [About](#about)
 * [Setup](#setup)
-* [Example Usage](#usage)
+* [Usage](#usage)
 
 
 ## About
@@ -19,7 +19,7 @@ For the latest stable version, in your project's Cargo.toml...
 wrecked = { version ="*" }
 ```
 
-## Example Usage
+## Usage
 ```
 use wrecked::{RectManager, RectColor};
 
@@ -37,6 +37,9 @@ rectmanager.set_string(rect_id, 2, 3, "Hello World!");
 
 // Make that rectangle blue
 rectmanager.set_bg_color(rect_id, RectColor::BLUE);
+
+// And finally underline the text of the rectangle
+rectmanager.set_underline_flag(rect_id);
 
 // Draw the environment
 rectmanager.draw();
