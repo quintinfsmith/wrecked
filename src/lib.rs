@@ -175,6 +175,7 @@ impl RectManager {
     pub fn new() -> RectManager {
         let termios = Termios::from_fd(0).unwrap();
 
+        let mut new_termios = termios.clone();
 
         let mut rectmanager = RectManager {
             idgen: TOP,
@@ -186,7 +187,6 @@ impl RectManager {
 
         #[cfg(not(debug_assertions))]
         {
-            let mut new_termios = termios.clone();
             new_termios.c_lflag &= !(ICANON | ECHO);
             tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
 
@@ -195,7 +195,7 @@ impl RectManager {
         }
 
 
-        rectmanager.new_rect(TOP);
+        rectmanager.new_orphan();
         rectmanager.auto_resize();
 
 
@@ -419,7 +419,7 @@ impl RectManager {
             Some(parent) => {
                 let did_move = match parent.child_positions.get(&rect_id) {
                     Some((xx, yy)) => {
-                        *xx == x && *yy == y
+                        !(*xx == x && *yy == y)
                     }
                     None => {
                         true
