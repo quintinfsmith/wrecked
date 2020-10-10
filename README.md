@@ -12,8 +12,8 @@ Wrecked is (hopefully) a straightforward environment for rendering character-bas
 It exists partially because I wanted to give myself a reason to work in rust, but mostly because I didn't want to read through the ncurses documentation.
 
 ## Setup
-The latest *stable* version can be found at crates.io
-For the latest stable version, in your project's Cargo.toml...
+The latest *stable* version can be found at crates.io.
+In your project's Cargo.toml...
 ```toml
 [dependencies]
 wrecked = { version ="*" }
