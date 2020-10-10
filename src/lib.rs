@@ -39,7 +39,7 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.draw(rect_id);
+    let result = rectmanager.draw_rect(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -281,7 +281,19 @@ pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: usize, height: usize) -> usize {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let new_rect_id = rectmanager.new_rect(Some(parent_id));
+    let new_rect_id = rectmanager.new_rect(parent_id);
+    rectmanager.resize(new_rect_id, width, height);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    new_rect_id
+}
+
+#[no_mangle]
+pub extern "C" fn new_orphan(ptr: *mut RectManager, width: usize, height: usize) -> usize {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let new_rect_id = rectmanager.new_orphan();
     rectmanager.resize(new_rect_id, width, height);
 
     Box::into_raw(rectmanager); // Prevent Release

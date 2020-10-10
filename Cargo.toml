@@ -6,7 +6,7 @@ edition = "2018"
 description = "Bindings for the wrecked terminal graphics library"
 
 [dependencies]
-wrecked = { path = "/home/pent/Projects/wrecked/" }
+wrecked = { git = "https://github.com/quintinfsmith/wrecked" }
 
 [lib]
 name = "wrecked_bindings"
