@@ -14,13 +14,13 @@ It exists partially because I wanted to give myself a reason to work in rust, bu
 ## Setup
 The latest *stable* version can be found at crates.io
 For the latest stable version, in your project's Cargo.toml...
-```
+```toml
 [dependencies]
 wrecked = { version ="*" }
 ```
 
 ## Usage
-```
+```rust
 use wrecked::{RectManager, RectColor};
 
 // Instantiates the environment. Turns off input echo.
