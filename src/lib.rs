@@ -197,7 +197,7 @@ impl RectManager {
         }
 
 
-        rectmanager.new_rect(None);
+        rectmanager.new_rect(TOP);
         rectmanager.auto_resize();
 
 
