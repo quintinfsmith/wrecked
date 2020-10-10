@@ -250,7 +250,49 @@ impl RectManager {
 
     }
 
-    /// Render the rectangle and all children specified.
+    /// Render the rectangle (and all its children) specified.
+    /// # Example
+    /// ```
+    /// // Use TOP to draw everything
+    /// use std::{thread, time};
+    /// use wrecked::{RectManager, TOP};
+    ///
+    /// let mut rectmanager = RectManager::new();
+    /// let some_rect = rectmanager.new_rect(TOP);
+    /// // Adjust the rectangle so it will fit the string
+    /// rectmanager.resize(some_rect, 16, 1);
+    /// // Give it some text
+    /// rectmanager.set_string(some_rect, 0, 0, "Hello World");
+    ///
+    /// // draw the latest changes, but only those of some_rect
+    /// rectmanager.draw_rect(some_rect);
+    ///
+    /// // wait 5 seconds (in order to see the screen)
+    /// let five_seconds = time::Duration::from_seconds(5);
+    /// let now = time::Instant::now();
+    /// thread::sleep(five_seconds);
+    ///
+    /// rectmanager.kill();
+    /// ```
+    pub fn draw_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
+        let draw_map = self.build_draw_map(rect_id);
+
+        let mut filtered_map = self.filter_cached(draw_map);
+
+        if filtered_map.len() > 0 {
+            // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
+            filtered_map.sort();
+            filtered_map.sort_by(|a,b|(a.0).1.cmp(&(b.0).1));
+
+            let renderstring = self.build_ansi_string(filtered_map);
+            print!("{}\x1B[0m", renderstring);
+            println!("\x1B[1;1H");
+        }
+
+        Ok(())
+    }
+
+    /// Render the visible portion of the rectmanager environment
     /// # Example
     /// ```
     /// // Use TOP to draw everything
@@ -271,23 +313,10 @@ impl RectManager {
     ///
     /// rectmanager.kill();
     /// ```
-    pub fn draw(&mut self, rect_id: usize) -> Result<(), RectError> {
-        let draw_map = self.build_draw_map(rect_id);
-
-        let mut filtered_map = self.filter_cached(draw_map);
-
-        if filtered_map.len() > 0 {
-            // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
-            filtered_map.sort();
-            filtered_map.sort_by(|a,b|(a.0).1.cmp(&(b.0).1));
-
-            let renderstring = self.build_ansi_string(filtered_map);
-            print!("{}\x1B[0m", renderstring);
-            println!("\x1B[1;1H");
-        }
-
-        Ok(())
+    pub fn draw(&mut self) -> Result<(), RectError> {
+        self.draw_rect(TOP)
     }
+
 
     /// Get dimensions of specified rectangle, if it exists
     /// # Example
@@ -1471,7 +1500,7 @@ impl RectManager {
             }
         }
 
-        self.draw(TOP);
+        self.draw();
 
         #[cfg(not(debug_assertions))]
         {
