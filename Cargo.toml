@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "A terminal graphics library"
+repository = "https://github.com/quintinfsmith/wrecked"
+license-file = "LICENSE"
 
 [dependencies]
 termios = "0.3"
