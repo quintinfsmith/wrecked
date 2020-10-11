@@ -13,4 +13,4 @@ libc = "0.2"
 
 [lib]
 name = "wrecked"
-crate-type = ["dylib"]
+crate-type = ["rlib"]
