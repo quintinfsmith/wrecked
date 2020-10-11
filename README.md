@@ -4,7 +4,7 @@ A library for terminal-based graphics and UI.
 ## Table of Contents
 * [About](#about)
 * [Setup](#setup)
-* [Example Usage](#usage)
+* [Usage](#usage)
 
 
 ## About
@@ -12,15 +12,15 @@ Wrecked is (hopefully) a straightforward environment for rendering character-bas
 It exists partially because I wanted to give myself a reason to work in rust, but mostly because I didn't want to read through the ncurses documentation.
 
 ## Setup
-The latest *stable* version can be found at crates.io
-For the latest stable version, in your project's Cargo.toml...
-```
+The latest *stable* version can be found at crates.io.
+In your project's Cargo.toml...
+```toml
 [dependencies]
 wrecked = { version ="*" }
 ```
 
-## Example Usage
-```
+## Usage
+```rust
 use wrecked::{RectManager, RectColor};
 
 // Instantiates the environment. Turns off input echo.
@@ -37,6 +37,9 @@ rectmanager.set_string(rect_id, 2, 3, "Hello World!");
 
 // Make that rectangle blue
 rectmanager.set_bg_color(rect_id, RectColor::BLUE);
+
+// And finally underline the text of the rectangle
+rectmanager.set_underline_flag(rect_id);
 
 // Draw the environment
 rectmanager.draw();
