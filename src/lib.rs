@@ -191,7 +191,7 @@ impl RectManager {
 
         #[cfg(not(debug_assertions))]
         match termios.clone() {
-            Some(new_termios) => {
+            Some(mut new_termios) => {
                 new_termios.c_lflag &= !(ICANON | ECHO);
                 tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
 
