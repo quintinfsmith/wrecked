@@ -3,7 +3,7 @@ use std::os::raw::c_char;
 use std::str;
 use std::io::prelude::*;
 
-use wrecked::{RectManager, Rect, RectColor, RectError};
+use wrecked::{RectManager, RectColor, RectError};
 
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
@@ -281,7 +281,7 @@ pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: usize, height: usize) -> usize {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let new_rect_id = rectmanager.new_rect(parent_id);
+    let new_rect_id = rectmanager.new_rect(parent_id).ok().unwrap();
     rectmanager.resize(new_rect_id, width, height);
 
     Box::into_raw(rectmanager); // Prevent Release
@@ -293,7 +293,7 @@ pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: usize
 pub extern "C" fn new_orphan(ptr: *mut RectManager, width: usize, height: usize) -> usize {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let new_rect_id = rectmanager.new_orphan();
+    let new_rect_id = rectmanager.new_orphan().ok().unwrap();
     rectmanager.resize(new_rect_id, width, height);
 
     Box::into_raw(rectmanager); // Prevent Release
