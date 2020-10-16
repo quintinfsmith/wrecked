@@ -7,6 +7,9 @@ use std::cmp::PartialOrd;
 use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 use std::fmt;
 
+use std::error::Error;
+use std::fmt::Display;
+
 
 pub mod tests;
 /*
@@ -15,14 +18,17 @@ pub mod tests;
 */
 
 pub fn get_terminal_size() -> (u16, u16) {
-    use libc::{winsize, TIOCGWINSZ, ioctl};
-    let mut output = (0, 0);
+    use libc::{winsize, TIOCGWINSZ, ioctl, isatty};
+    let mut output = (1, 1);
+
+
     let mut t = winsize {
         ws_row: 0,
         ws_col: 0,
         ws_xpixel: 0,
         ws_ypixel: 0
     };
+
 
     if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
         output = (t.ws_col, t.ws_row);
@@ -44,6 +50,14 @@ pub enum RectError {
     ChildNotFound = 7
 }
 
+impl Display for RectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        //let name = format!("{:?}", self);
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for RectError {}
 
 #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Debug)]
 pub enum RectColor {
@@ -146,7 +160,7 @@ pub const TOP: usize = 0;
 /// rectmanager.draw();
 ///
 /// // wait 5 seconds (in order to see the screen)
-/// let five_seconds = time::Duration::from_seconds(5);
+/// let five_seconds = time::Duration::from_secs(5);
 /// let now = time::Instant::now();
 /// thread::sleep(five_seconds);
 ///
@@ -158,7 +172,7 @@ pub struct RectManager {
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, RectEffectsHandler)>,
-    _termios: Termios,
+    _termios: Option<Termios>,
     default_character: char
 }
 
@@ -173,9 +187,22 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new() -> RectManager {
-        let termios = Termios::from_fd(0).unwrap();
+        let termios = Termios::from_fd(libc::STDOUT_FILENO).ok();
 
-        let mut new_termios = termios.clone();
+        #[cfg(not(debug_assertions))]
+        match termios.clone() {
+            Some(new_termios) => {
+                new_termios.c_lflag &= !(ICANON | ECHO);
+                tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
+
+                print!("\x1B[?25l"); // Hide Cursor
+                println!("\x1B[?1049h"); // New screen
+            }
+            None => {
+
+            }
+        }
+
 
         let mut rectmanager = RectManager {
             idgen: TOP,
@@ -185,17 +212,7 @@ impl RectManager {
             default_character: ' '
         };
 
-        #[cfg(not(debug_assertions))]
-        {
-            new_termios.c_lflag &= !(ICANON | ECHO);
-            tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
-
-            print!("\x1B[?25l"); // Hide Cursor
-            println!("\x1B[?1049h"); // New screen
-        }
-
-
-        rectmanager.new_orphan();
+        rectmanager.new_orphan().expect("Couldn't Create TOP rect");
         rectmanager.auto_resize();
 
 
@@ -210,44 +227,47 @@ impl RectManager {
     /// let mut rectmanager = RectManager::new();
     ///
     /// // Create a rectangle and attach it as a child to the top-level rectangle.
-    /// let first_rect_id = rectmanager.new_rect(TOP);
+    /// let first_rect_id = rectmanager.new_rect(TOP).ok().unwrap();
     ///
     /// // Create a child of the newly created rect...
-    /// let second_rect_id = rectmanager.new_rect(first_rect_id);
+    /// let second_rect_id = rectmanager.new_rect(first_rect_id).ok().unwrap();
     ///
     /// rectmanager.kill();
     /// ```
-    pub fn new_rect(&mut self, parent_id: usize) -> usize {
+    pub fn new_rect(&mut self, parent_id: usize) -> Result<usize, RectError> {
         let new_id = self.idgen;
         self.idgen += 1;
 
         self.rects.entry(new_id).or_insert(Rect::new(new_id));
 
-        self.attach(new_id, parent_id);
-        self.flag_refresh(new_id);
+        self.attach(new_id, parent_id)?;
 
-        new_id
+        self.flag_refresh(new_id)?;
+
+        Ok(new_id)
     }
 
     /// Create a new rectangle, but don't add it to the environment yet.
     /// # Example
     /// ```
+    /// use wrecked::RectManager;
     /// let mut rectmanager = RectManager::new();
     ///
     /// // Create a rectangle
-    /// let orphan_id = rectmanager.new_orphan();
+    /// let orphan_id = rectmanager.new_orphan().ok().unwrap();
     ///
-    /// assert!(rectmanager.get_parent(orphan_id).is_none());
+    /// assert!(!rectmanager.has_parent(orphan_id));
     ///
     /// rectmanager.kill();
     /// ```
-    pub fn new_orphan(&mut self) -> usize {
+    pub fn new_orphan(&mut self) -> Result<usize, RectError> {
+        // For now, there's really no way to Result in an error here,
+        // but future proofing and consistency and all that, we'll return a Result
         let new_id = self.idgen;
         self.idgen += 1;
         self.rects.entry(new_id).or_insert(Rect::new(new_id));
 
-        new_id
-
+        Ok(new_id)
     }
 
     /// Render the rectangle (and all its children) specified.
@@ -258,7 +278,7 @@ impl RectManager {
     /// use wrecked::{RectManager, TOP};
     ///
     /// let mut rectmanager = RectManager::new();
-    /// let some_rect = rectmanager.new_rect(TOP);
+    /// let some_rect = rectmanager.new_rect(TOP).ok().unwrap();
     /// // Adjust the rectangle so it will fit the string
     /// rectmanager.resize(some_rect, 16, 1);
     /// // Give it some text
@@ -268,7 +288,7 @@ impl RectManager {
     /// rectmanager.draw_rect(some_rect);
     ///
     /// // wait 5 seconds (in order to see the screen)
-    /// let five_seconds = time::Duration::from_seconds(5);
+    /// let five_seconds = time::Duration::from_secs(5);
     /// let now = time::Instant::now();
     /// thread::sleep(five_seconds);
     ///
@@ -307,7 +327,7 @@ impl RectManager {
     /// rectmanager.draw();
     ///
     /// // wait 5 seconds (in order to see the screen)
-    /// let five_seconds = time::Duration::from_seconds(5);
+    /// let five_seconds = time::Duration::from_secs(5);
     /// let now = time::Instant::now();
     /// thread::sleep(five_seconds);
     ///
@@ -323,10 +343,10 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let rect_id = rectmanager.new_rect(TOP);
+    /// let rect_id = rectmanager.new_rect(TOP).ok().unwrap();
     /// // Resizing to make sure we know the size
     /// rectmanager.resize(rect_id, 10, 10);
-    /// assert_eq!((10, 10), rectmanger.get_rect_size(rect_id).unwrap());
+    /// assert_eq!((10, 10), rectmanager.get_rect_size(rect_id).unwrap());
     /// ```
     pub fn get_rect_size(&self, rect_id: usize) -> Option<(usize, usize)> {
         match self.get_rect(rect_id) {
@@ -345,47 +365,43 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let rect_id = rectmanager.new_rect(TOP);
+    /// let rect_id = rectmanager.new_rect(TOP).ok().unwrap();
     /// // Resizing to make sure we know the size
     /// rectmanager.resize(rect_id, 10, 10);
-    /// assert_eq!((10, 10), rectmanger.get_rect_size(rect_id).unwrap());
+    /// assert_eq!((10, 10), rectmanager.get_rect_size(rect_id).unwrap());
     /// ```
     pub fn resize(&mut self, rect_id: usize, width: usize, height: usize) -> Result<(), RectError> {
-        let mut output = Ok(());
-        let mut pos = (0, 0);
-
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.resize(width, height);
-            },
+            }
             None => {
-                output = Err(RectError::NotFound);
+                Err(RectError::NotFound)?;
             }
         };
 
+        let mut position = None;
+        match self.get_parent_mut(rect_id) {
+            Some(parent) => {
+                position = Some(parent.get_child_position(rect_id));
+            }
+            None => ()
+        };
 
-        if output.is_ok() {
-            match self.get_parent_mut(rect_id) {
-                Some(parent) => {
-                    pos = parent.get_child_position(rect_id);
-                }
-                None => ()
-            };
-
-            output = self.set_position(rect_id, pos.0, pos.1);
+        match position {
+            Some((x, y)) => {
+                self.set_position(rect_id, x, y)?;
+            }
+            None => ()
         }
 
-        if output.is_ok() {
-            output = self.flag_refresh(rect_id);
-        }
 
-        if output.is_err() {
-        }
+        self.flag_refresh(rect_id)?;
 
-        output
+        Ok(())
     }
 
-    /// Move all contents, both characters and child rectangles, by the offsets specified
+    /// Move all child rectangles, but not characters by the offsets specified
     /// # Example
     /// ```
     /// use wrecked::{RectManager, TOP};
@@ -393,12 +409,12 @@ impl RectManager {
     /// // Put a string at (0, 0)
     /// rectmanager.set_string(TOP, 0, 0, "Hello world");
     /// // Put a rect at (0, 1)
-    /// let rect_id = rectmanager.new_rect(TOP);
+    /// let rect_id = rectmanager.new_rect(TOP).ok().unwrap();
     /// rectmanager.set_position(rect_id, 0, 1);
     /// // Shift contents down one row ...
     /// rectmanager.shift_contents(TOP, 0, 1);
     ///
-    /// assert_eq!(rectmanager.get_character(TOP, 0, 1).ok(), 'H');
+    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok().unwrap(), 'H');
     /// assert_eq!(rectmanager.get_relative_offset(rect_id).unwrap(), (0, 2));
     ///
     /// rectmanager.kill();
@@ -435,7 +451,7 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect_id = rectmanager.new_rect(TOP);
+    /// let mut rect_id = rectmanager.new_rect(TOP).ok().unwrap();
     /// rectmanager.set_position(rect_id, 4, 4);
     /// assert_eq!(rectmanager.get_relative_offset(rect_id).unwrap(), (4, 4));
     /// ```
@@ -564,7 +580,7 @@ impl RectManager {
     /// let mut rectmanager = RectManager::new();
     /// // Add some Characters to TOP rect
     /// for x in 0 .. 10 {
-    ///     rectmanager.set_character(TOP, 'X', x, 0);
+    ///     rectmanager.set_character(TOP, x, 0, 'X');
     /// }
     /// // Now delete them all ...
     /// rectmanager.clear_characters(TOP);
@@ -572,19 +588,15 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn clear_characters(&mut self, rect_id: usize) -> Result<(), RectError> {
-        let mut output = Ok(());
-
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.clear_characters();
             }
             None => {
-                output = Err(RectError::NotFound);
+                Err(RectError::NotFound)?;
             }
         };
-        self.flag_refresh(rect_id);
-
-        output
+        self.flag_refresh(rect_id)
     }
 
     /// Remove all children from a rectangle, deleting them.
@@ -594,7 +606,7 @@ impl RectManager {
     /// let mut rectmanager = RectManager::new();
     /// // Add some children to TOP rect
     /// for _ in 0 .. 10 {
-    ///     rectmanager.new_rect(TOP);
+    ///     rectmanager.new_rect(TOP).ok().unwrap();
     /// }
     /// // Now delete them all ...
     /// rectmanager.clear_children(TOP);
@@ -630,23 +642,16 @@ impl RectManager {
 
     /// Remove all effects from the rectangle's text. Does not apply recursively.
     pub fn clear_effects(&mut self, rect_id: usize) -> Result<(), RectError> {
-        let mut output = Ok(());
-
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.effects.clear();
             }
             None => {
-                output = Err(RectError::NotFound);
+                Err(RectError::NotFound)?;
             }
         };
 
-        if output.is_ok() {
-            self.flag_refresh(rect_id);
-        }
-
-
-        output
+        self.flag_refresh(rect_id)
     }
 
 
@@ -656,13 +661,13 @@ impl RectManager {
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
     /// // Create a rectangle that is attached to TOP.
-    /// let rect_a = rectmanager.new_rect(TOP);
+    /// let rect_a = rectmanager.new_rect(TOP).ok().unwrap();
     /// rectmanager.detach(rect_a);
     ///
-    /// assert!(rectmanager.get_parent(rect_a).is_none());
+    /// assert!(!rectmanager.has_parent(rect_a));
     ///
     /// rectmanager.kill();
-    /// '''
+    /// ```
     pub fn detach(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = self.clear_child_space(rect_id);
 
@@ -695,15 +700,15 @@ impl RectManager {
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
     /// // Create a rectangle that is attached to TOP.
-    /// let rect_a = rectmanager.new_rect(TOP);
+    /// let rect_a = rectmanager.new_rect(TOP).ok().unwrap();
     /// // Create an orphan rectangle to switch in.
-    /// let rect_b = rectmanager.new_orphan();
+    /// let rect_b = rectmanager.new_orphan().ok().unwrap();
     /// rectmanager.attach(rect_b, rect_a);
     ///
-    /// assert_eq!(rectmanager.get_parent(rect_b).unwrap().get_rect_id(), rect_a);
+    /// assert_eq!(rectmanager.get_parent_id(rect_b).unwrap(), rect_a);
     ///
     /// rectmanager.kill();
-    /// '''
+    /// ```
     pub fn attach(&mut self, rect_id: usize, new_parent_id: usize) -> Result<(), RectError> {
         let mut output = self.detach(rect_id);
 
@@ -799,14 +804,14 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect_a = rectmanager.new_rect(TOP);
-    /// let mut rect_b = rectmanager.new_rect(rect_a);
+    /// let mut rect_a = rectmanager.new_rect(TOP).ok().unwrap();
+    /// let mut rect_b = rectmanager.new_rect(rect_a).ok().unwrap();
     /// // Move parent rect ...
     /// rectmanager.set_position(rect_a, 10, 1);
     /// // Move child rect ...
     /// rectmanager.set_position(rect_b, 5, 2);
     ///
-    /// assert_eq!(rectmanger.get_relative_offset(rect_b).unwrap(), (5, 2));
+    /// assert_eq!(rectmanager.get_relative_offset(rect_b).unwrap(), (5, 2));
     ///
     /// rectmanager.kill();
     /// ```
@@ -827,14 +832,14 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect_a = rectmanager.new_rect(TOP);
-    /// let mut rect_b = rectmanager.new_rect(rect_a);
+    /// let mut rect_a = rectmanager.new_rect(TOP).ok().unwrap();
+    /// let mut rect_b = rectmanager.new_rect(rect_a).ok().unwrap();
     /// // Move parent rect ...
     /// rectmanager.set_position(rect_a, 5, 2);
     /// // Move child rect ...
     /// rectmanager.set_position(rect_b, 5, 2);
     ///
-    /// assert_eq!(rectmanger.get_absolute_offset(rect_b).unwrap(), (10, 4));
+    /// assert_eq!(rectmanager.get_absolute_offset(rect_b).unwrap(), (10, 4));
     ///
     /// rectmanager.kill();
     /// ```
@@ -880,8 +885,8 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// rectmanager.set_character(TOP, 'X', 0, 0);
-    /// assert!(rectmanager.get_character(TOP, 0, 0).ok(), 'X');
+    /// rectmanager.set_character(TOP, 0, 0, 'X');
+    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok().unwrap(), 'X');
     /// rectmanager.kill();
     /// ```
     pub fn get_character(&self, rect_id: usize, x: isize, y: isize) -> Result<char, RectError> {
@@ -900,8 +905,8 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// rectmanager.set_character(TOP, 'X', 0, 0);
-    /// assert!(rectmanager.get_character(TOP, 0, 0).ok(), 'X');
+    /// rectmanager.set_character(TOP, 0, 0, 'X');
+    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok().unwrap(), 'X');
     /// rectmanager.kill();
     /// ```
     pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: char) -> Result<(), RectError> {
@@ -926,9 +931,9 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// rectmanager.set_character(TOP, 'X', 0, 0);
+    /// rectmanager.set_character(TOP, 0, 0, 'X');
     /// rectmanager.unset_character(TOP, 0, 0);
-    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok(), rectmanager.get_default_character(TOP));
+    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok().unwrap(), rectmanager.get_default_character(TOP));
     /// rectmanager.kill();
     /// ```
     pub fn unset_character(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
@@ -953,10 +958,10 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect = rectmanager.new_rect(TOP);
+    /// let mut rect = rectmanager.new_rect(TOP).ok().unwrap();
     ///
     /// rectmanager.delete_rect(rect);
-    /// assert!(rectmanager.get_rect(rect).is_none());
+    /// assert!(!rectmanager.has_rect(rect));
     ///
     /// rectmanager.kill();
     /// ```
@@ -1005,16 +1010,15 @@ impl RectManager {
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
     /// // Create a rectangle that is attached to TOP.
-    /// let rect_a = rectmanager.new_rect(TOP);
+    /// let rect_a = rectmanager.new_rect(TOP).ok().unwrap();
     /// // Create an orphan rectangle to switch in.
-    /// let rect_b = rectmanager.new_orphan();
+    /// let rect_b = rectmanager.new_orphan().ok().unwrap();
     /// rectmanager.replace_with(rect_a, rect_b);
     ///
-    /// assert!(rectmanager.get_parent(rect_b).is_some());
-    /// assert!(rectmanager.get_parent(rect_a).is_none());
+    /// assert!(rectmanager.has_parent(rect_b));
+    /// assert!(!rectmanager.has_parent(rect_a));
     /// ```
     pub fn replace_with(&mut self, old_rect_id: usize, new_rect_id: usize) -> Result<(), RectError> {
-        let mut output = Ok(());
         let mut parent_id = TOP;
         let mut old_position = (0, 0);
         match self.get_parent_mut(old_rect_id) {
@@ -1023,20 +1027,15 @@ impl RectManager {
                 old_position = *parent.child_positions.get(&old_rect_id).unwrap();
             }
             None => {
-                output = Err(RectError::NotFound);
+                Err(RectError::NotFound)?;
             }
         }
 
-        if output.is_ok() {
-            output = self.detach(old_rect_id);
-        }
+        self.detach(old_rect_id)?;
+        self.attach(new_rect_id, parent_id)?;
+        self.set_position(new_rect_id, old_position.0, old_position.1)?;
 
-        if output.is_ok() {
-            output = self.attach(new_rect_id, parent_id);
-            self.set_position(new_rect_id, old_position.0, old_position.1);
-        }
-
-        output
+        Ok(())
     }
 
     /// Get width of given rectangle
@@ -1044,7 +1043,7 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect = rectmanager.new_rect(TOP);
+    /// let mut rect = rectmanager.new_rect(TOP).ok().unwrap();
     /// rectmanager.resize(rect, 10, 10);
     /// assert_eq!(rectmanager.get_rect_height(rect), 10);
     /// rectmanager.kill();
@@ -1059,7 +1058,7 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect = rectmanager.new_rect(TOP);
+    /// let mut rect = rectmanager.new_rect(TOP).ok().unwrap();
     /// rectmanager.resize(rect, 10, 10);
     /// assert_eq!(rectmanager.get_rect_height(rect), 10);
     /// rectmanager.kill();
@@ -1089,7 +1088,7 @@ impl RectManager {
 
         let (w, h) = get_terminal_size();
         if w as usize != current_width || h as usize != current_height {
-            self.resize(TOP, w as usize, h as usize);
+            self.resize(TOP, w as usize, h as usize).expect("Unable to fit TOP rect to terminal");
             did_resize = true;
         }
 
@@ -1105,14 +1104,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Bold Text");
     /// rectmanager.kill();
     /// ```
-    pub fn set_bold_flag(&mut self, rect_id: usize) {
+    pub fn set_bold_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_bold_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable bold text effect
@@ -1125,14 +1124,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_bold_flag(&mut self, rect_id: usize) {
+    pub fn unset_bold_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_bold_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Apply underline effect to text of given rect (does not apply recursively).
@@ -1144,14 +1143,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Underlined Text");
     /// rectmanager.kill();
     /// ```
-    pub fn set_underline_flag(&mut self, rect_id: usize) {
+    pub fn set_underline_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_underline_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable underline text effect
@@ -1164,14 +1163,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_underline_flag(&mut self, rect_id: usize) {
+    pub fn unset_underline_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_underline_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Invert the background and foreground colors of the text of the given rect (does not apply recursively).
@@ -1183,14 +1182,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Inverted Text");
     /// rectmanager.kill();
     /// ```
-    pub fn set_invert_flag(&mut self, rect_id: usize) {
+    pub fn set_invert_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_invert_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable invert text effect
@@ -1203,14 +1202,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_invert_flag(&mut self, rect_id: usize) {
+    pub fn unset_invert_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_invert_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Apply italics effect to text of given rect (does not apply recursively).
@@ -1222,14 +1221,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Italicized Text");
     /// rectmanager.kill();
     /// ```
-    pub fn set_italics_flag(&mut self, rect_id: usize) {
+    pub fn set_italics_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_italics_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable italics text effect
@@ -1242,14 +1241,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_italics_flag(&mut self, rect_id: usize) {
+    pub fn unset_italics_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_italics_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Apply strike effect to text of given rect (does not apply recursively).
@@ -1261,14 +1260,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Text With Strikethrough");
     /// rectmanager.kill();
     /// ```
-    pub fn set_strike_flag(&mut self, rect_id: usize) {
+    pub fn set_strike_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_strike_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable strike text effect
@@ -1281,14 +1280,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_strike_flag(&mut self, rect_id: usize) {
+    pub fn unset_strike_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_strike_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Apply blink effect to text of given rect (does not apply recursively).
@@ -1300,14 +1299,14 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Some Blinking Text");
     /// rectmanager.kill();
     /// ```
-    pub fn set_blink_flag(&mut self, rect_id: usize) {
+    pub fn set_blink_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.set_blink_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+        self.flag_refresh(rect_id)
     }
 
     /// Disable blink text effect
@@ -1320,20 +1319,21 @@ impl RectManager {
     /// rectmanager.set_string(TOP, 0, 0, "Normal Text");
     /// rectmanager.kill();
     /// ```
-    pub fn unset_blink_flag(&mut self, rect_id: usize) {
+    pub fn unset_blink_flag(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.unset_blink_flag();
             }
             None => ()
         }
-        self.flag_refresh(rect_id);
+
+        self.flag_refresh(rect_id)
     }
 
     /// Set color of background of given rect (does not apply recursively)
     /// # Example
     /// ```
-    /// use wrecked::{RectManager, TOP};
+    /// use wrecked::{RectManager, TOP, RectColor};
     /// let mut rectmanager = RectManager::new();
     /// // Give Top a Green background
     /// rectmanager.set_fg_color(TOP, RectColor::GREEN);
@@ -1361,7 +1361,7 @@ impl RectManager {
     /// Return background color to default
     /// # Example
     /// ```
-    /// use wrecked::{RectManager, TOP};
+    /// use wrecked::{RectManager, TOP, RectColor};
     /// let mut rectmanager = RectManager::new();
     /// // Give Top a Magenta background
     /// rectmanager.set_bg_color(TOP, RectColor::MAGENTA);
@@ -1392,7 +1392,7 @@ impl RectManager {
     /// Set color of foreground (text) of given rect (does not apply recursively)
     /// # Example
     /// ```
-    /// use wrecked::{RectManager, TOP};
+    /// use wrecked::{RectManager, TOP, RectColor};
     /// let mut rectmanager = RectManager::new();
     /// // Give Top a YELLOW foreground
     /// rectmanager.set_fg_color(TOP, RectColor::YELLOW);
@@ -1420,7 +1420,7 @@ impl RectManager {
     /// Return foreground color to default
     /// # Example
     /// ```
-    /// use wrecked::{RectManager, TOP};
+    /// use wrecked::{RectManager, TOP, RectColor};
     /// let mut rectmanager = RectManager::new();
     /// // Give Top a White foreground
     /// rectmanager.set_fg_color(TOP, RectColor::WHITE);
@@ -1451,7 +1451,7 @@ impl RectManager {
     /// Return both background and foreground colors to default
     /// # Example
     /// ```
-    /// use wrecked::{RectManager, TOP};
+    /// use wrecked::{RectManager, TOP, RectColor};
     /// let mut rectmanager = RectManager::new();
     /// // Give Top a Blue background and a White foreground
     /// rectmanager.set_bg_color(TOP, RectColor::BLUE);
@@ -1490,26 +1490,43 @@ impl RectManager {
     /// // turn echo back on and return input to normal.
     /// rectmanager.kill();
     /// ```
-    pub fn kill(&mut self) {
-        self.clear_children(TOP);
+    pub fn kill(&mut self) -> Result<(), RectError> {
 
-        let (w, h) = self.get_rect_size(TOP).unwrap();
-        for x in 0 .. w {
-            for y in 0 .. h {
-                self.set_character(TOP, x as isize, y as isize, ' ');
-            }
+        let mut last_error = Ok(());
+        match self.clear_children(TOP) {
+            Ok(_) => {}
+            Err(e) => { last_error = Err(e); }
+        }
+        match self.clear_characters(TOP) {
+            Ok(_) => {}
+            Err(e) => { last_error = Err(e); }
+        }
+        match self.clear_effects(TOP) {
+            Ok(_) => {}
+            Err(e) => { last_error = Err(e); }
+        }
+        match self.draw() {
+            Ok(_) => {}
+            Err(e) => { last_error = Err(e); }
         }
 
-        self.draw();
-
+        // Even if it fails, we want to try clearing out all the rects
+        // that are drawn, and reset the screen, to try to make failure
+        // as easy to read as possible.
         #[cfg(not(debug_assertions))]
-        {
-            tcsetattr(0, TCSANOW, & self._termios).unwrap();
+        match self._termios {
+            Some(_termios) => {
+                tcsetattr(0, TCSANOW, & _termios).unwrap();
 
-            print!("\x1B[?25h"); // Show Cursor
-            println!("\x1B[?1049l"); // Return to previous screen
+                print!("\x1B[?25h"); // Show Cursor
+                println!("\x1B[?1049l"); // Return to previous screen
+            }
+            None => ()
         }
+
+        last_error
     }
+
     /// Get the fallback character that would be displayed where no character is set.
     /// Defaults to ' '.
     pub fn get_default_character(&self, rect_id: usize) -> char {
@@ -1523,6 +1540,33 @@ impl RectManager {
         }
     }
 
+    pub fn get_parent_id(&self, rect_id: usize) -> Option<usize> {
+        let mut output = None;
+
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                output = rect.parent;
+            }
+            None => ()
+        };
+
+        output
+    }
+
+    pub fn has_parent(&self, rect_id: usize) -> bool {
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                rect.parent.is_some()
+            }
+            None => {
+                false
+            }
+        }
+    }
+
+    pub fn has_rect(&self, rect_id: usize) -> bool {
+        self.rects.contains_key(&rect_id)
+    }
 
     fn flag_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut output = Ok(());
@@ -1551,33 +1595,6 @@ impl RectManager {
     }
 
     fn get_parent(&self, rect_id: usize) -> Option<&Rect> {
-        let mut output = None;
-        let mut has_parent = false;
-        let mut parent_id = TOP;
-
-        match self.get_rect(rect_id) {
-            Some(rect) => {
-                match rect.parent {
-                    Some(pid) => {
-                        has_parent = true;
-                        parent_id = pid;
-                    }
-                    None => ()
-                };
-            },
-            None => ()
-        };
-
-
-        if has_parent {
-            output = self.get_rect(parent_id);
-        }
-
-        output
-    }
-
-    fn get_parent_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
-        let mut output = None;
         let mut has_parent = false;
         let mut parent_id = TOP;
 
@@ -1596,16 +1613,40 @@ impl RectManager {
 
 
         if has_parent {
-            output = self.get_rect_mut(parent_id);
+            self.get_rect(parent_id)
+        } else {
+            None
         }
+    }
 
-        output
+    fn get_parent_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
+        let mut has_parent = false;
+        let mut parent_id = TOP;
+
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                match rect.parent {
+                    Some(pid) => {
+                        has_parent = true;
+                        parent_id = pid;
+                    }
+                    None => ()
+                };
+            }
+            None => ()
+        };
+
+
+        if has_parent {
+            self.get_rect_mut(parent_id)
+        } else {
+            None
+        }
     }
 
     // Top can be the same as the given rect
     fn get_top(&self, rect_id: usize) -> Option<&Rect> {
         let mut current_id = rect_id;
-        let mut output = None;
         let mut rect_defined = false;
 
         loop {
@@ -1630,16 +1671,15 @@ impl RectManager {
         }
 
         if rect_defined {
-            output = self.get_rect(current_id);
+            self.get_rect(current_id)
+        } else {
+            None
         }
-
-        output
     }
 
     // Top can be the same as the given rect
     fn get_top_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
         let mut current_id = rect_id;
-        let mut output = None;
         let mut rect_defined = false;
 
         loop {
@@ -1664,10 +1704,10 @@ impl RectManager {
         }
 
         if rect_defined {
-            output = self.get_rect_mut(current_id);
+            self.get_rect_mut(current_id)
+        } else {
+            None
         }
-
-        output
     }
 
     fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), RectError> {
@@ -2381,8 +2421,8 @@ impl Rect {
         Rect {
             rect_id,
             parent: None,
-            width: 0,
-            height: 0,
+            width: 1,
+            height: 1,
             children: Vec::new(),
             child_space: HashMap::new(),
             _inverse_child_space: HashMap::new(),
