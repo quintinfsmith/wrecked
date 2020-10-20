@@ -43,6 +43,7 @@ pub enum RectError {
     AllGood,
     BadColor,
     InvalidUtf8,
+    StringTooLong,
     NotFound(usize),
     NoParent(usize), // Rect has no parent id
     BadPosition(isize, isize),
@@ -404,16 +405,19 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, TOP};
     /// let mut rectmanager = RectManager::new();
-    /// // Put a string at (0, 0)
-    /// rectmanager.set_string(TOP, 0, 0, "Hello world");
-    /// // Put a rect at (0, 1)
-    /// let rect_id = rectmanager.new_rect(TOP).ok().unwrap();
-    /// rectmanager.set_position(rect_id, 0, 1);
-    /// // Shift contents down one row ...
-    /// rectmanager.shift_contents(TOP, 0, 1);
+    /// let mut rect_parent = rectmanager.new_rect(TOP).ok().unwrap();
+    /// rectmanager.resize(rect_parent, 16, 5);
     ///
-    /// assert_eq!(rectmanager.get_character(TOP, 0, 0).ok().unwrap(), 'H');
-    /// assert_eq!(rectmanager.get_relative_offset(rect_id).unwrap(), (0, 2));
+    /// // Put a string at (0, 0)
+    /// rectmanager.set_string(rect_parent, 0, 0, "Hello world");
+    /// // Put a rect at (0, 1)
+    /// let rect_child = rectmanager.new_rect(rect_parent).ok().unwrap();
+    /// rectmanager.set_position(rect_child, 0, 1);
+    /// // Shift contents down one row ...
+    /// rectmanager.shift_contents(rect_parent, 0, 1);
+    ///
+    /// assert_eq!(rectmanager.get_character(rect_parent, 0, 0).ok().unwrap(), 'H');
+    /// assert_eq!(rectmanager.get_relative_offset(rect_child).unwrap(), (0, 2));
     ///
     /// rectmanager.kill();
     /// ```
@@ -738,6 +742,10 @@ impl RectManager {
         let mut y;
         let start_offset = (start_y * dimensions.0) + start_x;
 
+        if start_offset + (string.len() as isize) >= dimensions.0 * dimensions.1 {
+            Err(RectError::StringTooLong)?;
+        }
+
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 let mut i = start_offset;
@@ -872,7 +880,7 @@ impl RectManager {
     pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: char) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_character(x, y, character);
+                rect.set_character(x, y, character)?;
             }
             None => {
                 Err(RectError::NotFound(rect_id))?;
@@ -897,7 +905,7 @@ impl RectManager {
     pub fn unset_character(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_character(x, y);
+                rect.unset_character(x, y)?;
             }
             None => {
                 Err(RectError::NotFound(rect_id))?;

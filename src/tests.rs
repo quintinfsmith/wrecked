@@ -727,47 +727,47 @@ fn test_failures() -> Result<(), RectError> {
     assert!(rectmanager.get_top(bad_id).is_none());
     assert!(rectmanager.get_top_mut(bad_id).is_none());
 
-    assert_eq!(rectmanager.get_visible_box(bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.get_visible_box(bad_id).err().unwrap(), RectError::NotFound(bad_id));
 
-    assert_eq!(rectmanager.set_bg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.set_fg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.unset_bg_color(bad_id).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.unset_fg_color(bad_id).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.unset_color(bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.set_bg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.set_fg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.unset_bg_color(bad_id).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.unset_fg_color(bad_id).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.unset_color(bad_id).err().unwrap(), RectError::NotFound(bad_id));
 
-    assert_eq!(rectmanager.unset_bold_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.unset_invert_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.unset_underline_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.unset_strike_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.unset_italics_flag(bad_id), Err(RectError::NotFound(x: usize)));
+    assert_eq!(rectmanager.unset_bold_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.unset_invert_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.unset_underline_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.unset_strike_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.unset_italics_flag(bad_id), Err(RectError::NotFound(bad_id)));
 
-    assert_eq!(rectmanager.set_bold_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.set_invert_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.set_underline_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.set_strike_flag(bad_id), Err(RectError::NotFound(x: usize)));
-    assert_eq!(rectmanager.set_italics_flag(bad_id), Err(RectError::NotFound(x: usize)));
+    assert_eq!(rectmanager.set_bold_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.set_invert_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.set_underline_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.set_strike_flag(bad_id), Err(RectError::NotFound(bad_id)));
+    assert_eq!(rectmanager.set_italics_flag(bad_id), Err(RectError::NotFound(bad_id)));
 
-    assert_eq!(rectmanager.replace_with(bad_id, good_id).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.replace_with(TOP, bad_id).err().unwrap(), RectError::NotFound(x: usize));
-    //assert_eq!(rectmanager.replace_with(good_id, bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.replace_with(bad_id, good_id).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.replace_with(TOP, bad_id).err().unwrap(), RectError::NotFound(TOP));
+    //assert_eq!(rectmanager.replace_with(good_id, bad_id).err().unwrap(), RectError::NotFound(bad_id));
 
-    assert_eq!(rectmanager.update_child_space(bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.update_child_space(bad_id).err().unwrap(), RectError::NotFound(bad_id));
     //assert!(rectmanager.update_child_space(TOP).is_ok());
 
-    assert_eq!(rectmanager.delete_rect(bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.delete_rect(bad_id).err().unwrap(), RectError::NotFound(bad_id));
 
-    assert_eq!(rectmanager.set_character(bad_id, 0, 0, 'x').err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.set_character(good_id, 1, 100, 'x').err().unwrap(), RectError::BadPosition(x, y));
-    assert_eq!(rectmanager.unset_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.unset_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition(x, y));
+    assert_eq!(rectmanager.set_character(bad_id, 0, 0, 'x').err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.set_character(good_id, 1, 100, 'x').err().unwrap(), RectError::BadPosition(1, 100));
+    assert_eq!(rectmanager.unset_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.unset_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition(1, 100));
 
-    assert_eq!(rectmanager.get_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.get_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition(x, y));
+    assert_eq!(rectmanager.get_character(bad_id, 0, 0).err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.get_character(good_id, 1, 100).err().unwrap(), RectError::BadPosition(1, 100));
 
-    assert_eq!(rectmanager.set_string(bad_id, 0, 0, &"BOOP").err().unwrap(), RectError::NotFound(x: usize));
-    assert_eq!(rectmanager.set_string(good_id, 3000, 0, &"afnwjeklnawjekflnawjekflnawejfklanwejfklnawejfklawnefjkawlnefjkawlenfjawkelfnajwkelfafawefBOOP").err().unwrap(), RectError::BadPosition(x, y));
+    assert_eq!(rectmanager.set_string(bad_id, 0, 0, &"BOOP").err().unwrap(), RectError::NotFound(bad_id));
+    assert_eq!(rectmanager.set_string(good_id, 3000, 0, &"afnwjeklnawjekflnawjekflnawejfklanwejfklnawejfklawnefjkawlnefjkawlenfjawkelfnajwkelfafawefBOOP").err().unwrap(), RectError::StringTooLong);
 
-    assert_eq!(rectmanager.get_rank(bad_id).err().unwrap(), RectError::NotFound(x: usize));
+    assert_eq!(rectmanager.get_rank(bad_id).err().unwrap(), RectError::NotFound(bad_id));
     assert!(rectmanager.get_depth(bad_id).is_none());
 
     rectmanager.kill()
@@ -821,7 +821,7 @@ fn test_get_rank() -> Result<(), RectError> {
                 assert_eq!(real_rank, *test_rank, "get_rank() isn't returning correct value");
             }
             Err(e) => {
-                assert_ne!(e, RectError::ChildNotFound(parent, child), "Somehow a child is being deleted, but not detached from its parent.");
+                assert_ne!(e, RectError::ChildNotFound(TOP, *working_id), "Somehow a child is being deleted, but not detached from its parent.");
                 assert!(false);
             }
         }
