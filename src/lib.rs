@@ -5,6 +5,21 @@ use std::io::prelude::*;
 
 use wrecked::{RectManager, RectColor, RectError};
 
+fn cast_result(result: Result<(), RectError>) -> u32 {
+    match result {
+        Ok(_) => 0,
+        Err(RectError::BadColor) => 1,
+        Err(RectError::InvalidUtf8) => 2,
+        Err(RectError::StringTooLong) => 3,
+        Err(RectError::NotFound(_)) => 4,
+        Err(RectError::NoParent(_)) => 5,
+        Err(RectError::ParentNotFound(_, _)) => 6,
+        Err(RectError::ChildNotFound(_, _)) => 7,
+        Err(RectError::BadPosition(_, _)) => 8,
+        Err(_) => 255
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
@@ -13,10 +28,7 @@ pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -28,10 +40,7 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -43,10 +52,7 @@ pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -66,10 +72,7 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -87,10 +90,7 @@ pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, color_n: u
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -159,10 +159,7 @@ pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: usize
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -173,10 +170,7 @@ pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let result = rectmanager.unset_bg_color(rect_id);
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -188,10 +182,7 @@ pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -203,10 +194,7 @@ pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(e) => e as u32
-    }
+    cast_result(result)
 }
 
 
@@ -222,10 +210,7 @@ pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y:
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 
@@ -240,10 +225,7 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 
@@ -255,10 +237,7 @@ pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isiz
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 
@@ -270,10 +249,7 @@ pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 
@@ -310,10 +286,7 @@ pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, 
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -325,10 +298,7 @@ pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -340,10 +310,7 @@ pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: usize)  -> u3
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -355,10 +322,7 @@ pub extern "C" fn clear_children(ptr: *mut RectManager, rect_id: usize)  -> u32 
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -370,10 +334,7 @@ pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize)  -> u32 {
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 
@@ -386,11 +347,7 @@ pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize
 
     Box::into_raw(rectmanager); // Prevent Release
 
-
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
@@ -403,10 +360,7 @@ pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: usize, new_re
     Box::into_raw(rectmanager); // Prevent Release
 
 
-    match result {
-        Ok(_) => 0,
-        Err(error) => error as u32
-    }
+    cast_result(result)
 }
 
 #[no_mangle]
