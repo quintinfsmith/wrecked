@@ -374,11 +374,32 @@ pub extern "C" fn kill(ptr: *mut RectManager) {
     // Releases boxes
 }
 
-// TODO: Remove need for arguments
 #[no_mangle]
 pub extern "C" fn init() -> *mut RectManager {
 
     let rectmanager = RectManager::new();
 
     Box::into_raw(Box::new(rectmanager))
+}
+
+#[no_mangle]
+pub extern "C" fn get_width(ptr: *mut RectManager, rect_id: usize) -> usize {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let width = rectmanager.get_rect_width(rect_id);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    width
+}
+
+#[no_mangle]
+pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: usize) -> usize {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let height = rectmanager.get_rect_width(rect_id);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    height
 }

@@ -128,11 +128,11 @@ class Rect(object):
 
     def enable(self):
         self.enabled = True
-        self.rectmanager.rect_enable(self.rect_id);
+        self.rectmanager.rect_enable(self.rect_id)
 
     def disable(self):
         self.enabled = False
-        self.rectmanager.rect_disable(self.rect_id);
+        self.rectmanager.rect_disable(self.rect_id)
 
     def draw(self):
         self.rectmanager.rect_draw(self.rect_id)
@@ -216,7 +216,7 @@ class RectManager:
         ffi.cdef("""
             typedef void* RectManager;
 
-            RectManager init(uint32_t, uint32_t);
+            RectManager init();
             void kill(RectManager);
 
 
@@ -259,6 +259,9 @@ class RectManager:
 
             uint32_t shift_contents(RectManager, uint32_t, int32_t, int32_t);
 
+            uint64_t get_height(RectManager, uint64_t);
+            uint64_t get_width(RectManager, uint64_t);
+
         """)
 
         sl = RectLogger(logging.getLogger('STDOUT'), logging.INFO)
@@ -280,9 +283,9 @@ class RectManager:
 
         self.lib = ffi.dlopen(self.SO_PATH)
 
-        # TODO: get rectmanager's root node size from  cffi layer
-        self.width, self.height = get_terminal_size()
-        self.rectmanager = self.lib.init(self.width, self.height)
+        self.rectmanager = self.lib.init()
+        self.width = self.lib.get_width(self.rectmanager, 0)
+        self.height = self.lib.get_height(self.rectmanager, 0)
 
         self.root = Rect(0, self, width=self.width, height=self.height)
         self.root.draw()
@@ -325,7 +328,7 @@ class RectManager:
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
         err = 0
-        if (position != (0,0)):
+        if position != (0,0):
             err = self.rect_move(rect_id, *position)
 
 
@@ -641,4 +644,3 @@ if __name__ == "__main__":
     while not scene.done and stage.playing:
         time.sleep(.1)
     stage.kill()
-
