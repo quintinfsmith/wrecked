@@ -21,6 +21,17 @@ fn cast_result(result: Result<(), RectError>) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn set_transparency(ptr: *mut RectManager, rect_id: usize, transparency: bool) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.set_transparency(rect_id, transparency);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    cast_result(result)
+}
+
+#[no_mangle]
 pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 

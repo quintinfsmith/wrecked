@@ -90,6 +90,7 @@ class Rect(object):
         self.enabled = True
         self.x = 0
         self.y = 0
+        self.transparent = False
 
         self.width = 1
         if 'width' in kwargs.keys():
@@ -207,6 +208,10 @@ class Rect(object):
     def shift_contents(self, x, y):
         self.rectmanager.rect_shift_contents(self.rect_id, x, y)
 
+    def set_transparency(self, transparency):
+        self.rectmanager.rect_set_transparency(self.rect_id, transparency)
+        self.transparent = transparency
+
 
 class RectManager:
     SO_PATH = "libwrecked_bindings.so"
@@ -261,6 +266,8 @@ class RectManager:
 
             uint64_t get_height(RectManager, uint64_t);
             uint64_t get_width(RectManager, uint64_t);
+
+            uint32_t set_transparency(RectManager, uint64_t, bool);
 
         """)
 
@@ -505,6 +512,14 @@ class RectManager:
 
     def rect_remove(self, rect_id):
         err = self.lib.delete_rect(self.rectmanager, rect_id)
+
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id
+            )
+
+    def rect_set_transparency(self, rect_id, transparency):
+        err = self.lib.set_transparency(self.rectmanager, rect_id, transparency)
 
         if err:
             raise EXCEPTIONS[err](
