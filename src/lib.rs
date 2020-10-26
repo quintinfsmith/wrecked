@@ -519,10 +519,12 @@ impl RectManager {
     /// If a rectangle has been disabled, enable it.
     pub fn enable(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut was_enabled = false;
+        let mut parent = None;
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 was_enabled = rect.enabled;
                 rect.enable();
+                parent = rect.parent;
             }
             None => {
                 Err(RectError::NotFound(rect_id))?;
@@ -531,13 +533,7 @@ impl RectManager {
 
 
         if ! was_enabled {
-            match self.get_parent_mut(rect_id) {
-                Some(parent) => {
-                    parent.clear_child_space(rect_id);
-                }
-                None => ()
-            }
-            self.flag_refresh(rect_id)?;
+            self.update_child_space(rect_id);
         }
 
         Ok(())
