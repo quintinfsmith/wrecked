@@ -1649,7 +1649,7 @@ impl RectManager {
     }
 
     fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), RectError> {
-        let mut pos_stack: HashMap<(isize, isize), Vec<usize>> = HashMap::new();
+        let mut pos_stack: HashMap<(isize, isize), Vec<(usize, usize)>> = HashMap::new();
         let mut require_updates: HashSet<usize> = HashSet::new();
 
         let mut x: isize;
@@ -1671,7 +1671,9 @@ impl RectManager {
                 transparent_children.insert(*child_id);
             }
         }
+
         let mut child_positions: HashMap<usize, (isize, isize)> = HashMap::new();
+        let mut max_cache_ranks: HashMap<(isize, isize), usize> = HashMap::new();
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 child_positions = rect.child_positions.clone();
@@ -1692,20 +1694,20 @@ impl RectManager {
                                 .or_insert(rect.default_character);
 
                             rect._cached_display.entry((x,y))
-                                .and_modify(|e| {*e = (*tmp_chr, tmp_fx)})
-                                .or_insert((*tmp_chr, tmp_fx));
+                                .and_modify(|e| {*e = (*tmp_chr, tmp_fx, 0)})
+                                .or_insert((*tmp_chr, tmp_fx, 0));
                         } else {
                             rect._cached_display.remove(&(x, y));
                         }
                     } else {
-
                         match rect.child_space.get(&(x, y)) {
                             Some(child_ids) => {
-                                for child_id in child_ids.iter().rev() {
+                                for (i, child_id) in child_ids.iter().rev().enumerate() {
+                                    let rank = child_ids.len() - i;
                                     require_updates.insert(*child_id);
                                     pos_stack.entry((x, y))
-                                        .and_modify(|e| e.push(*child_id))
-                                        .or_insert(vec![*child_id]);
+                                        .and_modify(|e| e.push((*child_id, rank)))
+                                        .or_insert(vec![(*child_id, rank)]);
 
                                     if !transparent_children.contains(child_id) {
                                         break;
@@ -1729,20 +1731,22 @@ impl RectManager {
 
 
         let mut new_values = Vec::new();
-        let mut unset_values = HashSet::new();
+        let mut transparent_coords = HashSet::new();
 
         for ((x, y), child_ids) in pos_stack.iter() {
-            for child_id in child_ids.iter() {
+            for (child_id, rank) in child_ids.iter() {
                 let child_position = child_positions.get(child_id).unwrap();
                 match self.get_rect_mut(*child_id) {
                     Some(child) => {
+
                         match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
                             Some(new_value) => {
-                                new_values.push((*new_value, *x, *y));
+                                new_values.push((*new_value, *rank, *x, *y));
+                                break;
                             }
                             None => {
                                 if child.transparent {
-                                    unset_values.insert((*x, *y));
+                                    transparent_coords.insert((*x, *y));
                                 }
                             }
                         }
@@ -1756,28 +1760,36 @@ impl RectManager {
 
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                for (new_value, x, y) in new_values.iter() {
+                for (new_value, rank, x, y) in new_values.iter() {
+                    let max_cache_rank = match max_cache_ranks.get(&(*x, *y)) {
+                        Some(m) => *m,
+                        None => 0
+                    };
+
                     rect._cached_display.entry((*x, *y))
-                        .and_modify(|e| { *e = *new_value })
-                        .or_insert(*new_value);
-                    unset_values.remove(&(*x, *y));
+                        .and_modify(|e| {
+                            if e.2 <= *rank || max_cache_rank <= e.2 {
+                                *e = (new_value.0, new_value.1, *rank);
+                            }
+                        })
+                        .or_insert((new_value.0, new_value.1, *rank));
+
+                    transparent_coords.remove(&(*x, *y));
                 }
 
-                // Unset values are spaces missing due to transparent children
-                for (x, y) in unset_values.iter() {
+                for coord in transparent_coords.iter() {
                     if rect.transparent {
-                        rect._cached_display.remove(&(*x, *y));
-                        continue;
+                        rect._cached_display.remove(coord);
+                    } else {
+                        tmp_fx = rect.effects;
+
+                        tmp_chr = rect.character_space.entry(*coord)
+                            .or_insert(rect.default_character);
+
+                        rect._cached_display.entry(*coord)
+                            .and_modify(|e| {*e = (*tmp_chr, tmp_fx, 0)})
+                            .or_insert((tmp_chr.clone(), tmp_fx.clone(), 0));
                     }
-
-                    tmp_fx = rect.effects;
-
-                    tmp_chr = rect.character_space.entry((*x, *y))
-                        .or_insert(rect.default_character);
-
-                    rect._cached_display.entry((*x,*y))
-                        .and_modify(|e| {*e = (*tmp_chr, tmp_fx)})
-                        .or_insert((tmp_chr.clone(), tmp_fx.clone()));
                 }
             }
             None => {
@@ -1896,7 +1908,7 @@ impl RectManager {
         match self.get_rect(rect_id) {
             Some(rect) => {
                 if rect.enabled {
-                    for ((x, y), (new_c, effects)) in rect._cached_display.iter() {
+                    for ((x, y), (new_c, effects, _)) in rect._cached_display.iter() {
                         outhash.insert((*x, *y), (*new_c, *effects));
                     }
                 }
@@ -2352,7 +2364,7 @@ struct Rect {
 
     effects: RectEffectsHandler,
 
-    _cached_display: HashMap<(isize, isize), (char, RectEffectsHandler)>,
+    _cached_display: HashMap<(isize, isize), (char, RectEffectsHandler, usize)>,
 }
 
 impl Rect {
@@ -2675,8 +2687,8 @@ impl Rect {
     fn add_child(&mut self, child_id: usize) {
         self.children.push(child_id);
         self._inverse_child_space.insert(child_id, Vec::new());
-        self.set_child_position(child_id, 0, 0);
         self.update_child_ranks();
+        self.set_child_position(child_id, 0, 0);
     }
 
     // Needed for quick access to child ranks
