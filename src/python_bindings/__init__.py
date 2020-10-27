@@ -288,7 +288,8 @@ class RectManager:
            filemode='a'
         )
 
-        self.lib = ffi.dlopen(self.SO_PATH)
+        abs_dir = os.path.dirname(os.path.realpath(__file__))
+        self.lib = ffi.dlopen(abs_dir + '/' + self.SO_PATH)
 
         self.rectmanager = self.lib.init()
         self.width = self.lib.get_width(self.rectmanager, 0)
