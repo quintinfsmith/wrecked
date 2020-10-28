@@ -1,6 +1,6 @@
 from cffi import FFI
 from ctypes import c_bool
-import sys
+import sys, site
 import tty, termios
 import os, time
 import json
@@ -24,18 +24,18 @@ def logg(error_code, args, msg):
     with open("logg", "a") as fp:
         fp.write(newline)
 
-class RectLogger:
-    def __init__(self, logger, log_level=logging.INFO):
-        self.logger = logger
-        self.log_level = log_level
-
-    def write(self, buf):
-        for line in buf.rstrip().splitlines():
-            self.logger.log(self.log_level, line.rstrip())
-
-    def flush(self):
-        # TODO: Figure out what is needed here
-        pass
+#class RectLogger:
+#    def __init__(self, logger, log_level=logging.INFO):
+#        self.logger = logger
+#        self.log_level = log_level
+#
+#    def write(self, buf):
+#        for line in buf.rstrip().splitlines():
+#            self.logger.log(self.log_level, line.rstrip())
+#
+#    def flush(self):
+#        # TODO: Figure out what is needed here
+#        pass
 
 
 class RectError(Exception):
@@ -214,8 +214,6 @@ class Rect(object):
 
 
 class RectManager:
-    SO_PATH = "libwrecked_bindings.so"
-
     def __init__(self):
         ffi = FFI()
         ffi.cdef("""
@@ -271,25 +269,30 @@ class RectManager:
 
         """)
 
-        sl = RectLogger(logging.getLogger('STDOUT'), logging.INFO)
-        sys.stdout = sl
+        #sl = RectLogger(logging.getLogger('STDOUT'), logging.INFO)
+        #sys.stdout = sl
 
-        sl = RectLogger(logging.getLogger('STDERR'), logging.ERROR)
-        sys.stderr = sl
-        self.log_path = '.wreckederr.log'
-        if os.path.isfile(self.log_path):
-            with open(self.log_path, 'w') as fp:
-                fp.write("")
+        #sl = RectLogger(logging.getLogger('STDERR'), logging.ERROR)
+        #sys.stderr = sl
+        #self.log_path = '.wreckederr.log'
+        #if os.path.isfile(self.log_path):
+        #    with open(self.log_path, 'w') as fp:
+        #        fp.write("")
 
-        logging.basicConfig(
-           level=logging.DEBUG,
-           format='%(message)s',
-           filename=self.log_path,
-           filemode='a'
-        )
+        #logging.basicConfig(
+        #   level=logging.DEBUG,
+        #   format='%(message)s',
+        #   filename=self.log_path,
+        #   filemode='a'
+        #)
 
-        abs_dir = os.path.dirname(os.path.realpath(__file__))
-        self.lib = ffi.dlopen(abs_dir + '/' + self.SO_PATH)
+        lib_path = None
+        for prefix in [site.USER_BASE, sys.prefix]:
+            if os.path.isfile("%s/wrecked/libwrecked_bindings.so" % prefix):
+                lib_path = "%s/wrecked/libwrecked_bindings.so" % prefix
+                break
+
+        self.lib = ffi.dlopen(lib_path)
 
         self.rectmanager = self.lib.init()
         self.width = self.lib.get_width(self.rectmanager, 0)
@@ -630,33 +633,3 @@ class RectScene(Rect):
     def tick(self):
         pass
 
-
-if __name__ == "__main__":
-    import time, math, threading
-    stage = RectStage()
-    class TestScene(RectScene):
-        def __init__(self, n, rectmanager, **kwargs):
-            super().__init__(n, rectmanager, **kwargs)
-            self.limit = 60
-            self.p = 0
-            self.done = False
-
-        def tick(self):
-            if not self.done:
-                self.p += 1
-
-                if self.p == self.limit // 2:
-                    raise KeyError()
-                elif self.p == self.limit:
-                    self.done = True
-
-                self.set_bg_color(int(self.p * 8 / self.limit))
-            self.draw()
-
-    stage.play()
-    scene = stage.create_scene(0, TestScene)
-    scene.set_string(0, 0, 'Some Test Text')
-    stage.start_scene(0)
-    while not scene.done and stage.playing:
-        time.sleep(.1)
-    stage.kill()
