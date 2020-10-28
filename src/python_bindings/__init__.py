@@ -63,7 +63,7 @@ EXCEPTIONS = {
     8: ChildNotFound
 }
 
-class Rect(object):
+class RectColor:
     BLACK = 0
     RED = 1
     GREEN = 2
@@ -82,6 +82,7 @@ class Rect(object):
     BRIGHTCYAN = CYAN | BRIGHT
     BRIGHTWHITE = WHITE | BRIGHT
 
+class Rect(object):
     def __init__(self, n, rectmanager, **kwargs):
         self.rectmanager  = rectmanager
         self.rect_id = n
