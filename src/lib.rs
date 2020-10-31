@@ -20,17 +20,25 @@ pub fn get_terminal_size() -> (u16, u16) {
     use libc::{winsize, TIOCGWINSZ, ioctl, isatty};
     let mut output = (1, 1);
 
-
-    let mut t = winsize {
-        ws_row: 0,
-        ws_col: 0,
-        ws_xpixel: 0,
-        ws_ypixel: 0
-    };
+    #[cfg(debug_assertions)]
+    {
+        output = (50, 25);
+    }
 
 
-    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
-        output = (t.ws_col, t.ws_row);
+    #[cfg(not(debug_assertions))]
+    {
+        let mut t = winsize {
+            ws_row: 0,
+            ws_col: 0,
+            ws_xpixel: 0,
+            ws_ypixel: 0
+        };
+
+
+        if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
+            output = (t.ws_col, t.ws_row);
+        }
     }
 
     output
@@ -292,21 +300,34 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn draw_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
+
+        match self.build_latest_rect_string(rect_id) {
+            Some(renderstring) => {
+                print!("{}\x1B[0m", renderstring);
+                println!("\x1B[1;1H");
+            }
+            None => ()
+        }
+
+        Ok(())
+    }
+
+
+    /// builds a string from the latest cached content of the
+    /// given rect.
+    /// It's been separated and made public for testing only, so if you're using it outside that case, you're likely doing something wrong.
+    pub fn build_latest_rect_string(&mut self, rect_id: usize) -> Option<String> {
         let draw_map = self.build_draw_map(rect_id);
-
         let mut filtered_map = self.filter_cached(draw_map);
-
         if filtered_map.len() > 0 {
             // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
             filtered_map.sort();
             filtered_map.sort_by(|a,b|(a.0).1.cmp(&(b.0).1));
 
-            let renderstring = self.build_ansi_string(filtered_map);
-            print!("{}\x1B[0m", renderstring);
-            println!("\x1B[1;1H");
+            Some(self.build_ansi_string(filtered_map))
+        } else {
+            None
         }
-
-        Ok(())
     }
 
     /// Render the visible portion of the rectmanager environment

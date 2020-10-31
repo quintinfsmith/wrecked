@@ -1,6 +1,7 @@
 #[cfg (test)]
 use super::*;
 
+// Keep in mind: in debug, the terminal is set to (25,25) for consistency
 #[test]
 fn test_init() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
@@ -886,3 +887,38 @@ fn test_update_child_space() -> Result<(), RectError> {
 
     rectmanager.kill()
 }
+
+
+#[test]
+fn test_transparency() -> Result<(), RectError> {
+    let mut rectmanager = RectManager::new();
+    let mut rect_id = rectmanager.new_rect(TOP).ok().unwrap();
+    let mut t_rect_id = rectmanager.new_rect(TOP).ok().unwrap();
+
+    rectmanager.resize(rect_id, 10, 10);
+    rectmanager.set_bg_color(rect_id, RectColor::BLUE);
+
+    rectmanager.resize(t_rect_id, 10, 10);
+    rectmanager.set_position(t_rect_id, 3, 3);
+    rectmanager.set_transparency(t_rect_id, true);
+
+    let mut ansi_string = rectmanager.build_latest_rect_string(TOP).unwrap();
+
+    rectmanager.kill();
+
+    // Get comparison string, (don't build the transparent rect)
+    rectmanager = RectManager::new();
+    rect_id = rectmanager.new_rect(TOP).ok().unwrap();
+
+    rectmanager.resize(rect_id, 10, 10);
+    rectmanager.set_bg_color(rect_id, RectColor::BLUE);
+
+    let mut control_string = rectmanager.build_latest_rect_string(TOP).unwrap();
+
+    rectmanager.kill();
+
+    assert_eq!(control_string, ansi_string);
+
+    Ok(())
+}
+
