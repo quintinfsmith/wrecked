@@ -673,8 +673,8 @@ fn test_set_effects() -> Result<(), RectError> {
     rectmanager.set_fg_color(TOP, RectColor::RED)?;
     match rectmanager.get_rect(TOP) {
         Some(rect) => {
-            assert_eq!(rect.get_bg_color(), RectColor::BLUE);
-            assert_eq!(rect.get_fg_color(), RectColor::RED);
+            assert_eq!(rect.get_bg_color(), Some(RectColor::BLUE));
+            assert_eq!(rect.get_fg_color(), Some(RectColor::RED));
         }
         None => {
             assert!(false);
@@ -685,8 +685,8 @@ fn test_set_effects() -> Result<(), RectError> {
     rectmanager.unset_fg_color(TOP)?;
     match rectmanager.get_rect(TOP) {
         Some(rect) => {
-            assert_eq!(rect.get_bg_color(), RectColor::NONE);
-            assert_eq!(rect.get_fg_color(), RectColor::NONE);
+            assert_eq!(rect.get_bg_color(), None);
+            assert_eq!(rect.get_fg_color(), None);
         }
         None => {
             assert!(false);
@@ -698,8 +698,8 @@ fn test_set_effects() -> Result<(), RectError> {
     rectmanager.unset_color(TOP)?;
     match rectmanager.get_rect(TOP) {
         Some(rect) => {
-            assert_eq!(rect.get_bg_color(), RectColor::NONE);
-            assert_eq!(rect.get_fg_color(), RectColor::NONE);
+            assert_eq!(rect.get_bg_color(), None);
+            assert_eq!(rect.get_fg_color(), None);
         }
         None => {
             assert!(false);

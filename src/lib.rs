@@ -82,8 +82,7 @@ pub enum RectColor {
     BRIGHTBLUE = 8 | 4,
     BRIGHTMAGENTA = 8 | 5,
     BRIGHTCYAN = 8 | 6,
-    BRIGHTWHITE = 8 | 7,
-    NONE = 255
+    BRIGHTWHITE = 8 | 7
 }
 
 /// Structure to manage text effects instead of having disparate flags
@@ -95,8 +94,8 @@ struct RectEffectsHandler {
     italics: bool,
     strike: bool,
     blink: bool,
-    background_color: RectColor,
-    foreground_color: RectColor
+    background_color: Option<RectColor>,
+    foreground_color: Option<RectColor>
 }
 
 impl fmt::Debug for RectEffectsHandler {
@@ -122,8 +121,8 @@ impl RectEffectsHandler {
             italics: false,
             strike: false,
             blink: false,
-            background_color: RectColor::NONE,
-            foreground_color: RectColor::NONE
+            background_color: None,
+            foreground_color: None
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -133,8 +132,8 @@ impl RectEffectsHandler {
         && !self.italics
         && !self.strike
         && !self.blink
-        && self.background_color == RectColor::NONE
-        && self.foreground_color == RectColor::NONE
+        && self.background_color.is_none()
+        && self.foreground_color.is_none()
     }
     pub fn clear(&mut self) {
         self.bold = false;
@@ -143,8 +142,8 @@ impl RectEffectsHandler {
         self.italics = false;
         self.strike = false;
         self.blink = false;
-        self.background_color = RectColor::NONE;
-        self.foreground_color = RectColor::NONE;
+        self.background_color = None;
+        self.foreground_color = None;
     }
 }
 
@@ -1967,29 +1966,35 @@ impl RectManager {
                 let mut ansi_code_list: Vec<u8> = vec![];
                 // ForeGround
                 if new_effects.foreground_color != active_effects.foreground_color {
-                    if new_effects.foreground_color != RectColor::NONE {
-                        tmp_color_n = new_effects.foreground_color as u8;
-                        if tmp_color_n & 8 == 8 {
-                            ansi_code_list.push(90 + (tmp_color_n & 7));
-                        } else {
-                            ansi_code_list.push(30 + (tmp_color_n & 7));
+                    match new_effects.foreground_color {
+                        Some(fg_color) => {
+                            tmp_color_n = fg_color as u8;
+                            if tmp_color_n & 8 == 8 {
+                                ansi_code_list.push(90 + (tmp_color_n & 7));
+                            } else {
+                                ansi_code_list.push(30 + (tmp_color_n & 7));
+                            }
                         }
-                    } else {
-                        ansi_code_list.push(39);
+                        None => {
+                            ansi_code_list.push(39);
+                        }
                     }
                 }
 
                 // BackGround
                 if new_effects.background_color != active_effects.background_color {
-                    if new_effects.background_color != RectColor::NONE {
-                        tmp_color_n = new_effects.background_color as u8;
-                        if tmp_color_n & 8 == 8 {
-                            ansi_code_list.push(100 + (tmp_color_n & 7));
-                        } else {
-                            ansi_code_list.push(40 + (tmp_color_n & 7));
+                    match new_effects.background_color {
+                        Some(bg_color) => {
+                            tmp_color_n = bg_color as u8;
+                            if tmp_color_n & 8 == 8 {
+                                ansi_code_list.push(100 + (tmp_color_n & 7));
+                            } else {
+                                ansi_code_list.push(40 + (tmp_color_n & 7));
+                            }
                         }
-                    } else {
-                        ansi_code_list.push(49);
+                        None => {
+                            ansi_code_list.push(49);
+                        }
                     }
                 }
 
@@ -2677,11 +2682,19 @@ impl Rect {
     }
 
     fn unset_bg_color(&mut self) {
-        self.set_bg_color(RectColor::NONE);
+        if self.effects.background_color.is_some() {
+            self.flag_full_refresh = true;
+        }
+
+        self.effects.background_color = None;
     }
 
     fn unset_fg_color(&mut self) {
-        self.set_fg_color(RectColor::NONE);
+        if self.effects.foreground_color.is_some() {
+            self.flag_full_refresh = true;
+        }
+
+        self.effects.foreground_color = None;
     }
 
     fn unset_color(&mut self) {
@@ -2690,19 +2703,19 @@ impl Rect {
     }
 
     fn set_bg_color(&mut self, color: RectColor) {
-        if self.effects.background_color != color {
+        if self.effects.background_color != Some(color) {
             self.flag_full_refresh = true;
         }
 
-        self.effects.background_color = color;
+        self.effects.background_color = Some(color);
     }
 
     fn set_fg_color(&mut self, color: RectColor) {
-        if self.effects.foreground_color != color {
+        if self.effects.foreground_color != Some(color) {
             self.flag_full_refresh = true;
         }
 
-        self.effects.foreground_color = color;
+        self.effects.foreground_color = Some(color);
     }
 
     fn add_child(&mut self, child_id: usize) {
@@ -2769,10 +2782,10 @@ impl Rect {
         self._cached_display.clear();
     }
 
-    pub fn get_fg_color(&self) -> RectColor {
+    pub fn get_fg_color(&self) -> Option<RectColor> {
         self.effects.foreground_color
     }
-    pub fn get_bg_color(&self) -> RectColor {
+    pub fn get_bg_color(&self) -> Option<RectColor> {
         self.effects.background_color
     }
 }
