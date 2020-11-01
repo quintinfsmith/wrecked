@@ -287,12 +287,7 @@ class RectManager:
         #   filemode='a'
         #)
 
-        lib_path = None
-        for prefix in [site.USER_BASE, sys.prefix]:
-            if os.path.isfile("%s/wrecked/libwrecked_bindings.so" % prefix):
-                lib_path = "%s/wrecked/libwrecked_bindings.so" % prefix
-                break
-
+        lib_path = "libwrecked.so"
         self.lib = ffi.dlopen(lib_path)
 
         self.rectmanager = self.lib.init()
