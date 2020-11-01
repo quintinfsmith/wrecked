@@ -6,6 +6,8 @@ edition = "2018"
 description = "A terminal graphics library"
 repository = "https://github.com/quintinfsmith/wrecked"
 license-file = "LICENSE"
+categories = ["GUI", "Command-line Interface"]
+keywords = ["tui", "ui", "terminal"]
 
 [dependencies]
 termios = "0.3"
