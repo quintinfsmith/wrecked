@@ -53,14 +53,26 @@ class NoParent(RectError):
     pass
 class ChildNotFound(RectError):
     pass
+class BadColor(RectError):
+    pass
+class InvalidUtf8(RectError):
+    pass
+class StringOverflow(RectError):
+    pass
+class UnknownError(RectError):
+    pass
 
 EXCEPTIONS = {
     0: None,
-    1: OutOfBounds,
-    2: NotFound,
-    3: ParentNotFound,
-    4: NoParent,
-    8: ChildNotFound
+    1: BadColor,
+    2: InvalidUtf8,
+    3: StringOverflow,
+    4: NotFound,
+    5: NoParent,
+    6: ParentNotFound,
+    7: ChildNotFound,
+    8: OutOfBounds,
+    255: UnknownError
 }
 
 class RectColor:
