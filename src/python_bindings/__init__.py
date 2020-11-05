@@ -300,7 +300,10 @@ class RectManager:
         #)
 
         lib_path = "libwrecked.so"
-        self.lib = ffi.dlopen(lib_path)
+        try:
+            self.lib = ffi.dlopen(sys.prefix + '/lib/' + lib_path)
+        except:
+            self.lib = ffi.dlopen(site.USER_BASE + '/lib/' + lib_path)
 
         self.rectmanager = self.lib.init()
         self.width = self.lib.get_width(self.rectmanager, 0)
