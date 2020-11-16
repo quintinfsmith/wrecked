@@ -408,7 +408,7 @@ pub extern "C" fn get_width(ptr: *mut RectManager, rect_id: usize) -> usize {
 pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: usize) -> usize {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let height = rectmanager.get_rect_width(rect_id);
+    let height = rectmanager.get_rect_height(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 

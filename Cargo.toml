@@ -1,6 +1,6 @@
 [package]
 name = "wrecked_bindings"
-version = "0.2.2"
+version = "0.2.4"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "Bindings for the wrecked terminal graphics library"
