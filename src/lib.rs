@@ -1755,25 +1755,29 @@ impl RectManager {
 
         for ((x, y), child_ids) in pos_stack.iter() {
             for (child_id, rank) in child_ids.iter() {
-                let child_position = child_positions.get(child_id).unwrap();
-                match self.get_rect_mut(*child_id) {
-                    Some(child) => {
+                match child_positions.get(child_id) {
+                    Some(child_position) => {
+                        match self.get_rect_mut(*child_id) {
+                            Some(child) => {
 
-                        match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
-                            Some(new_value) => {
-                                new_values.push((*new_value, *rank, *x, *y));
-                                break;
+                                match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
+                                    Some(new_value) => {
+                                        new_values.push((*new_value, *rank, *x, *y));
+                                        break;
+                                    }
+                                    None => {
+                                        if child.transparent {
+                                            transparent_coords.insert((*x, *y));
+                                        }
+                                    }
+                                }
                             }
                             None => {
-                                if child.transparent {
-                                    transparent_coords.insert((*x, *y));
-                                }
+                                Err(RectError::NotFound(*child_id))?;
                             }
                         }
                     }
-                    None => {
-                        Err(RectError::NotFound(*child_id))?;
-                    }
+                    None => ()
                 }
             }
         }
