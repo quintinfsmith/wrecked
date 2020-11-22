@@ -1,12 +1,12 @@
 [package]
 name = "wrecked_bindings"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "Bindings for the wrecked terminal graphics library"
 
 [dependencies]
-wrecked = { git = "https://github.com/quintinfsmith/wrecked" }
+wrecked = { git = "https://github.com/quintinfsmith/wrecked", version = "0.1.11" }
 
 [lib]
 name = "wrecked_bindings"
