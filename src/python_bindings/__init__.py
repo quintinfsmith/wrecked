@@ -24,20 +24,6 @@ def logg(error_code, args, msg):
     with open("logg", "a") as fp:
         fp.write(newline)
 
-#class RectLogger:
-#    def __init__(self, logger, log_level=logging.INFO):
-#        self.logger = logger
-#        self.log_level = log_level
-#
-#    def write(self, buf):
-#        for line in buf.rstrip().splitlines():
-#            self.logger.log(self.log_level, line.rstrip())
-#
-#    def flush(self):
-#        # TODO: Figure out what is needed here
-#        pass
-
-
 class RectError(Exception):
     def __init__(self, **kwargs):
         self.msg = json.dumps(kwargs)
@@ -136,9 +122,6 @@ class Rect(object):
 
     def replace_with(self, rect):
         self.rectmanager.rect_replace_with(self.rect_id, rect.rect_id)
-
-    #def fill(self, character):
-    #    self.rectmanager.rect_fill(self.rect_id, character)
 
     def enable(self):
         self.enabled = True
@@ -282,23 +265,6 @@ class RectManager:
 
         """)
 
-        #sl = RectLogger(logging.getLogger('STDOUT'), logging.INFO)
-        #sys.stdout = sl
-
-        #sl = RectLogger(logging.getLogger('STDERR'), logging.ERROR)
-        #sys.stderr = sl
-        #self.log_path = '.wreckederr.log'
-        #if os.path.isfile(self.log_path):
-        #    with open(self.log_path, 'w') as fp:
-        #        fp.write("")
-
-        #logging.basicConfig(
-        #   level=logging.DEBUG,
-        #   format='%(message)s',
-        #   filename=self.log_path,
-        #   filemode='a'
-        #)
-
         lib_path = "libwrecked.so"
         try:
             self.lib = ffi.dlopen(sys.prefix + '/lib/' + lib_path)
@@ -350,9 +316,10 @@ class RectManager:
     def rect_attach(self, rect_id, parent_id, position=(0,0)):
         self.lib.attach(self.rectmanager, rect_id, parent_id)
         err = 0
+
+        # No need to move the rect to 0,0. That is the default position.
         if position != (0,0):
             err = self.rect_move(rect_id, *position)
-
 
         if err:
             raise EXCEPTIONS[err](
@@ -565,7 +532,7 @@ class RectManager:
         self.rect_draw(0)
 
 
-class RectStage(RectManager):
+class RectStage:
     FPS = 60
     DELAY = 1 / FPS
     def __init__(self):
@@ -573,6 +540,7 @@ class RectStage(RectManager):
         self.scenes = {}
         self.active_scene = None
         self.playing = False
+        self.rect = init()
 
     def set_fps(self, new_fps):
         self.FPS = new_fps
@@ -587,8 +555,8 @@ class RectStage(RectManager):
     def _resize_checker(self):
         w, h = get_terminal_size()
 
-        if self.width != w or self.height != h:
-            self.resize(w, h)
+        if self.rect.width != w or self.rect.height != h:
+            self.rect.resize(w, h)
             try:
                 scene = self.scenes[self.active_scene]
             except KeyError:
@@ -616,11 +584,11 @@ class RectStage(RectManager):
 
     # TODO: Handle Errors here
     def create_scene(self, key, constructor, **kwargs):
-        kwargs['width'] = self.width
-        kwargs['height'] = self.height
+        kwargs['width'] = self.rect.width
+        kwargs['height'] = self.rect.height
         kwargs['constructor'] = constructor
 
-        output = self.create_rect(**kwargs)
+        output = self.rect.new_rect(**kwargs)
         self.scenes[key] = output
 
         return output
@@ -630,12 +598,11 @@ class RectStage(RectManager):
             self.scenes[self.active_scene].disable()
         self.active_scene = new_scene_key
         self.scenes[self.active_scene].enable()
-        self.draw()
+        self.rect.draw()
 
     def kill(self):
         self.playing = False
-        super().kill()
-
+        kill()
 
 class RectScene(Rect):
     def __init__(self, n, rectmanager, **kwargs):
@@ -643,4 +610,16 @@ class RectScene(Rect):
 
     def tick(self):
         pass
+
+__RECTMANAGER = None
+def init():
+    global __RECTMANAGER
+    if not __RECTMANAGER:
+        __RECTMANAGER = RectManager()
+    return __RECTMANAGER.root
+
+def kill():
+    global __RECTMANAGER
+    if __RECTMANAGER:
+        __RECTMANAGER.kill()
 
