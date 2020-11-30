@@ -1,5 +1,10 @@
 # Wrecked
-A library for terminal-based graphics and UI.
+A library for terminal-based graphics and UI.<br/>
+![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/d/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/v/wrecked?style=flat-square)
+
 
 ## Table of Contents
 * [About](#about)
