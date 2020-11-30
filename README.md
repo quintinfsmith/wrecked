@@ -1,5 +1,8 @@
 # wrecked_bindings
-python bindings for the wrecked library.
+Python bindings for the wrecked terminal interface library.<br/>
+![PyPI - Downloads](https://img.shields.io/pypi/dw/wrecked?style=flat-square)
+![PyPI - License](https://img.shields.io/pypi/l/wrecked?style=flat-square)
+![PyPI](https://img.shields.io/pypi/v/wrecked?style=flat-square)
 
 ## Installation
 Can be installed through pip
