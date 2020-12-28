@@ -1028,7 +1028,7 @@ impl RectManager {
     /// assert_eq!(rectmanager.get_rect_height(rect), 10);
     /// rectmanager.kill();
     /// ```
-    pub fn get_rect_width(&mut self, rect_id: usize) -> usize {
+    pub fn get_rect_width(&self, rect_id: usize) -> usize {
         let (width, _) = self.get_rect_size(rect_id).unwrap();
         width
     }
@@ -1043,19 +1043,19 @@ impl RectManager {
     /// assert_eq!(rectmanager.get_rect_height(rect), 10);
     /// rectmanager.kill();
     /// ```
-    pub fn get_rect_height(&mut self, rect_id: usize) -> usize {
+    pub fn get_rect_height(&self, rect_id: usize) -> usize {
         let (_, height) = self.get_rect_size(rect_id).unwrap();
         height
     }
 
     /// Gets the width of the RectManager
-    pub fn get_width(&mut self) -> usize {
+    pub fn get_width(&self) -> usize {
         let (width, _) = self.get_rect_size(TOP).unwrap();
         width
     }
 
     /// Gets the height of the RectManager
-    pub fn get_height(&mut self) -> usize {
+    pub fn get_height(&self) -> usize {
         let (_, height) = self.get_rect_size(TOP).unwrap();
         height
     }
