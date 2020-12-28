@@ -1,11 +1,9 @@
 # Wrecked
-A library for terminal-based graphics and UI.
-
-## Table of Contents
-* [About](#about)
-* [Setup](#setup)
-* [Usage](#usage)
-
+A library for terminal-based graphics and UI.<br/>
+![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/d/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/wrecked?style=flat-square)
+![Crates.io](https://img.shields.io/crates/v/wrecked?style=flat-square)
 
 ## About
 Wrecked is (hopefully) a straightforward environment for rendering character-based graphics that uses a tree-like structure with rectangles as nodes.
