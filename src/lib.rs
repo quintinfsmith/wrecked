@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str;
+use std::io::{self, Write};
 use std::cmp;
 use std::cmp::PartialOrd;
 
@@ -200,8 +201,7 @@ impl RectManager {
                 new_termios.c_lflag &= !(ICANON | ECHO);
                 tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
 
-                print!("\x1B[?25l"); // Hide Cursor
-                println!("\x1B[?1049h"); // New screen
+                RectManager::__write("\x1B[?25l\x1B[?1049h"); // New screen
             }
             None => {
 
@@ -219,9 +219,16 @@ impl RectManager {
 
         rectmanager.new_orphan().expect("Couldn't Create TOP rect");
         rectmanager.auto_resize();
-
         rectmanager
     }
+
+    fn __write(input: &str) -> io::Result<()> {
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        handle.write_all(format!("{}\x0A", input).as_bytes())?;
+        Ok(())
+    }
+
 
 
     /// Add a new rectangle to the environment
@@ -299,15 +306,12 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn draw_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
-
         match self.build_latest_rect_string(rect_id) {
             Some(renderstring) => {
-                print!("{}\x1B[0m", renderstring);
-                println!("\x1B[1;1H");
+                RectManager::__write(&format!("{}\x1B[0m\x1B[1;1H", renderstring));
             }
             None => ()
         }
-
         Ok(())
     }
 
@@ -1480,8 +1484,7 @@ impl RectManager {
             Some(_termios) => {
                 tcsetattr(0, TCSANOW, & _termios).unwrap();
 
-                print!("\x1B[?25h"); // Show Cursor
-                println!("\x1B[?1049l"); // Return to previous screen
+                RectManager::__write("\x1B[?25h\x1B[?1049l"); // Return to previous screen
             }
             None => ()
         }
