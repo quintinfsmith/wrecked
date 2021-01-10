@@ -1,10 +1,9 @@
 # Wrecked
 A library for terminal-based graphics and UI.<br/>
-![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/wrecked?style=flat-square)
-![Crates.io](https://img.shields.io/crates/d/wrecked?style=flat-square)
-![Crates.io](https://img.shields.io/crates/l/wrecked?style=flat-square)
-![Crates.io](https://img.shields.io/crates/v/wrecked?style=flat-square)
-
+[![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/wrecked?style=flat-square)](https://travis-ci.com/github/quintinfsmith/wrecked)
+[![Crates.io](https://img.shields.io/crates/d/wrecked?style=flat-square)](https://crates.io/crates/wrecked)
+[![Crates.io](https://img.shields.io/crates/v/wrecked?style=flat-square)](https://crates.io/crates/wrecked)
+[![GitHub](https://img.shields.io/github/license/quintinfsmith/wrecked?style=flat-square)](https://github.com/quintinfsmith/wrecked/blob/master/LICENSE)
 ## About
 Wrecked is (hopefully) a straightforward environment for rendering character-based graphics that uses a tree-like structure with rectangles as nodes.
 It exists partially because I wanted to give myself a reason to work in rust, but mostly because I didn't want to read through the ncurses documentation.
