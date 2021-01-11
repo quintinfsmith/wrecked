@@ -186,7 +186,6 @@ impl RectManager {
     pub fn new() -> RectManager {
         let termios = Termios::from_fd(libc::STDOUT_FILENO).ok();
 
-        #[cfg(not(debug_assertions))]
         match termios.clone() {
             Some(mut new_termios) => {
                 new_termios.c_lflag &= !(ICANON | ECHO);
@@ -1470,7 +1469,6 @@ impl RectManager {
         // Even if it fails, we want to try clearing out all the rects
         // that are drawn, and reset the screen, to try to make failure
         // as easy to read as possible.
-        #[cfg(not(debug_assertions))]
         match self._termios {
             Some(_termios) => {
                 tcsetattr(0, TCSANOW, & _termios).unwrap();
