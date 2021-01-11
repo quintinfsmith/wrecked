@@ -21,25 +21,16 @@ pub fn get_terminal_size() -> (u16, u16) {
     use libc::{winsize, TIOCGWINSZ, ioctl, isatty};
     let mut output = (1, 1);
 
-    #[cfg(debug_assertions)]
-    {
-        output = (50, 25);
-    }
+    let mut t = winsize {
+        ws_row: 0,
+        ws_col: 0,
+        ws_xpixel: 0,
+        ws_ypixel: 0
+    };
 
 
-    #[cfg(not(debug_assertions))]
-    {
-        let mut t = winsize {
-            ws_row: 0,
-            ws_col: 0,
-            ws_xpixel: 0,
-            ws_ypixel: 0
-        };
-
-
-        if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
-            output = (t.ws_col, t.ws_row);
-        }
+    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
+        output = (t.ws_col, t.ws_row);
     }
 
     output
@@ -2423,10 +2414,6 @@ impl Rect {
             _cached_display: HashMap::new(),
             default_character: ' ' // Space
         }
-    }
-
-    fn get_rect_id(&self) -> usize {
-        self.rect_id
     }
 
     fn disable(&mut self) {

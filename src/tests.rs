@@ -533,141 +533,43 @@ fn test_get_visible_box() -> Result<(), RectError> {
 #[test]
 fn test_set_effects() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
-    rectmanager.set_bold_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
+    let effect_count = 6;
+    for i in 0 .. effect_count + 1 {
+        match i {
+            0 => { rectmanager.set_bold_flag(TOP); }
+            1 => { rectmanager.set_underline_flag(TOP); }
+            2 => { rectmanager.set_invert_flag(TOP); }
+            3 => { rectmanager.set_italics_flag(TOP); }
+            4 => { rectmanager.set_strike_flag(TOP); }
+            5 => { rectmanager.set_blink_flag(TOP); }
+            _ => {}
         }
-        None => {
-            assert!(false);
+
+        match rectmanager.get_rect(TOP) {
+            Some(rect) => {
+                assert!((i == 0) == rect.is_bold());
+                assert!((i == 1) == rect.is_underlined());
+                assert!((i == 2) == rect.is_inverted());
+                assert!((i == 3) == rect.is_italicized());
+                assert!((i == 4) == rect.is_striken());
+                assert!((i == 5) == rect.is_blinking());
+            }
+            None => {
+                assert!(false);
+            }
+        }
+
+        match i {
+            0 => { rectmanager.unset_bold_flag(TOP); }
+            1 => { rectmanager.unset_underline_flag(TOP); }
+            2 => { rectmanager.unset_invert_flag(TOP); }
+            3 => { rectmanager.unset_italics_flag(TOP); }
+            4 => { rectmanager.unset_strike_flag(TOP); }
+            5 => { rectmanager.unset_blink_flag(TOP); }
+            _ => {}
         }
     }
 
-    rectmanager.unset_bold_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-
-    rectmanager.set_underline_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-    rectmanager.unset_underline_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-
-    rectmanager.set_invert_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-    rectmanager.unset_invert_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-
-    rectmanager.set_italics_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-    rectmanager.unset_italics_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-
-    rectmanager.set_strike_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
-    rectmanager.unset_strike_flag(TOP)?;
-    match rectmanager.get_rect(TOP) {
-        Some(rect) => {
-            assert!(!rect.is_bold());
-            assert!(!rect.is_underlined());
-            assert!(!rect.is_inverted());
-            assert!(!rect.is_italicized());
-            assert!(!rect.is_striken());
-        }
-        None => {
-            assert!(false);
-        }
-    }
 
     rectmanager.set_bg_color(TOP, RectColor::BLUE)?;
     rectmanager.set_fg_color(TOP, RectColor::RED)?;
