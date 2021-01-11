@@ -13,7 +13,7 @@ The latest *stable* version can be found at crates.io.
 In your project's Cargo.toml...
 ```toml
 [dependencies]
-wrecked = { version ="*" }
+wrecked = "^0.1.17"
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ use wrecked::{RectManager, RectColor};
 let mut rectmanager = RectManager::new();
 
 // create a rectangle to put text in.
-let mut rect_id = rectmanager.new_rect(wrecked::TOP);
+let mut rect_id = rectmanager.new_rect(wrecked::TOP).ok().unwrap();
 
 // set the new rectangle's size
 rectmanager.resize(rect_id, 16, 5);
