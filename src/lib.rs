@@ -317,7 +317,7 @@ impl RectManager {
     /// builds a string from the latest cached content of the
     /// given rect.
     /// It's been separated and made public for testing only, so if you're using it outside that case, you're likely doing something wrong.
-    pub fn build_latest_rect_string(&mut self, rect_id: usize) -> Option<String> {
+    fn build_latest_rect_string(&mut self, rect_id: usize) -> Option<String> {
         let draw_map = self.build_draw_map(rect_id);
         let mut filtered_map = self.filter_cached(draw_map);
         if filtered_map.len() > 0 {
