@@ -138,7 +138,6 @@ fn test_delete() -> Result<(), RectError> {
     rectmanager.kill()
 }
 
-
 #[test]
 fn test_move() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
@@ -270,7 +269,7 @@ fn test_shift_contents() -> Result<(), RectError> {
 #[test]
 fn test_clear_children() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
-    for i in 0 .. 4 {
+    for _ in 0 .. 4 {
         rectmanager.new_rect(TOP).ok().unwrap();
     }
 
@@ -305,8 +304,6 @@ fn test_clear_effects() -> Result<(), RectError> {
             assert!(false);
         }
     }
-
-
 
     rectmanager.kill()
 }
@@ -443,42 +440,10 @@ fn test_draw_map() -> Result<(), RectError> {
 }
 
 #[test]
-fn test_lineage() -> Result<(), RectError> {
-    let mut rectmanager = RectManager::new();
-    let rect_a = rectmanager.new_rect(TOP).ok().unwrap();
-    let rect_b = rectmanager.new_rect(rect_a).ok().unwrap();
-    let rect_c = rectmanager.new_rect(rect_b).ok().unwrap();
-
-    let expected_lineage = vec![rect_b, rect_a, 0];
-    assert_eq!(rectmanager.trace_lineage(rect_c), expected_lineage);
-
-    match rectmanager.get_top(rect_c) {
-        Some(top) => {
-            assert_eq!(TOP, top.rect_id);
-        }
-        None => {
-            assert!(false);
-        }
-    };
-
-    match rectmanager.get_top_mut(rect_c) {
-        Some(top) => {
-            assert_eq!(TOP, top.rect_id);
-        }
-        None => {
-            assert!(false);
-        }
-    };
-    rectmanager.kill()
-}
-
-#[test]
 fn test_replace() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
     let rect_a = rectmanager.new_rect(TOP).ok().unwrap();
-    let rect_a_a = rectmanager.new_rect(rect_a).ok().unwrap();
     let rect_b = rectmanager.new_rect(TOP).ok().unwrap();
-    let rect_b_a = rectmanager.new_rect(rect_b).ok().unwrap();
     rectmanager.detach(rect_b)?;
 
     rectmanager.replace_with(rect_a, rect_b)?;
@@ -493,23 +458,7 @@ fn test_replace() -> Result<(), RectError> {
         }
     }
 
-    match rectmanager.get_top(rect_a_a) {
-        Some(rect) => {
-            assert_eq!(rect.rect_id, rect_a);
-        }
-        None => {
-            assert!(false);
-        }
-    }
 
-    match rectmanager.get_top(rect_b_a) {
-        Some(rect) => {
-            assert_eq!(rect.rect_id, 0);
-        }
-        None => {
-            assert!(false);
-        }
-    }
     rectmanager.kill()
 }
 
@@ -529,19 +478,18 @@ fn test_get_visible_box() -> Result<(), RectError> {
     rectmanager.kill()
 }
 
-
 #[test]
 fn test_set_effects() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
     let effect_count = 6;
     for i in 0 .. effect_count + 1 {
         match i {
-            0 => { rectmanager.set_bold_flag(TOP); }
-            1 => { rectmanager.set_underline_flag(TOP); }
-            2 => { rectmanager.set_invert_flag(TOP); }
-            3 => { rectmanager.set_italics_flag(TOP); }
-            4 => { rectmanager.set_strike_flag(TOP); }
-            5 => { rectmanager.set_blink_flag(TOP); }
+            0 => { assert!(rectmanager.set_bold_flag(TOP).is_ok()); }
+            1 => { assert!(rectmanager.set_underline_flag(TOP).is_ok()); }
+            2 => { assert!(rectmanager.set_invert_flag(TOP).is_ok()); }
+            3 => { assert!(rectmanager.set_italics_flag(TOP).is_ok()); }
+            4 => { assert!(rectmanager.set_strike_flag(TOP).is_ok()); }
+            5 => { assert!(rectmanager.set_blink_flag(TOP).is_ok()); }
             _ => {}
         }
 
@@ -560,12 +508,12 @@ fn test_set_effects() -> Result<(), RectError> {
         }
 
         match i {
-            0 => { rectmanager.unset_bold_flag(TOP); }
-            1 => { rectmanager.unset_underline_flag(TOP); }
-            2 => { rectmanager.unset_invert_flag(TOP); }
-            3 => { rectmanager.unset_italics_flag(TOP); }
-            4 => { rectmanager.unset_strike_flag(TOP); }
-            5 => { rectmanager.unset_blink_flag(TOP); }
+            0 => { assert!(rectmanager.unset_bold_flag(TOP).is_ok()); }
+            1 => { assert!(rectmanager.unset_underline_flag(TOP).is_ok()); }
+            2 => { assert!(rectmanager.unset_invert_flag(TOP).is_ok()); }
+            3 => { assert!(rectmanager.unset_italics_flag(TOP).is_ok()); }
+            4 => { assert!(rectmanager.unset_strike_flag(TOP).is_ok()); }
+            5 => { assert!(rectmanager.unset_blink_flag(TOP).is_ok()); }
             _ => {}
         }
     }
@@ -627,9 +575,6 @@ fn test_failures() -> Result<(), RectError> {
     assert!(rectmanager.get_parent_mut(bad_id).is_none());
     assert!(rectmanager.get_parent_mut(TOP).is_none());
 
-    assert!(rectmanager.get_top(bad_id).is_none());
-    assert!(rectmanager.get_top_mut(bad_id).is_none());
-
     assert_eq!(rectmanager.get_visible_box(bad_id).err().unwrap(), RectError::NotFound(bad_id));
 
     assert_eq!(rectmanager.set_bg_color(bad_id, RectColor::RED).err().unwrap(), RectError::NotFound(bad_id));
@@ -670,8 +615,6 @@ fn test_failures() -> Result<(), RectError> {
     assert_eq!(rectmanager.set_string(bad_id, 0, 0, &"BOOP").err().unwrap(), RectError::NotFound(bad_id));
     assert_eq!(rectmanager.set_string(good_id, 3000, 0, &"afnwjeklnawjekflnawjekflnawejfklanwejfklnawejfklawnefjkawlnefjkawlenfjawkelfnajwkelfafawefBOOP").err().unwrap(), RectError::StringTooLong);
 
-    assert_eq!(rectmanager.get_rank(bad_id).err().unwrap(), RectError::NotFound(bad_id));
-    assert!(rectmanager.get_depth(bad_id).is_none());
 
     rectmanager.kill()
 }
@@ -690,45 +633,6 @@ fn test_default_character() -> Result<(), RectError> {
     }
 
     assert_eq!(rectmanager.get_default_character(TOP), test_character);
-
-    rectmanager.kill()
-}
-
-#[test]
-fn test_get_depth() -> Result<(), RectError> {
-    let mut rectmanager = RectManager::new();
-    let test_depth = 4;
-    let mut prev_id = 0;
-    for _ in 0 .. test_depth {
-        prev_id = rectmanager.new_rect(prev_id).ok().unwrap();
-    }
-
-    let real_depth = rectmanager.get_depth(prev_id).unwrap();
-    assert_eq!(real_depth, test_depth, "get_depth() is broken");
-
-    rectmanager.kill()
-}
-
-#[test]
-fn test_get_rank() -> Result<(), RectError> {
-    let mut rectmanager = RectManager::new();
-    let test_children = 5;
-    let mut child_ids: Vec<(usize, usize)> = Vec::new();
-    for i in 0 .. test_children {
-        child_ids.push((i, rectmanager.new_rect(TOP).ok().unwrap()));
-    }
-
-    for (test_rank, working_id) in child_ids.iter() {
-        match rectmanager.get_rank(*working_id) {
-            Ok(real_rank) => {
-                assert_eq!(real_rank, *test_rank, "get_rank() isn't returning correct value");
-            }
-            Err(e) => {
-                assert_ne!(e, RectError::ChildNotFound(TOP, *working_id), "Somehow a child is being deleted, but not detached from its parent.");
-                assert!(false);
-            }
-        }
-    }
 
     rectmanager.kill()
 }
@@ -795,29 +699,29 @@ fn test_update_child_space() -> Result<(), RectError> {
 fn test_transparency() -> Result<(), RectError> {
     let mut rectmanager = RectManager::new();
     let mut rect_id = rectmanager.new_rect(TOP).ok().unwrap();
-    let mut t_rect_id = rectmanager.new_rect(TOP).ok().unwrap();
+    let t_rect_id = rectmanager.new_rect(TOP).ok().unwrap();
 
-    rectmanager.resize(rect_id, 10, 10);
+    rectmanager.resize(rect_id, 10, 10)?;
     rectmanager.set_bg_color(rect_id, RectColor::BLUE);
 
-    rectmanager.resize(t_rect_id, 10, 10);
-    rectmanager.set_position(t_rect_id, 3, 3);
-    rectmanager.set_transparency(t_rect_id, true);
+    rectmanager.resize(t_rect_id, 10, 10)?;
+    rectmanager.set_position(t_rect_id, 3, 3)?;
+    assert!(rectmanager.set_transparency(t_rect_id, true).is_ok());
 
-    let mut ansi_string = rectmanager.build_latest_rect_string(TOP).unwrap();
+    let ansi_string = rectmanager.build_latest_rect_string(TOP).unwrap();
 
-    rectmanager.kill();
+    rectmanager.kill()?;
 
     // Get comparison string, (don't build the transparent rect)
     rectmanager = RectManager::new();
     rect_id = rectmanager.new_rect(TOP).ok().unwrap();
 
-    rectmanager.resize(rect_id, 10, 10);
-    rectmanager.set_bg_color(rect_id, RectColor::BLUE);
+    rectmanager.resize(rect_id, 10, 10)?;
+    rectmanager.set_bg_color(rect_id, RectColor::BLUE)?;
 
-    let mut control_string = rectmanager.build_latest_rect_string(TOP).unwrap();
+    let control_string = rectmanager.build_latest_rect_string(TOP).unwrap();
 
-    rectmanager.kill();
+    rectmanager.kill()?;
 
     assert_eq!(control_string, ansi_string);
 

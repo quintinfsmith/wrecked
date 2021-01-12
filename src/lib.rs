@@ -18,7 +18,7 @@ pub mod tests;
 */
 
 pub fn get_terminal_size() -> (u16, u16) {
-    use libc::{winsize, TIOCGWINSZ, ioctl, isatty};
+    use libc::{winsize, TIOCGWINSZ, ioctl};
     let mut output = (1, 1);
 
     let mut t = winsize {
@@ -47,7 +47,8 @@ pub enum RectError {
     NoParent(usize), // Rect has no parent id
     BadPosition(isize, isize),
     ParentNotFound(usize, usize), // rect has an associated parent id that does not exist in RectManager
-    ChildNotFound(usize, usize)
+    ChildNotFound(usize, usize),
+    StdoutFailure(String)
 }
 impl Display for RectError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -57,6 +58,7 @@ impl Display for RectError {
 }
 impl Error for RectError {}
 
+/// enum versions of the ANSI color codes
 #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Debug)]
 pub enum RectColor {
     BLACK = 0,
@@ -117,7 +119,7 @@ impl RectEffectsHandler {
             foreground_color: None
         }
     }
-    pub fn is_empty(&self) -> bool {
+    pub fn is_plain(&self) -> bool {
         !self.bold
         && !self.underline
         && !self.invert
@@ -191,7 +193,7 @@ impl RectManager {
                 new_termios.c_lflag &= !(ICANON | ECHO);
                 tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
 
-                RectManager::__write("\x1B[?25l\x1B[?1049h"); // New screen
+                RectManager::__write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
             }
             None => {
 
@@ -212,11 +214,17 @@ impl RectManager {
         rectmanager
     }
 
-    fn __write(input: &str) -> io::Result<()> {
+    fn __write(input: &str) -> Result<(), RectError> {
         let stdout = io::stdout();
         let mut handle = stdout.lock();
-        handle.write_all(format!("{}\x0A", input).as_bytes())?;
-        Ok(())
+        match handle.write_all(format!("{}\x0A", input).as_bytes()) {
+            Ok(_) => {
+                Ok(())
+            }
+            Err(_e) => {
+                Err(RectError::StdoutFailure(input.to_string()))
+            }
+        }
     }
 
 
@@ -298,7 +306,7 @@ impl RectManager {
     pub fn draw_rect(&mut self, rect_id: usize) -> Result<(), RectError> {
         match self.build_latest_rect_string(rect_id) {
             Some(renderstring) => {
-                RectManager::__write(&format!("{}\x1B[0m\x1B[1;1H", renderstring));
+                RectManager::__write(&format!("{}\x1B[0m\x1B[1;1H", renderstring))?;
             }
             None => ()
         }
@@ -533,12 +541,10 @@ impl RectManager {
     /// If a rectangle has been disabled, enable it.
     pub fn enable(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut was_enabled = false;
-        let mut parent = None;
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 was_enabled = rect.enabled;
                 rect.enable();
-                parent = rect.parent;
             }
             None => {
                 Err(RectError::NotFound(rect_id))?;
@@ -547,7 +553,7 @@ impl RectManager {
 
 
         if ! was_enabled {
-            self.update_child_space(rect_id);
+            self.update_child_space(rect_id)?;
         }
 
         Ok(())
@@ -1473,7 +1479,7 @@ impl RectManager {
             Some(_termios) => {
                 tcsetattr(0, TCSANOW, & _termios).unwrap();
 
-                RectManager::__write("\x1B[?25h\x1B[?1049l"); // Return to previous screen
+                RectManager::__write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
             }
             None => ()
         }
@@ -1594,72 +1600,6 @@ impl RectManager {
         }
     }
 
-    // Top can be the same as the given rect
-    fn get_top(&self, rect_id: usize) -> Option<&Rect> {
-        let mut current_id = rect_id;
-        let mut rect_defined = false;
-
-        loop {
-            match self.get_rect(current_id) {
-                Some(current_rect) => {
-                    rect_defined = true;
-                    match current_rect.parent {
-                        Some(parent_id) => {
-                            current_id = parent_id
-                        }
-                        None => {
-                            break;
-                        }
-                    }
-                }
-                None => {
-                    // Should only happen on first loop, indicating that the
-                    // queried rect doesn't exist
-                    break;
-                }
-            }
-        }
-
-        if rect_defined {
-            self.get_rect(current_id)
-        } else {
-            None
-        }
-    }
-
-    // Top can be the same as the given rect
-    fn get_top_mut(&mut self, rect_id: usize) -> Option<&mut Rect> {
-        let mut current_id = rect_id;
-        let mut rect_defined = false;
-
-        loop {
-            match self.get_rect_mut(current_id) {
-                Some(current_rect) => {
-                    rect_defined = true;
-                    match current_rect.parent {
-                        Some(parent_id) => {
-                            current_id = parent_id
-                        }
-                        None => {
-                            break;
-                        }
-                    }
-                }
-                None => {
-                    // Should only happen on first loop, indicating that the
-                    // queried rect doesn't exist
-                    break;
-                }
-            }
-        }
-
-        if rect_defined {
-            self.get_rect_mut(current_id)
-        } else {
-            None
-        }
-    }
-
     fn _update_cached_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), RectError> {
         let mut pos_stack: HashMap<(isize, isize), Vec<(usize, usize)>> = HashMap::new();
         let mut require_updates: HashSet<usize> = HashSet::new();
@@ -1685,7 +1625,6 @@ impl RectManager {
         }
 
         let mut child_positions: HashMap<usize, (isize, isize)> = HashMap::new();
-        let mut max_cache_ranks: HashMap<(isize, isize), usize> = HashMap::new();
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 child_positions = rect.child_positions.clone();
@@ -1738,7 +1677,7 @@ impl RectManager {
         }
 
         for child_id in require_updates.iter() {
-            self._update_cached_display(*child_id);
+            self._update_cached_display(*child_id)?;
         }
 
 
@@ -1777,14 +1716,9 @@ impl RectManager {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 for (new_value, rank, x, y) in new_values.iter() {
-                    let max_cache_rank = match max_cache_ranks.get(&(*x, *y)) {
-                        Some(m) => *m,
-                        None => 0
-                    };
-
                     rect._cached_display.entry((*x, *y))
                         .and_modify(|e| {
-                            if e.2 <= *rank || max_cache_rank <= e.2 {
+                            if e.2 <= *rank {
                                 *e = (new_value.0, new_value.1, *rank);
                             }
                         })
@@ -2127,83 +2061,6 @@ impl RectManager {
         to_draw
     }
 
-    // Get n where n is the position in sibling array
-    fn get_rank(&self, rect_id: usize) -> Result<usize, RectError> {
-        let mut rank = 0;
-        match self.get_parent(rect_id) {
-            Some(parent) => {
-                let mut _rank = 0;
-                for i in parent.children.iter() {
-                    if *i == rect_id {
-                        rank = _rank;
-                        break;
-                    }
-                    _rank += 1;
-                }
-
-                if _rank == parent.children.len() {
-                    Err(RectError::ChildNotFound(parent.rect_id, rect_id))?;
-                }
-
-            }
-            None => {
-                Err(RectError::NotFound(rect_id))?;
-            }
-        }
-
-        Ok(rank)
-    }
-
-    fn get_depth(&self, rect_id: usize) -> Option<usize> {
-        let mut output = match self.get_rect(rect_id) {
-            Some(_) => {
-                Some(0)
-            }
-            None => {
-                None
-            }
-        };
-
-        if output.is_some() {
-            let mut depth = 0;
-            let mut working_id = rect_id;
-            loop {
-                match self.get_parent(working_id) {
-                    Some(parent) => {
-                        working_id = parent.rect_id;
-                        depth += 1
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            }
-
-            output = Some(depth);
-        }
-
-        output
-    }
-
-    fn trace_lineage(&self, rect_id: usize) -> Vec<usize> {
-        let mut lineage = Vec::new();
-        let mut working_id = rect_id;
-        loop {
-            match self.get_parent(working_id) {
-                Some(parent) => {
-                    lineage.push(parent.rect_id);
-                    working_id = parent.rect_id;
-                }
-                None => {
-                    break;
-                }
-            }
-        }
-
-        lineage
-    }
-
-
     // Flags the area of the parent of given rect covered by the given rect
     fn flag_parent_refresh(&mut self, rect_id: usize) -> Result<(), RectError> {
         let mut dimensions = (0, 0);
@@ -2357,6 +2214,29 @@ impl RectManager {
             }
         }
     }
+
+    pub fn get_fg_color(&self, rect_id: usize) -> Option<RectColor> {
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                rect.get_fg_color()
+            }
+            None => {
+                None
+            }
+        }
+    }
+
+    pub fn get_bg_color(&self, rect_id: usize) -> Option<RectColor> {
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                rect.get_bg_color()
+            }
+            None => {
+                None
+            }
+        }
+    }
+
 }
 
 #[derive(Debug)]
@@ -2550,34 +2430,6 @@ impl Rect {
         self.set_character(x, y, self.default_character)
     }
 
-    pub fn is_plain(&self) -> bool {
-        self.effects.is_empty()
-    }
-
-    fn is_bold(&self) -> bool {
-        self.effects.bold
-    }
-
-    fn is_underlined(&self) -> bool {
-        self.effects.underline
-    }
-
-    fn is_inverted(&self) -> bool {
-        self.effects.invert
-    }
-
-    fn is_italicized(&self) -> bool {
-        self.effects.italics
-    }
-
-    fn is_striken(&self) -> bool {
-        self.effects.strike
-    }
-
-    fn is_blinking(&self) -> bool {
-        self.effects.blink
-    }
-
     fn set_bold_flag(&mut self) {
         if ! self.effects.bold {
             self.flag_full_refresh = true;
@@ -2758,17 +2610,6 @@ impl Rect {
             .or_insert((x, y));
     }
 
-    pub fn has_child(&self, child_id: usize) -> bool {
-        let mut output = false;
-        for connected_child_id in self.children.iter() {
-            if *connected_child_id == child_id {
-                output = true;
-                break;
-            }
-        }
-        output
-    }
-
     pub fn clear_characters(&mut self) {
         self.character_space.clear();
         self._cached_display.clear();
@@ -2779,5 +2620,44 @@ impl Rect {
     }
     pub fn get_bg_color(&self) -> Option<RectColor> {
         self.effects.background_color
+    }
+
+    pub fn is_plain(&self) -> bool {
+        self.effects.is_plain()
+    }
+
+    pub fn is_bold(&self) -> bool {
+        self.effects.bold
+    }
+
+    pub fn is_underlined(&self) -> bool {
+        self.effects.underline
+    }
+
+    pub fn is_inverted(&self) -> bool {
+        self.effects.invert
+    }
+
+    pub fn is_italicized(&self) -> bool {
+        self.effects.italics
+    }
+
+    pub fn is_striken(&self) -> bool {
+        self.effects.strike
+    }
+
+    pub fn is_blinking(&self) -> bool {
+        self.effects.blink
+    }
+
+    pub fn has_child(&self, child_id: usize) -> bool {
+        let mut output = false;
+        for connected_child_id in self.children.iter() {
+            if *connected_child_id == child_id {
+                output = true;
+                break;
+            }
+        }
+        output
     }
 }
