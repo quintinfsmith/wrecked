@@ -19,6 +19,7 @@ wrecked = "^0.1.17"
 ## Usage
 ```rust
 use wrecked::{RectManager, RectColor};
+use std::{time, thread};
 
 // Instantiates the environment. Turns off input echo.
 let mut rectmanager = RectManager::new();
@@ -40,6 +41,9 @@ rectmanager.set_underline_flag(rect_id);
 
 // Draw the environment
 rectmanager.draw();
+
+// Sleep for 2 seconds so you can see the output before it gets torn down
+thread::sleep(time::Duration::from_secs(2));
 
 // take down the environment, and turn echo back on.
 rectmanager.kill();
