@@ -1933,7 +1933,7 @@ impl RectManager {
                     if new_effects.bold {
                         ansi_code_list.push(1); // on
                     } else {
-                        ansi_code_list.push(21); // off
+                        ansi_code_list.push(22); // off
                     }
                 }
 
