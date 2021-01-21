@@ -729,13 +729,13 @@ impl RectManager {
         Ok(())
     }
 
-    pub fn get_children(&self, rect_id: usize) -> Result<Vec<usize>, RectError> {
+    pub fn get_children(&self, rect_id: usize) -> Vec<usize> {
         match self.get_rect(rect_id) {
             Some(rect) => {
-                Ok(rect.children.clone())
+                rect.children.clone()
             }
             None => {
-                Err(RectError::NotFound(rect_id))
+                Vec::new()
             }
         }
     }
