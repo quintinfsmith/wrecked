@@ -729,6 +729,17 @@ impl RectManager {
         Ok(())
     }
 
+    pub fn get_children(&self, rect_id: usize) -> Result<Vec<usize>, RectError> {
+        match self.get_rect(rect_id) {
+            Some(rect) => {
+                Ok(rect.children.clone())
+            }
+            None => {
+                Err(RectError::NotFound(rect_id))
+            }
+        }
+    }
+
     /// Set a string of characters starting at the specified position of the given rectangle.
     /// Wraps automatically, but will throw error on y-overflow.
     /// # Example
