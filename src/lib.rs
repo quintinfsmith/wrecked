@@ -501,10 +501,29 @@ impl RectManager {
 
         if has_parent {
             self.update_child_space(rect_id)?;
+            self.cached_to_queued(rect_id);
             self.flag_parent_refresh(rect_id)?;
         }
 
         Ok(())
+    }
+
+    fn cached_to_queued(&mut self, rect_id: usize) {
+        match self.get_rect_mut(rect_id) {
+            Some(rect) => {
+                let mut tmp = Vec::new();
+                for (key, val) in rect._cached_display.drain() {
+                    tmp.push((key, val));
+                }
+                for (key, val) in tmp.drain(..) {
+                    rect._queued_display.entry(key)
+                        .and_modify(|e| {*e = val})
+                        .or_insert(val);
+                }
+
+            }
+            None => {}
+        }
     }
 
     /// Do not draw the given rectangle or is descendents when draw() is called.
@@ -1577,7 +1596,7 @@ impl RectManager {
                 };
             }
             None => ()
-        };
+        }
 
 
         if has_parent {
@@ -1793,7 +1812,9 @@ impl RectManager {
                             any children that cover the requested positions
                         */
                         for pos in rect.flags_pos_refresh.iter() {
-                            if pos.0 >= 0 && pos.1 >= 0 && pos.0 < rect.width as isize && pos.1 < rect.height as isize {
+                            if pos.0 >= 0 && pos.1 >= 0
+                            && pos.0 < rect.width as isize
+                            && pos.1 < rect.height as isize {
                                 flags_pos_refresh.insert((pos.0 as isize, pos.1 as isize));
                             }
                         }
@@ -2074,6 +2095,7 @@ impl RectManager {
             Some(rect) => {
                 for key in to_cache.drain(..) {
                     let val = rect._queued_display.remove(&key).unwrap();
+                    rect._cached_display.insert(key, val);
                 }
             }
             None => {}
@@ -2107,7 +2129,7 @@ impl RectManager {
                     );
                 }
                 None => ()
-            };
+            }
 
             match self.get_parent_mut(working_id) {
                 Some(parent) => {
@@ -2121,7 +2143,7 @@ impl RectManager {
                 None => {
                     break;
                 }
-            };
+            }
         }
 
         Ok(())
@@ -2289,6 +2311,8 @@ struct Rect {
     effects: RectEffectsHandler,
 
     _queued_display: HashMap<(isize, isize), (char, RectEffectsHandler, usize)>,
+    _cached_display: HashMap<(isize, isize), (char, RectEffectsHandler, usize)>,
+
 }
 
 impl Rect {
@@ -2312,6 +2336,7 @@ impl Rect {
             effects: RectEffectsHandler::new(),
 
             _queued_display: HashMap::new(),
+            _cached_display: HashMap::new(),
             default_character: ' ' // Space
         }
     }
