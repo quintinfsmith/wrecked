@@ -2150,9 +2150,14 @@ impl RectManager {
     }
 
     fn flag_pos_refresh(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), RectError> {
+
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.flags_pos_refresh.insert((x, y));
+                match rect._cached_display.remove(&(x, y)) {
+                    Some(_) => {}
+                    None => {}
+                }
             }
             None => {
                 Err(RectError::NotFound(rect_id))?;
@@ -2351,6 +2356,7 @@ impl Rect {
 
     fn flag_refresh(&mut self) {
         self.flag_full_refresh = true;
+        self._cached_display.drain();
     }
 
     fn get_default_character(&self) -> char {
