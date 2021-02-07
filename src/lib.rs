@@ -12,10 +12,6 @@ use std::error::Error;
 use std::fmt::Display;
 
 pub mod tests;
-/*
-    TODO
-    Figure out why i made height/width of rect isize, change to usize or uN if not a good reason
-*/
 
 pub fn get_terminal_size() -> (u16, u16) {
     use libc::{winsize, TIOCGWINSZ, ioctl};
@@ -403,7 +399,7 @@ impl RectManager {
         let mut position = None;
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
-                position = Some(parent.get_child_position(rect_id));
+                position = parent.get_child_position(rect_id);
             }
             None => ()
         };
@@ -742,9 +738,7 @@ impl RectManager {
             }
         }
 
-
-        // TODO: This SHOULD only need flag_parent_refresh. but for some reason that break.
-        self.flag_refresh(rect_id)?;
+        self.flag_parent_refresh(rect_id)?;
 
         Ok(())
     }
@@ -831,11 +825,10 @@ impl RectManager {
     pub fn get_relative_offset(&self, rect_id: usize) -> Option<(isize, isize)> {
         match self.get_parent(rect_id) {
             Some(parent) => {
-                let pos = parent.get_child_position(rect_id);
-                Some((pos.0, pos.1))
-            },
+                parent.get_child_position(rect_id)
+            }
             None => {
-               Some((0, 0))
+                None
             }
         }
     }
@@ -857,39 +850,39 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn get_absolute_offset(&self, rect_id: usize) -> Option<(isize, isize)> {
-        let mut output = None;
-
-        let mut found = true;
-        match self.get_rect(rect_id) {
-            Some(_) => {}
-            None => {
-                found = false;
-            }
-        }
-
-        if found {
+        if self.has_rect(rect_id) {
             let mut x = 0;
             let mut y = 0;
             let mut working_id = rect_id;
-            let mut pos;
+            let mut broken = false;
             loop {
                 match self.get_parent(working_id) {
                     Some(parent) => {
-                        pos = parent.get_child_position(working_id);
-                        x += pos.0;
-                        y += pos.1;
-                        working_id = parent.rect_id;
-                    },
+                        match parent.get_child_position(working_id) {
+                            Some(pos) => {
+                                x += pos.0;
+                                y += pos.1;
+                                working_id = parent.rect_id;
+                            }
+                            None => {
+                                broken = true;
+                                break;
+                            }
+                        }
+                    }
                     None => {
                         break;
                     }
-                };
+                }
             }
-
-            output = Some((x, y));
+            if broken {
+                None
+            } else {
+                Some((x, y))
+            }
+        } else {
+            None
         }
-
-        output
     }
 
     /// Get the character at the given position of a rectangle.
@@ -1805,11 +1798,6 @@ impl RectManager {
     }
 
     fn _update_queued_display(&mut self, rect_id: usize) -> Result<(), RectError> {
-        /*
-           //TODO
-            Since Children indicate to parents that a refresh is requested,
-            if no flag is set, there is no need to delve down
-        */
         let mut flags_pos_refresh = HashSet::new();
 
         match self.get_rect_mut(rect_id) {
@@ -2395,23 +2383,15 @@ impl Rect {
         }
     }
 
-    fn get_child_position(&self, child_id: usize) -> (isize, isize) {
-        let x;
-        let y;
-
+    fn get_child_position(&self, child_id: usize) -> Option<(isize, isize)> {
         match self.child_positions.get(&child_id) {
-            Some(position) => {
-                x = position.0;
-                y = position.1;
+            Some((x, y)) => {
+                Some((*x, *y))
             }
-            // TODO: Throw Error
             None => {
-                x = 0;
-                y = 0;
+                None
             }
         }
-
-        (x, y)
     }
 
     fn update_child_space(&mut self, rect_id: usize, corners: (isize, isize, isize, isize), keep_cached: bool) {
@@ -2446,15 +2426,13 @@ impl Rect {
     }
 
     fn clear_child_space(&mut self, rect_id: usize) {
-        // TODO: Implement Copy for Vec<(isize, isize)> ?
-        let mut new_positions = Vec::new();
-        match self._inverse_child_space.get(&rect_id) {
+        let mut new_positions = match self._inverse_child_space.get(&rect_id) {
             Some(positions) => {
-                for position in positions.iter() {
-                    new_positions.push((position.0, position.1));
-                }
+                positions.clone()
             }
-            None => ()
+            None => {
+                vec![]
+            }
         };
 
         for position in new_positions.iter() {
