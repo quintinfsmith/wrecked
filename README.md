@@ -13,7 +13,7 @@ The latest *stable* version can be found at crates.io.
 In your project's Cargo.toml...
 ```toml
 [dependencies]
-wrecked = "^0.1.17"
+wrecked = "^0.1.24"
 ```
 
 ## Usage
