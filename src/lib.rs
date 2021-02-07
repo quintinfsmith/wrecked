@@ -1899,11 +1899,8 @@ impl RectManager {
         self._update_queued_display(rect_id)?;
 
         match self.get_rect_mut(rect_id) {
-            Some(mut rect) => {
+            Some(rect) => {
                 if rect.enabled {
-                    //for ((x, y), (new_c, effects, _)) in rect._queued_display.iter() {
-                    //    outhash.insert((*x, *y), (*new_c, *effects));
-                    //}
                     Ok(&rect._queued_display)
                 } else {
                     Err(RectError::RectDisabled(rect_id))
@@ -1935,84 +1932,88 @@ impl RectManager {
             new_effects = val.1;
 
             if new_effects != active_effects {
-                let mut tmp_color_n;
                 let mut ansi_code_list: Vec<u8> = vec![];
-                // ForeGround
-                if new_effects.foreground_color != active_effects.foreground_color {
-                    match new_effects.foreground_color {
-                        Some(fg_color) => {
-                            tmp_color_n = fg_color as u8;
-                            if tmp_color_n & 8 == 8 {
-                                ansi_code_list.push(90 + (tmp_color_n & 7));
-                            } else {
-                                ansi_code_list.push(30 + (tmp_color_n & 7));
+                if new_effects.is_plain() {
+                    ansi_code_list.push(0);
+                } else {
+                    let mut tmp_color_n;
+                    // ForeGround
+                    if new_effects.foreground_color != active_effects.foreground_color {
+                        match new_effects.foreground_color {
+                            Some(fg_color) => {
+                                tmp_color_n = fg_color as u8;
+                                if tmp_color_n & 8 == 8 {
+                                    ansi_code_list.push(90 + (tmp_color_n & 7));
+                                } else {
+                                    ansi_code_list.push(30 + (tmp_color_n & 7));
+                                }
+                            }
+                            None => {
+                                ansi_code_list.push(39);
                             }
                         }
-                        None => {
-                            ansi_code_list.push(39);
-                        }
                     }
-                }
 
-                // BackGround
-                if new_effects.background_color != active_effects.background_color {
-                    match new_effects.background_color {
-                        Some(bg_color) => {
-                            tmp_color_n = bg_color as u8;
-                            if tmp_color_n & 8 == 8 {
-                                ansi_code_list.push(100 + (tmp_color_n & 7));
-                            } else {
-                                ansi_code_list.push(40 + (tmp_color_n & 7));
+                    // BackGround
+                    if new_effects.background_color != active_effects.background_color {
+                        match new_effects.background_color {
+                            Some(bg_color) => {
+                                tmp_color_n = bg_color as u8;
+                                if tmp_color_n & 8 == 8 {
+                                    ansi_code_list.push(100 + (tmp_color_n & 7));
+                                } else {
+                                    ansi_code_list.push(40 + (tmp_color_n & 7));
+                                }
+                            }
+                            None => {
+                                ansi_code_list.push(49);
                             }
                         }
-                        None => {
-                            ansi_code_list.push(49);
+                    }
+
+                    // Bold
+                    if new_effects.bold != active_effects.bold {
+                        if new_effects.bold {
+                            ansi_code_list.push(1); // on
+                        } else {
+                            ansi_code_list.push(22); // off
                         }
                     }
-                }
 
-                // Bold
-                if new_effects.bold != active_effects.bold {
-                    if new_effects.bold {
-                        ansi_code_list.push(1); // on
-                    } else {
-                        ansi_code_list.push(22); // off
+                    // Underline
+                    if new_effects.underline != active_effects.underline {
+                        if new_effects.underline {
+                            ansi_code_list.push(4); // on
+                        } else {
+                            ansi_code_list.push(24); // off
+                        }
                     }
-                }
 
-                // Underline
-                if new_effects.underline != active_effects.underline {
-                    if new_effects.underline {
-                        ansi_code_list.push(4); // on
-                    } else {
-                        ansi_code_list.push(24); // off
+                    // Inverted
+                    if new_effects.invert != active_effects.invert {
+                        if new_effects.invert {
+                            ansi_code_list.push(7); // on
+                        } else {
+                            ansi_code_list.push(27); // off
+                        }
                     }
-                }
 
-                // Inverted
-                if new_effects.invert != active_effects.invert {
-                    if new_effects.invert {
-                        ansi_code_list.push(7); // on
-                    } else {
-                        ansi_code_list.push(27); // off
+                    // Italics
+                    if new_effects.italics != active_effects.italics {
+                        if new_effects.italics {
+                            ansi_code_list.push(3); // on
+                        } else {
+                            ansi_code_list.push(23); // off
+                        }
                     }
-                }
 
-                // Italics
-                if new_effects.italics != active_effects.italics {
-                    if new_effects.italics {
-                        ansi_code_list.push(3); // on
-                    } else {
-                        ansi_code_list.push(23); // off
-                    }
-                }
-
-                // Strike
-                if new_effects.blink != active_effects.blink {
-                    if new_effects.blink {
-                        ansi_code_list.push(5); // on
-                    } else {
-                        ansi_code_list.push(25); // off
+                    // Strike
+                    if new_effects.blink != active_effects.blink {
+                        if new_effects.blink {
+                            ansi_code_list.push(5); // on
+                        } else {
+                            ansi_code_list.push(25); // off
+                        }
                     }
                 }
 
@@ -2426,7 +2427,7 @@ impl Rect {
     }
 
     fn clear_child_space(&mut self, rect_id: usize) {
-        let mut new_positions = match self._inverse_child_space.get(&rect_id) {
+        let new_positions = match self._inverse_child_space.get(&rect_id) {
             Some(positions) => {
                 positions.clone()
             }
@@ -2676,42 +2677,46 @@ impl Rect {
         self.effects.background_color
     }
 
-    pub fn is_plain(&self) -> bool {
-        self.effects.is_plain()
-    }
+    // Commenting these functions out for now. may completely remove later.
+    // I don't think i should have any functions that could confuse a dev into thinking it's a
+    // good idea to mess around with rects directly instead of going through the RectManager.
+    //
+    //pub fn is_plain(&self) -> bool {
+    //    self.effects.is_plain()
+    //}
 
-    pub fn is_bold(&self) -> bool {
-        self.effects.bold
-    }
+    //pub fn is_bold(&self) -> bool {
+    //    self.effects.bold
+    //}
 
-    pub fn is_underlined(&self) -> bool {
-        self.effects.underline
-    }
+    //pub fn is_underlined(&self) -> bool {
+    //    self.effects.underline
+    //}
 
-    pub fn is_inverted(&self) -> bool {
-        self.effects.invert
-    }
+    //pub fn is_inverted(&self) -> bool {
+    //    self.effects.invert
+    //}
 
-    pub fn is_italicized(&self) -> bool {
-        self.effects.italics
-    }
+    //pub fn is_italicized(&self) -> bool {
+    //    self.effects.italics
+    //}
 
-    pub fn is_striken(&self) -> bool {
-        self.effects.strike
-    }
+    //pub fn is_striken(&self) -> bool {
+    //    self.effects.strike
+    //}
 
-    pub fn is_blinking(&self) -> bool {
-        self.effects.blink
-    }
+    //pub fn is_blinking(&self) -> bool {
+    //    self.effects.blink
+    //}
 
-    pub fn has_child(&self, child_id: usize) -> bool {
-        let mut output = false;
-        for connected_child_id in self.children.iter() {
-            if *connected_child_id == child_id {
-                output = true;
-                break;
-            }
-        }
-        output
-    }
+    //pub fn has_child(&self, child_id: usize) -> bool {
+    //    let mut output = false;
+    //    for connected_child_id in self.children.iter() {
+    //        if *connected_child_id == child_id {
+    //            output = true;
+    //            break;
+    //        }
+    //    }
+    //    output
+    //}
 }
