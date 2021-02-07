@@ -168,6 +168,7 @@ pub const TOP: usize = 0;
 /// ```
 pub struct RectManager {
     idgen: usize,
+    recycle_ids: Vec<usize>,
     rects: HashMap<usize, Rect>,
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
@@ -204,6 +205,7 @@ impl RectManager {
 
         let mut rectmanager = RectManager {
             idgen: TOP,
+            recycle_ids: Vec::new(),
             rects: HashMap::new(),
             top_cache: HashMap::new(),
             _termios: termios,
@@ -245,8 +247,7 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new_rect(&mut self, parent_id: usize) -> Result<usize, RectError> {
-        let new_id = self.idgen;
-        self.idgen += 1;
+        let new_id = self.gen_id();
 
         self.rects.entry(new_id).or_insert(Rect::new(new_id));
 
@@ -273,14 +274,13 @@ impl RectManager {
     pub fn new_orphan(&mut self) -> Result<usize, RectError> {
         // For now, there's really no way to Result in an error here,
         // but future proofing and consistency and all that, we'll return a Result
-        let new_id = self.idgen;
-        self.idgen += 1;
+        let new_id = self.gen_id();
         self.rects.entry(new_id).or_insert(Rect::new(new_id));
 
         Ok(new_id)
     }
 
-    /// Render the rectangle (and all its children) specified.
+    /// Render the rectangle (and all its children) specified. This will not update the Rects at higher levels and can lead to artifacts.
     /// # Example
     /// ```
     /// // Use TOP to draw everything
@@ -1010,9 +1010,33 @@ impl RectManager {
 
         for id in to_delete.iter() {
             self.rects.remove(&id);
+            self.recycle_id(*id);
         }
 
         Ok(())
+    }
+
+    fn recycle_id(&mut self, old_id: usize) {
+        // NOTE: Assumes 0 is reserved and can't be removed
+        self.recycle_ids.push(old_id);
+        self.recycle_ids.sort();
+
+        while self.recycle_ids.len() > 0
+        && self.recycle_ids.last().unwrap() == &(self.idgen - 1) {
+            self.recycle_ids.pop();
+            self.idgen -= 1;
+        }
+    }
+
+
+    fn gen_id(&mut self) -> usize {
+        if self.recycle_ids.len() > 0 {
+            self.recycle_ids.pop().unwrap()
+        } else {
+            let new_id = self.idgen;
+            self.idgen += 1;
+            new_id
+        }
     }
 
     /// Swap out one rectangle with another.
@@ -2317,7 +2341,6 @@ struct Rect {
 
     _queued_display: HashMap<(isize, isize), (char, RectEffectsHandler, usize)>,
     _cached_display: HashMap<(isize, isize), (char, RectEffectsHandler, usize)>,
-
 }
 
 impl Rect {

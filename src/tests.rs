@@ -728,3 +728,23 @@ fn test_transparency() -> Result<(), RectError> {
     Ok(())
 }
 
+#[test]
+fn test_id_recycling() {
+    let mut rectmanager = RectManager::new();
+    for _ in 1 .. 5 {
+        rectmanager.new_rect(TOP);
+    }
+
+    rectmanager.delete_rect(4);
+    assert_eq!(rectmanager.idgen, 4);
+    rectmanager.delete_rect(1);
+    assert_eq!(rectmanager.idgen, 4);
+    assert_eq!(rectmanager.recycle_ids.as_slice(), [1]);
+    rectmanager.delete_rect(2);
+    assert_eq!(rectmanager.idgen, 4);
+    assert_eq!(rectmanager.recycle_ids.as_slice(), [1, 2]);
+    rectmanager.delete_rect(3);
+    assert_eq!(rectmanager.idgen, 1);
+    assert_eq!(rectmanager.recycle_ids.as_slice(), []);
+}
+
