@@ -2677,46 +2677,43 @@ impl Rect {
         self.effects.background_color
     }
 
-    // Commenting these functions out for now. may completely remove later.
-    // I don't think i should have any functions that could confuse a dev into thinking it's a
-    // good idea to mess around with rects directly instead of going through the RectManager.
-    //
-    //pub fn is_plain(&self) -> bool {
-    //    self.effects.is_plain()
-    //}
+    // Everything below here is exclusively for testing
+    fn is_plain(&self) -> bool {
+        self.effects.is_plain()
+    }
 
-    //pub fn is_bold(&self) -> bool {
-    //    self.effects.bold
-    //}
+    fn is_bold(&self) -> bool {
+        self.effects.bold
+    }
 
-    //pub fn is_underlined(&self) -> bool {
-    //    self.effects.underline
-    //}
+    fn is_underlined(&self) -> bool {
+        self.effects.underline
+    }
 
-    //pub fn is_inverted(&self) -> bool {
-    //    self.effects.invert
-    //}
+    fn is_inverted(&self) -> bool {
+        self.effects.invert
+    }
 
-    //pub fn is_italicized(&self) -> bool {
-    //    self.effects.italics
-    //}
+    fn is_italicized(&self) -> bool {
+        self.effects.italics
+    }
 
-    //pub fn is_striken(&self) -> bool {
-    //    self.effects.strike
-    //}
+    fn is_striken(&self) -> bool {
+        self.effects.strike
+    }
 
-    //pub fn is_blinking(&self) -> bool {
-    //    self.effects.blink
-    //}
+    fn is_blinking(&self) -> bool {
+        self.effects.blink
+    }
 
-    //pub fn has_child(&self, child_id: usize) -> bool {
-    //    let mut output = false;
-    //    for connected_child_id in self.children.iter() {
-    //        if *connected_child_id == child_id {
-    //            output = true;
-    //            break;
-    //        }
-    //    }
-    //    output
-    //}
+    fn has_child(&self, child_id: usize) -> bool {
+        let mut output = false;
+        for connected_child_id in self.children.iter() {
+            if *connected_child_id == child_id {
+                output = true;
+                break;
+            }
+        }
+        output
+    }
 }
