@@ -40,7 +40,7 @@ rectmanager.set_bg_color(rect_id, RectColor::BLUE);
 rectmanager.set_underline_flag(rect_id);
 
 // Draw the environment
-rectmanager.draw();
+rectmanager.render();
 
 // Sleep for 2 seconds so you can see the output before it gets torn down
 thread::sleep(time::Duration::from_secs(2));
