@@ -3,19 +3,19 @@ use std::os::raw::c_char;
 use std::str;
 use std::io::prelude::*;
 
-use wrecked::{RectManager, RectColor, RectError};
+use wrecked::{RectManager, Color, WreckedError};
 
-fn cast_result(result: Result<(), RectError>) -> u32 {
+fn cast_result(result: Result<(), WreckedError>) -> u32 {
     match result {
         Ok(_) => 0,
-        Err(RectError::BadColor) => 1,
-        Err(RectError::InvalidUtf8) => 2,
-        Err(RectError::StringTooLong) => 3,
-        Err(RectError::NotFound(_)) => 4,
-        Err(RectError::NoParent(_)) => 5,
-        Err(RectError::ParentNotFound(_, _)) => 6,
-        Err(RectError::ChildNotFound(_, _)) => 7,
-        Err(RectError::BadPosition(_, _)) => 8,
+        Err(WreckedError::BadColor) => 1,
+        Err(WreckedError::InvalidUtf8) => 2,
+        Err(WreckedError::StringTooLong(_, _, _)) => 3,
+        Err(WreckedError::NotFound(_)) => 4,
+        Err(WreckedError::NoParent(_)) => 5,
+        Err(WreckedError::ParentNotFound(_, _)) => 6,
+        Err(WreckedError::ChildNotFound(_, _)) => 7,
+        Err(WreckedError::BadPosition(_, _)) => 8,
         Err(_) => 255
     }
 }
@@ -56,10 +56,10 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn render(ptr: *mut RectManager, rect_id: usize) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.draw_rect(rect_id);
+    let result = rectmanager.draw(rect_id);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -70,14 +70,14 @@ pub extern "C" fn draw(ptr: *mut RectManager, rect_id: usize) -> u32 {
 pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let colors = [RectColor::BLACK, RectColor::RED, RectColor::GREEN, RectColor::YELLOW, RectColor::BLUE, RectColor::MAGENTA, RectColor::CYAN, RectColor::WHITE, RectColor::BRIGHTBLACK, RectColor::BRIGHTRED, RectColor::BRIGHTGREEN, RectColor::BRIGHTYELLOW, RectColor::BRIGHTBLUE, RectColor::BRIGHTMAGENTA, RectColor::BRIGHTCYAN, RectColor::BRIGHTWHITE];
+    let colors = [Color::BLACK, Color::RED, Color::GREEN, Color::YELLOW, Color::BLUE, Color::MAGENTA, Color::CYAN, Color::WHITE, Color::BRIGHTBLACK, Color::BRIGHTRED, Color::BRIGHTGREEN, Color::BRIGHTYELLOW, Color::BRIGHTBLUE, Color::BRIGHTMAGENTA, Color::BRIGHTCYAN, Color::BRIGHTWHITE];
 
     let result = match colors.get(color_n as usize) {
         Some(color) => {
             rectmanager.set_fg_color(rect_id, *color)
         }
         None => {
-            Err(RectError::BadColor)
+            Err(WreckedError::BadColor)
         }
     };
 
@@ -89,13 +89,13 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u
 #[no_mangle]
 pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
-    let colors = [RectColor::BLACK, RectColor::RED, RectColor::GREEN, RectColor::YELLOW, RectColor::BLUE, RectColor::MAGENTA, RectColor::CYAN, RectColor::WHITE, RectColor::BRIGHTBLACK, RectColor::BRIGHTRED, RectColor::BRIGHTGREEN, RectColor::BRIGHTYELLOW, RectColor::BRIGHTBLUE, RectColor::BRIGHTMAGENTA, RectColor::BRIGHTCYAN, RectColor::BRIGHTWHITE];
+    let colors = [Color::BLACK, Color::RED, Color::GREEN, Color::YELLOW, Color::BLUE, Color::MAGENTA, Color::CYAN, Color::WHITE, Color::BRIGHTBLACK, Color::BRIGHTRED, Color::BRIGHTGREEN, Color::BRIGHTYELLOW, Color::BRIGHTBLUE, Color::BRIGHTMAGENTA, Color::BRIGHTCYAN, Color::BRIGHTWHITE];
     let result = match colors.get(color_n as usize) {
         Some(color) => {
             rectmanager.set_bg_color(rect_id, *color)
         }
         None => {
-            Err(RectError::BadColor)
+            Err(WreckedError::BadColor)
         }
     };
 

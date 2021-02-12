@@ -24,28 +24,28 @@ def logg(error_code, args, msg):
     with open("logg", "a") as fp:
         fp.write(newline)
 
-class RectError(Exception):
+class WreckedError(Exception):
     def __init__(self, **kwargs):
         self.msg = json.dumps(kwargs)
         super().__init__(self.msg)
 
-class NotFound(RectError):
+class NotFound(WreckedError):
     pass
-class ParentNotFound(RectError):
+class ParentNotFound(WreckedError):
     pass
-class OutOfBounds(RectError):
+class OutOfBounds(WreckedError):
     pass
-class NoParent(RectError):
+class NoParent(WreckedError):
     pass
-class ChildNotFound(RectError):
+class ChildNotFound(WreckedError):
     pass
-class BadColor(RectError):
+class BadColor(WreckedError):
     pass
-class InvalidUtf8(RectError):
+class InvalidUtf8(WreckedError):
     pass
-class StringOverflow(RectError):
+class StringOverflow(WreckedError):
     pass
-class UnknownError(RectError):
+class UnknownError(WreckedError):
     pass
 
 EXCEPTIONS = {
@@ -251,7 +251,7 @@ class RectManager:
             uint32_t set_string(RectManager, uint32_t, uint32_t, uint32_t, const char*);
             uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
 
-            uint32_t draw(RectManager, uint32_t);
+            uint32_t render(RectManager, uint32_t);
 
             uint32_t replace_with(RectManager, uint32_t, uint32_t);
 
@@ -483,7 +483,7 @@ class RectManager:
 
 
     def rect_draw(self, rect_id):
-        err = self.lib.draw(self.rectmanager, rect_id)
+        err = self.lib.render(self.rectmanager, rect_id)
 
 
         if err:
@@ -527,7 +527,7 @@ class RectManager:
 
         self.lib.kill(self.rectmanager)
 
-    def draw(self):
+    def render(self):
         self.rect_draw(0)
 
 
