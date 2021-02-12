@@ -164,36 +164,6 @@ impl EffectsHandler {
 
         output
     }
-
-    pub fn diff_count(&self, other: EffectsHandler) -> usize {
-        let mut output = 0;
-        if self.bold != other.bold {
-            output += 1;
-        }
-        if self.underline != other.underline {
-            output += 1;
-        }
-        if self.invert != other.invert {
-            output += 1;
-        }
-        if self.italics != other.italics {
-            output += 1;
-        }
-        if self.strike != other.strike {
-            output += 1;
-        }
-        if self.blink != other.blink {
-            output += 1;
-        }
-        if self.background_color != other.background_color {
-            output += 1;
-        }
-        if self.foreground_color != other.foreground_color {
-            output += 1;
-        }
-
-        output
-    }
 }
 
 
