@@ -134,7 +134,68 @@ impl EffectsHandler {
         self.background_color = None;
         self.foreground_color = None;
     }
+
+    pub fn len(&mut self) -> usize {
+        let mut output = 0;
+        if self.bold {
+            output += 1;
+        }
+        if self.underline {
+            output += 1;
+        }
+        if self.invert {
+            output += 1;
+        }
+        if self.italics {
+            output += 1;
+        }
+        if self.strike {
+            output += 1;
+        }
+        if self.blink {
+            output += 1;
+        }
+        if self.background_color.is_some() {
+            output += 1;
+        }
+        if self.foreground_color.is_some() {
+            output += 1;
+        }
+
+        output
+    }
+
+    pub fn diff_count(&self, other: EffectsHandler) -> usize {
+        let mut output = 0;
+        if self.bold != other.bold {
+            output += 1;
+        }
+        if self.underline != other.underline {
+            output += 1;
+        }
+        if self.invert != other.invert {
+            output += 1;
+        }
+        if self.italics != other.italics {
+            output += 1;
+        }
+        if self.strike != other.strike {
+            output += 1;
+        }
+        if self.blink != other.blink {
+            output += 1;
+        }
+        if self.background_color != other.background_color {
+            output += 1;
+        }
+        if self.foreground_color != other.foreground_color {
+            output += 1;
+        }
+
+        output
+    }
 }
+
 
 /// This is the id of the top-level rectangle that is instantiated when a new RectManager is created.
 pub const ROOT: usize = 0;
@@ -1137,18 +1198,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_character(&mut self, rect_id: usize, x: isize, y: isize, character: char) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_character(x, y, character)?;
+                rect.set_character(x, y, character)
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
+        }?;
+
+        if changed {
+            self.flag_pos_refresh(rect_id, x, y)
+        } else {
+            Ok(())
         }
-
-        self.flag_pos_refresh(rect_id, x, y)?;
-
-        Ok(())
     }
 
     /// Delete a set character of a given rectangle at specified point
@@ -1162,18 +1225,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_character(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_character(x, y)?;
+                rect.unset_character(x, y)
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-
-        self.flag_refresh(rect_id)?;
-
-        Ok(())
     }
 
     /// Completely erase a rectangle & remove it from the RectManager's tree.
@@ -1273,13 +1338,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_bold_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_bold_flag();
+                Ok(rect.set_bold_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable bold text effect
@@ -1293,13 +1365,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_bold_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_bold_flag();
+                Ok(rect.unset_bold_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Apply underline effect to text of given rect (does not apply recursively).
@@ -1312,13 +1391,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_underline_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_underline_flag();
+                Ok(rect.set_underline_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable underline text effect
@@ -1332,13 +1417,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_underline_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_underline_flag();
+                Ok(rect.unset_underline_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Invert the background and foreground colors of the text of the given rect (does not apply recursively).
@@ -1351,13 +1442,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_invert_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_invert_flag();
+                Ok(rect.set_invert_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable invert text effect
@@ -1371,13 +1468,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_invert_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_invert_flag();
+                Ok(rect.unset_invert_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Apply italics effect to text of given rect (does not apply recursively).
@@ -1390,13 +1493,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_italics_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_italics_flag();
+                Ok(rect.set_italics_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable italics text effect
@@ -1410,13 +1519,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_italics_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_italics_flag();
+                Ok(rect.unset_italics_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Apply strike effect to text of given rect (does not apply recursively).
@@ -1429,13 +1544,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_strike_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_strike_flag();
+                Ok(rect.set_strike_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable strike text effect
@@ -1449,13 +1571,19 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_strike_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_strike_flag();
+                Ok(rect.unset_strike_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Apply blink effect to text of given rect (does not apply recursively).
@@ -1468,13 +1596,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_blink_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_blink_flag();
+                Ok(rect.set_blink_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-        self.flag_refresh(rect_id)
     }
 
     /// Disable blink text effect
@@ -1488,16 +1623,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_blink_flag(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_blink_flag();
+                Ok(rect.unset_blink_flag())
             }
-            None => ()
+            None => {
+                Err(WreckedError::NotFound(rect_id))
+            }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-
-        self.flag_refresh(rect_id)?;
-
-        Ok(())
     }
 
     /// Set color of background of given rect (does not apply recursively)
@@ -1511,18 +1650,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_bg_color(&mut self, rect_id: usize, color: Color) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_bg_color(color);
+                Ok(rect.set_bg_color(color))
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
+        }?;
+
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
         }
-
-        self.flag_refresh(rect_id)?;
-
-        Ok(())
     }
 
     /// Return background color to default
@@ -1539,17 +1680,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_bg_color(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_bg_color();
+                Ok(rect.unset_bg_color())
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
-        }
+        }?;
 
-        self.flag_refresh(rect_id)?;
-        Ok(())
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
+        }
     }
 
     /// Set color of foreground (text) of given rect (does not apply recursively)
@@ -1563,17 +1707,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn set_fg_color(&mut self, rect_id: usize, color: Color) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.set_fg_color(color);
+                Ok(rect.set_fg_color(color))
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
-        }
+        }?;
 
-        self.flag_refresh(rect_id)?;
-        Ok(())
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
+        }
     }
 
     /// Return foreground color to default
@@ -1590,17 +1737,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_fg_color(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_fg_color();
+                Ok(rect.unset_fg_color())
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
-        }
+        }?;
 
-        self.flag_refresh(rect_id)?;
-        Ok(())
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
+        }
     }
 
     /// Return both background and foreground colors to default
@@ -1618,17 +1768,20 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn unset_color(&mut self, rect_id: usize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
+        let changed = match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.unset_color();
+                Ok(rect.unset_color())
             }
             None => {
-                Err(WreckedError::NotFound(rect_id))?;
+                Err(WreckedError::NotFound(rect_id))
             }
-        }
+        }?;
 
-        self.flag_refresh(rect_id)?;
-        Ok(())
+        if changed {
+            self.flag_refresh(rect_id)
+        } else {
+            Ok(())
+        }
     }
     /// Get the fallback character that would be displayed where no character is set.
     /// Defaults to ' '.
@@ -2521,154 +2674,189 @@ impl Rect {
         }
     }
 
-    fn set_character(&mut self, x: isize, y: isize, character: char) -> Result<(), WreckedError> {
+    fn set_character(&mut self, x: isize, y: isize, character: char) -> Result<bool, WreckedError> {
         if y < self.height as isize && y >= 0 && x < self.width as isize && x >= 0 {
-            self.character_space.entry((x, y))
-                .and_modify(|coord| { *coord = character })
-                .or_insert(character);
-            self.flags_pos_refresh.insert((x, y));
+            let mut changed = true;
+            match self.character_space.get(&(x,y)) {
+                Some(existing_char) => {
+                    changed = *existing_char != character;
+                }
+                None => {
+                    changed = character != self.default_character && ! self.transparent;
+                }
+            }
+
+            if changed {
+                self.character_space.entry((x, y))
+                    .and_modify(|coord| { *coord = character })
+                    .or_insert(character);
+            }
+            Ok(changed)
         } else {
-            Err(WreckedError::BadPosition(x, y))?;
+            Err(WreckedError::BadPosition(x, y))
         }
 
-        Ok(())
     }
 
-    fn unset_character(&mut self, x: isize, y: isize) -> Result<(), WreckedError> {
+    fn unset_character(&mut self, x: isize, y: isize) -> Result<bool, WreckedError> {
         self.set_character(x, y, self.default_character)
     }
 
-    fn set_bold_flag(&mut self) {
+    fn set_bold_flag(&mut self) -> bool {
         if ! self.effects.bold {
-            self.flag_full_refresh = true;
+            self.effects.bold = true;
+            true
+        } else {
+            false
         }
-
-        self.effects.bold = true;
     }
 
-    fn unset_bold_flag(&mut self) {
+    fn unset_bold_flag(&mut self) -> bool {
         if self.effects.bold {
-            self.flag_full_refresh = true;
+            self.effects.bold = false;
+            true
+        } else {
+            false
         }
-
-        self.effects.bold = false;
     }
 
-    fn set_underline_flag(&mut self) {
+    fn set_underline_flag(&mut self) -> bool {
         if ! self.effects.underline {
-            self.flag_full_refresh = true;
+            self.effects.underline = true;
+            true
+        } else {
+            false
         }
-
-        self.effects.underline = true;
     }
 
-    fn unset_underline_flag(&mut self) {
+    fn unset_underline_flag(&mut self) -> bool {
         if self.effects.underline {
-            self.flag_full_refresh = true;
+            self.effects.underline = false;
+            true
+        } else {
+            false
         }
 
-        self.effects.underline = false;
     }
 
-    fn set_invert_flag(&mut self) {
+    fn set_invert_flag(&mut self) -> bool {
         if ! self.effects.invert {
-            self.flag_full_refresh = true;
+            self.effects.invert = true;
+            true
+        } else {
+            false
         }
-
-        self.effects.invert = true;
     }
 
-    fn unset_invert_flag(&mut self) {
+    fn unset_invert_flag(&mut self) -> bool {
         if self.effects.invert {
-            self.flag_full_refresh = true;
+            self.effects.invert = false;
+            true
+        } else {
+            false
         }
 
-        self.effects.invert = false;
     }
 
-    fn set_italics_flag(&mut self) {
+    fn set_italics_flag(&mut self) -> bool {
         if ! self.effects.italics {
-            self.flag_full_refresh = true;
+            self.effects.italics = true;
+            true
+        } else {
+            false
         }
 
-        self.effects.italics = true;
     }
 
-    fn unset_italics_flag(&mut self) {
+    fn unset_italics_flag(&mut self) -> bool {
         if self.effects.italics {
-            self.flag_full_refresh = true;
+            self.effects.italics = false;
+            true
+        } else {
+            false
         }
 
-        self.effects.italics = false;
     }
 
-    fn set_strike_flag(&mut self) {
+    fn set_strike_flag(&mut self) -> bool {
         if ! self.effects.strike {
-            self.flag_full_refresh = true;
+            self.effects.strike = true;
+            true
+        } else {
+            false
         }
 
-        self.effects.strike = true;
     }
 
-    fn unset_strike_flag(&mut self) {
+    fn unset_strike_flag(&mut self) -> bool {
         if self.effects.strike {
-            self.flag_full_refresh = true;
+            self.effects.strike = false;
+            true
+        } else {
+            false
         }
 
-        self.effects.strike = false;
     }
 
-    fn set_blink_flag(&mut self) {
+    fn set_blink_flag(&mut self) -> bool {
         if ! self.effects.blink {
-            self.flag_full_refresh = true;
+            self.effects.blink = true;
+            true
+        } else {
+            false
         }
-
-        self.effects.blink = true;
     }
 
-    fn unset_blink_flag(&mut self) {
+    fn unset_blink_flag(&mut self) -> bool {
         if self.effects.blink {
-            self.flag_full_refresh = true;
+            self.effects.blink = false;
+            true
+        } else {
+            false
         }
-
-        self.effects.blink = false;
     }
 
-    fn unset_bg_color(&mut self) {
+    fn unset_bg_color(&mut self) -> bool {
         if self.effects.background_color.is_some() {
-            self.flag_full_refresh = true;
+            self.effects.background_color = None;
+            true
+        } else {
+            false
         }
-
-        self.effects.background_color = None;
     }
 
-    fn unset_fg_color(&mut self) {
+    fn unset_fg_color(&mut self) -> bool {
         if self.effects.foreground_color.is_some() {
-            self.flag_full_refresh = true;
+            self.effects.foreground_color = None;
+            true
+        } else {
+            false
         }
-
-        self.effects.foreground_color = None;
     }
 
-    fn unset_color(&mut self) {
-        self.unset_bg_color();
-        self.unset_fg_color();
+    fn unset_color(&mut self) -> bool {
+        let mut changed = self.unset_bg_color();
+        changed |= self.unset_fg_color();
+
+        changed
     }
 
-    fn set_bg_color(&mut self, color: Color) {
+    fn set_bg_color(&mut self, color: Color) -> bool {
         if self.effects.background_color != Some(color) {
-            self.flag_full_refresh = true;
+            self.effects.background_color = Some(color);
+            true
+        } else {
+            false
         }
-
-        self.effects.background_color = Some(color);
     }
 
-    fn set_fg_color(&mut self, color: Color) {
+    fn set_fg_color(&mut self, color: Color) -> bool {
         if self.effects.foreground_color != Some(color) {
-            self.flag_full_refresh = true;
+            self.effects.foreground_color = Some(color);
+            true
+        } else {
+            false
         }
-
-        self.effects.foreground_color = Some(color);
     }
 
     fn add_child(&mut self, child_id: usize) {
