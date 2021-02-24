@@ -2318,38 +2318,33 @@ impl RectManager {
             }
         }
 
+        let mut working_id = rect_id;
         let mut offset = (0, 0);
-        match self.get_relative_offset(rect_id) {
-            Some(rel_offset) => {
-                offset = (
-                    offset.0 + rel_offset.0,
-                    offset.1 + rel_offset.1
-                );
-            }
-            None => ()
-        }
 
-        let mut parent_id = None;
-        match self.get_parent_mut(rect_id) {
-            Some(parent) => {
-                parent_id = Some(parent.rect_id);
+        loop {
+            match self.get_relative_offset(working_id) {
+                Some(rel_offset) => {
+                    offset = (
+                        offset.0 + rel_offset.0,
+                        offset.1 + rel_offset.1
+                    );
+                }
+                None => ()
             }
-            None => ()
-        }
 
-        match parent_id {
-            Some(id) => {
-                for x in 0 .. dimensions.0 {
-                    for y in 0 .. dimensions.1 {
-                        self.flag_pos_refresh(
-                            id,
-                            offset.0 + x as isize,
-                            offset.1 + y as isize
-                        )?;
+            match self.get_parent_mut(working_id) {
+                Some(parent) => {
+                    for x in 0 .. dimensions.0 {
+                        for y in 0 .. dimensions.1 {
+                            parent.flags_pos_refresh.insert((offset.0 + x as isize, offset.1 + y as isize));
+                        }
                     }
+                    working_id = parent.rect_id;
+                }
+                None => {
+                    break;
                 }
             }
-            None => ()
         }
 
         Ok(())
