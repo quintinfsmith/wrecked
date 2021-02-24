@@ -783,6 +783,19 @@ impl RectManager {
     /// assert_eq!((10, 10), rectmanager.get_rect_size(rect_id).unwrap());
     /// ```
     pub fn resize(&mut self, rect_id: usize, width: usize, height: usize) -> Result<(), WreckedError> {
+        // First check if there will be an artifact left by the resize
+        let has_artifact = match self.get_rect_size(rect_id) {
+            Some((old_width, old_height)) => {
+                old_width > width || old_height > height
+            }
+            None => {
+                false
+            }
+        };
+        if has_artifact {
+            self.flag_parent_refresh(rect_id)?;
+        }
+
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 rect.resize(width, height);
@@ -868,8 +881,10 @@ impl RectManager {
     /// assert_eq!(rectmanager.get_relative_offset(rect_id).unwrap(), (4, 4));
     /// ```
     pub fn set_position(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), WreckedError> {
-        let mut has_parent = false;
+        // first, handle artifacts
+        self.flag_parent_refresh(rect_id)?;
 
+        let mut has_parent = false;
         match self.get_parent_mut(rect_id) {
             Some(parent) => {
                 let did_move = match parent.child_positions.get(&rect_id) {
@@ -2303,33 +2318,38 @@ impl RectManager {
             }
         }
 
-        let mut working_id = rect_id;
         let mut offset = (0, 0);
-
-        loop {
-            match self.get_relative_offset(working_id) {
-                Some(rel_offset) => {
-                    offset = (
-                        offset.0 + rel_offset.0,
-                        offset.1 + rel_offset.1
-                    );
-                }
-                None => ()
+        match self.get_relative_offset(rect_id) {
+            Some(rel_offset) => {
+                offset = (
+                    offset.0 + rel_offset.0,
+                    offset.1 + rel_offset.1
+                );
             }
+            None => ()
+        }
 
-            match self.get_parent_mut(working_id) {
-                Some(parent) => {
-                    for x in 0 .. dimensions.0 {
-                        for y in 0 .. dimensions.1 {
-                            parent.flags_pos_refresh.insert((offset.0 + x as isize, offset.1 + y as isize));
-                        }
+        let mut parent_id = None;
+        match self.get_parent_mut(rect_id) {
+            Some(parent) => {
+                parent_id = Some(parent.rect_id);
+            }
+            None => ()
+        }
+
+        match parent_id {
+            Some(id) => {
+                for x in 0 .. dimensions.0 {
+                    for y in 0 .. dimensions.1 {
+                        self.flag_pos_refresh(
+                            id,
+                            offset.0 + x as isize,
+                            offset.1 + y as isize
+                        )?;
                     }
-                    working_id = parent.rect_id;
-                }
-                None => {
-                    break;
                 }
             }
+            None => ()
         }
 
         Ok(())
