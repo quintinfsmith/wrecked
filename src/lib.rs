@@ -182,7 +182,7 @@ pub const ROOT: usize = 0;
 /// rectmanager.set_string(ROOT, 0, 0, "Hello World");
 ///
 /// // draw the latest changes
-/// rectmanager.draw();
+/// rectmanager.render();
 ///
 /// // wait 5 seconds (in order to see the screen)
 /// let five_seconds = time::Duration::from_secs(5);
@@ -1797,7 +1797,7 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, ROOT, Color};
     /// let mut rectmanager = RectManager::new();
-    /// let mut rect = rectmanager.new_rect(ROOT);
+    /// let mut rect = rectmanager.new_rect(ROOT).ok().unwrap();
     /// assert!(rectmanager.has_parent(rect));
     ///
     /// rectmanager.detach(rect);
@@ -1840,9 +1840,8 @@ impl RectManager {
     /// ```
     /// use wrecked::{RectManager, ROOT, Color};
     /// let mut rectmanager = RectManager::new();
-    /// let rect = rectmanager.new_rect(ROOT);
+    /// let rect = rectmanager.new_rect(ROOT).ok().unwrap();
     /// rectmanager.set_transparency(rect, true);
-    /// assert
     /// rectmanager.kill();
     /// ```
     pub fn set_transparency(&mut self, rect_id: usize, transparent: bool) -> Result<(), WreckedError> {
