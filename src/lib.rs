@@ -908,7 +908,6 @@ impl RectManager {
 
         if has_parent {
             self.update_child_space(rect_id)?;
-            self.cached_to_queued(rect_id);
             self.flag_parent_refresh(rect_id)?;
         }
 
@@ -1061,6 +1060,7 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn detach(&mut self, rect_id: usize) -> Result<(), WreckedError> {
+        self.flag_parent_refresh(rect_id);
         self.clear_child_space(rect_id)?;
 
         match self.get_parent_mut(rect_id) {
@@ -1990,7 +1990,7 @@ impl RectManager {
         }
     }
 
-    fn _update_queue_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), WreckedError> {
+    fn _update_cache_by_positions(&mut self, rect_id: usize, positions: &HashSet<(isize, isize)>) -> Result<(), WreckedError> {
         let mut pos_stack: HashMap<(isize, isize), Vec<(usize, usize)>> = HashMap::new();
         let mut require_updates: HashSet<usize> = HashSet::new();
 
@@ -2034,11 +2034,9 @@ impl RectManager {
                             tmp_chr = rect.character_space.entry((x, y))
                                 .or_insert(rect.default_character);
 
-                            rect._queued_display.entry((x,y))
+                            rect._cached_display.entry((x,y))
                                 .and_modify(|e| {*e = (*tmp_chr, tmp_fx, 0)})
                                 .or_insert((*tmp_chr, tmp_fx, 0));
-                        } else {
-                            rect._queued_display.remove(&(x, y));
                         }
                     } else {
                         match rect.child_space.get(&(x, y)) {
@@ -2067,7 +2065,7 @@ impl RectManager {
         }
 
         for child_id in require_updates.iter() {
-            self._update_queued_display(*child_id)?;
+            self._update_cached_display(*child_id)?;
         }
 
 
@@ -2081,7 +2079,7 @@ impl RectManager {
                         match self.get_rect_mut(*child_id) {
                             Some(child) => {
 
-                                match child._queued_display.get(&(*x - child_position.0, *y - child_position.1)) {
+                                match child._cached_display.get(&(*x - child_position.0, *y - child_position.1)) {
                                     Some(new_value) => {
                                         new_values.push((*new_value, *rank, *x, *y));
                                         break;
@@ -2106,7 +2104,7 @@ impl RectManager {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 for (new_value, rank, x, y) in new_values.iter() {
-                    rect._queued_display.entry((*x, *y))
+                    rect._cached_display.entry((*x, *y))
                         .and_modify(|e| {
                             if e.2 <= *rank {
                                 *e = (new_value.0, new_value.1, *rank);
@@ -2119,14 +2117,14 @@ impl RectManager {
 
                 for coord in transparent_coords.iter() {
                     if rect.transparent {
-                        rect._queued_display.remove(coord);
+                        rect._cached_display.remove(coord);
                     } else {
                         tmp_fx = rect.effects;
 
                         tmp_chr = rect.character_space.entry(*coord)
                             .or_insert(rect.default_character);
 
-                        rect._queued_display.entry(*coord)
+                        rect._cached_display.entry(*coord)
                             .and_modify(|e| {*e = (*tmp_chr, tmp_fx, 0)})
                             .or_insert((tmp_chr.clone(), tmp_fx.clone(), 0));
                     }
@@ -2139,7 +2137,7 @@ impl RectManager {
         Ok(())
     }
 
-    fn _update_queued_display(&mut self, rect_id: usize) -> Result<(), WreckedError> {
+    fn _update_cached_display(&mut self, rect_id: usize) -> Result<(), WreckedError> {
         let mut flags_pos_refresh = HashSet::new();
 
         match self.get_rect_mut(rect_id) {
@@ -2151,7 +2149,6 @@ impl RectManager {
                     */
                     if rect.flag_full_refresh {
                         rect.flag_full_refresh = false;
-                        rect._queued_display.clear();
 
                         for y in 0 .. rect.height {
                             for x in 0 .. rect.width {
@@ -2169,7 +2166,8 @@ impl RectManager {
                             if pos.0 >= 0 && pos.1 >= 0
                             && pos.0 < rect.width as isize
                             && pos.1 < rect.height as isize {
-                                flags_pos_refresh.insert((pos.0 as isize, pos.1 as isize));
+                                let key = (pos.0 as isize, pos.1 as isize);
+                                flags_pos_refresh.insert(key);
                             }
                         }
                     }
@@ -2181,7 +2179,7 @@ impl RectManager {
             }
         }
 
-        self._update_queue_by_positions(rect_id, &flags_pos_refresh)?;
+        self._update_cache_by_positions(rect_id, &flags_pos_refresh)?;
 
         Ok(())
     }
@@ -2237,13 +2235,13 @@ impl RectManager {
         Ok(rect_box)
     }
 
-    fn get_queued_display(&mut self, rect_id: usize) -> Result<&HashMap<(isize, isize), (char, EffectsHandler, usize)>, WreckedError> {
-        self._update_queued_display(rect_id)?;
+    fn get_cached_display(&mut self, rect_id: usize) -> Result<&HashMap<(isize, isize), (char, EffectsHandler, usize)>, WreckedError> {
+        self._update_cached_display(rect_id)?;
 
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 if rect.enabled {
-                    Ok(&rect._queued_display)
+                    Ok(&rect._cached_display)
                 } else {
                     Err(WreckedError::Disabled(rect_id))
                 }
@@ -2254,7 +2252,7 @@ impl RectManager {
         }
     }
 
-    fn get_queued_draw_map(&mut self, rect_id: usize) -> Vec<((isize, isize), (char, EffectsHandler))> {
+    fn get_cached_draw_map(&mut self, rect_id: usize) -> Vec<((isize, isize), (char, EffectsHandler))> {
         let mut to_draw = Vec::new();
 
         let mut offset = (0, 0);
@@ -2273,8 +2271,7 @@ impl RectManager {
             Err(_e) => { }
         }
 
-        let mut to_cache = Vec::new();
-        match self.get_queued_display(rect_id) {
+        match self.get_cached_display(rect_id) {
             Ok(display_map) => {
                 for (pos, val) in display_map.iter() {
                     if offset.0 + pos.0 < boundry_box.0
@@ -2284,22 +2281,10 @@ impl RectManager {
                         // Ignore
                     } else {
                         to_draw.push(((offset.0 + pos.0, offset.1 + pos.1), (val.0, val.1)));
-                        to_cache.push(*pos);
                     }
                 }
             }
             Err(_e) => {}
-        }
-
-        // Cache the queued values
-        match self.get_rect_mut(rect_id) {
-            Some(rect) => {
-                for key in to_cache.drain(..) {
-                    let val = rect._queued_display.remove(&key).unwrap();
-                    rect._cached_display.insert(key, val);
-                }
-            }
-            None => {}
         }
 
 
@@ -2336,7 +2321,7 @@ impl RectManager {
                 Some(parent) => {
                     for x in 0 .. dimensions.0 {
                         for y in 0 .. dimensions.1 {
-                            parent.flags_pos_refresh.insert((offset.0 + x as isize, offset.1 + y as isize));
+                            parent.flag_pos_refresh((offset.0 + x as isize, offset.1 + y as isize));
                         }
                     }
                     working_id = parent.rect_id;
@@ -2353,11 +2338,7 @@ impl RectManager {
     fn flag_pos_refresh(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), WreckedError> {
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
-                rect.flags_pos_refresh.insert((x, y));
-                match rect._cached_display.remove(&(x, y)) {
-                    Some(_) => {}
-                    None => {}
-                }
+                rect.flag_pos_refresh((x, y));
             }
             None => {
                 Err(WreckedError::NotFound(rect_id))?;
@@ -2379,8 +2360,13 @@ impl RectManager {
 
             match self.get_parent_mut(working_id) {
                 Some(parent) => {
-                    parent.flags_pos_refresh.insert((x_out, y_out));
+                    parent.flag_pos_refresh((x_out, y_out));
                     working_id = parent.rect_id;
+
+                    match parent._cached_display.remove(&(x, y)) {
+                        Some(_) => {}
+                        None => {}
+                    }
                 }
                 None => {
                     break;
@@ -2445,7 +2431,7 @@ impl RectManager {
     /// given rect.
     /// It's been separated to facilitate testing only, so if you're using it outside that case, you're likely doing something wrong.
     fn build_latest_rect_string(&mut self, rect_id: usize) -> Option<String> {
-        let draw_map = self.get_queued_draw_map(rect_id);
+        let draw_map = self.get_cached_draw_map(rect_id);
         let mut filtered_map = self.filter_cached(draw_map);
         if filtered_map.len() > 0 {
             // Doesn't need to be sorted to work, but there're fewer ansi sequences if it is.
@@ -2457,25 +2443,6 @@ impl RectManager {
             None
         }
     }
-
-    fn cached_to_queued(&mut self, rect_id: usize) {
-        match self.get_rect_mut(rect_id) {
-            Some(rect) => {
-                let mut tmp = Vec::new();
-                for (key, val) in rect._cached_display.drain() {
-                    tmp.push((key, val));
-                }
-                for (key, val) in tmp.drain(..) {
-                    rect._queued_display.entry(key)
-                        .and_modify(|e| {*e = val})
-                        .or_insert(val);
-                }
-
-            }
-            None => {}
-        }
-    }
-
 
     fn recycle_id(&mut self, old_id: usize) {
         // NOTE: Assumes 0 is reserved and can't be removed
@@ -2518,7 +2485,6 @@ struct Rect {
 
     effects: EffectsHandler,
 
-    _queued_display: HashMap<(isize, isize), (char, EffectsHandler, usize)>,
     _cached_display: HashMap<(isize, isize), (char, EffectsHandler, usize)>
 }
 
@@ -2542,7 +2508,6 @@ impl Rect {
 
             effects: EffectsHandler::new(),
 
-            _queued_display: HashMap::new(),
             _cached_display: HashMap::new(),
             default_character: ' ' // Space
         }
@@ -2559,6 +2524,13 @@ impl Rect {
     fn flag_refresh(&mut self) {
         self.flag_full_refresh = true;
         self._cached_display.drain();
+    }
+    fn flag_pos_refresh(&mut self, pos: (isize, isize)) {
+        self.flags_pos_refresh.insert(pos);
+        match self._cached_display.remove(&pos) {
+            Some(_) => {}
+            None => {}
+        }
     }
 
     fn get_default_character(&self) -> char {
@@ -2627,7 +2599,7 @@ impl Rect {
         };
 
         for position in new_positions.iter() {
-            self.flags_pos_refresh.insert(*position);
+            self.flag_pos_refresh(*position);
 
             match self.child_space.get_mut(&position) {
                 Some(child_ids) => {
@@ -2893,7 +2865,6 @@ impl Rect {
 
     fn clear_characters(&mut self) {
         self.character_space.clear();
-        self._queued_display.clear();
     }
 
     fn get_fg_color(&self) -> Option<Color> {

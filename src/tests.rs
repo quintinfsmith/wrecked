@@ -431,7 +431,7 @@ fn test_draw_map() -> Result<(), WreckedError> {
     }
     expected_map.sort();
 
-    let mut actual_map = rectmanager.get_queued_draw_map(rect_a);
+    let mut actual_map = rectmanager.get_cached_draw_map(rect_a);
     actual_map.sort();
 
     assert_eq!(expected_map, actual_map);
