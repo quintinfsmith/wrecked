@@ -1149,7 +1149,7 @@ impl RectManager {
         let mut y;
         let start_offset = (start_y * dimensions.0) + start_x;
 
-        if start_offset + (string.len() as isize) > dimensions.0 * dimensions.1 {
+        if start_offset + (string.chars().count() as isize) > dimensions.0 * dimensions.1 {
             Err(WreckedError::StringTooLong(rect_id, (start_x, start_y), string.to_string()))?;
         }
 
