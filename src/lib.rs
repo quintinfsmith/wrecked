@@ -414,3 +414,14 @@ pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: usize) -> usize {
 
     height
 }
+
+#[no_mangle]
+pub extern "C" fn fit_to_terminal(ptr: *mut RectManager) -> bool {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.fit_to_terminal();
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    result
+}

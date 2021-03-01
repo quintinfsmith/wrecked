@@ -215,6 +215,7 @@ class RectManager:
             typedef void* RectManager;
 
             RectManager init();
+            bool fit_to_terminal(RectManager);
             void kill(RectManager);
 
 
@@ -247,9 +248,9 @@ class RectManager:
             uint32_t disable_rect(RectManager, uint32_t);
             uint32_t enable_rect(RectManager, uint32_t);
 
-            uint32_t set_character(RectManager, uint32_t, uint32_t, uint32_t, const char*);
-            uint32_t set_string(RectManager, uint32_t, uint32_t, uint32_t, const char*);
-            uint32_t unset_character(RectManager, uint32_t, uint32_t, uint32_t);
+            uint32_t set_character(RectManager, uint32_t, int32_t, int32_t, const char*);
+            uint32_t set_string(RectManager, uint32_t, int32_t, int32_t, const char*);
+            uint32_t unset_character(RectManager, uint32_t, int32_t, int32_t);
 
             uint32_t render(RectManager, uint32_t);
 
@@ -530,6 +531,9 @@ class RectManager:
     def render(self):
         self.rect_draw(0)
 
+    def fit_to_terminal(self):
+        return self.lib.fit_to_terminal(self.rectmanager)
+
 
 __RECTMANAGER = None
 def init():
@@ -537,6 +541,13 @@ def init():
     if not __RECTMANAGER:
         __RECTMANAGER = RectManager()
     return __RECTMANAGER.root
+
+def fit_to_terminal():
+    global __RECTMANAGER
+    output = False
+    if __RECTMANAGER:
+        output = __RECTMANAGER.fit_to_terminal()
+    return output
 
 def kill():
     global __RECTMANAGER
