@@ -238,7 +238,7 @@ impl RectManager {
         };
 
         rectmanager.new_orphan().expect("Couldn't Create ROOT rect");
-        rectmanager.auto_resize();
+        rectmanager.fit_to_terminal();
         rectmanager
     }
 
@@ -258,17 +258,28 @@ impl RectManager {
 
     /// If the ROOT rectangle dimensions to not match up to the console dimensions, then resize to fit.
     /// Returns true if a resize was made.
-    pub fn auto_resize(&mut self) -> bool {
+    pub fn fit_to_terminal(&mut self) -> bool {
+
         let mut did_resize = false;
         let (current_width, current_height) = self.get_rect_size(ROOT).unwrap();
 
         let (w, h) = get_terminal_size();
         if w as usize != current_width || h as usize != current_height {
             self.resize(ROOT, w as usize, h as usize).expect("Unable to fit ROOT rect to terminal");
+
+            for (_, child) in self.rects.iter_mut() {
+                child.flag_refresh();
+            }
+
             did_resize = true;
         }
 
         did_resize
+    }
+
+    /// Deprecated. Use fit_to_terminal()
+    pub fn auto_resize(&mut self) -> bool {
+        self.fit_to_terminal()
     }
 
     /// Render the visible portion of the rectmanager environment
