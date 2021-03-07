@@ -267,6 +267,7 @@ impl RectManager {
         if w as usize != current_width || h as usize != current_height {
             self.resize(ROOT, w as usize, h as usize).expect("Unable to fit ROOT rect to terminal");
 
+            self.top_cache.drain();
             for (_, child) in self.rects.iter_mut() {
                 child.flag_refresh();
             }
@@ -1129,7 +1130,7 @@ impl RectManager {
             }
         }
 
-        self.flag_parent_refresh(rect_id)?;
+        self.set_position(rect_id, 0, 0)?;
 
         Ok(())
     }
@@ -1164,13 +1165,16 @@ impl RectManager {
             Err(WreckedError::StringTooLong(rect_id, (start_x, start_y), string.to_string()))?;
         }
 
+
+
+        let mut character_positions: Vec<(isize, isize, char)> = vec![];
         match self.get_rect_mut(rect_id) {
             Some(rect) => {
                 let mut i = start_offset;
                 for character in string.chars() {
                     x = i % dimensions.0;
                     y = i / dimensions.0;
-                    rect.set_character(x, y, character)?;
+                    character_positions.push((x, y, character));
                     i += 1;
                 }
             }
@@ -1179,7 +1183,9 @@ impl RectManager {
             }
         }
 
-        self.flag_refresh(rect_id)?;
+        for (x, y, character) in character_positions.iter() {
+            self.set_character(rect_id, *x, *y, *character)?;
+        }
 
         Ok(())
     }
@@ -2079,7 +2085,6 @@ impl RectManager {
             self._update_cached_display(*child_id)?;
         }
 
-
         let mut new_values = Vec::new();
         let mut transparent_coords = HashSet::new();
 
@@ -2347,21 +2352,22 @@ impl RectManager {
     }
 
     fn flag_pos_refresh(&mut self, rect_id: usize, x: isize, y: isize) -> Result<(), WreckedError> {
-        match self.get_rect_mut(rect_id) {
-            Some(rect) => {
-                rect.flag_pos_refresh((x, y));
-            }
-            None => {
-                Err(WreckedError::NotFound(rect_id))?;
-            }
-        }
 
         // loop top, setting requisite refresh flags
         let mut x_out = x;
         let mut y_out = y;
         let mut working_id = rect_id;
         loop {
-            match self.get_relative_offset(rect_id) {
+            match self.get_rect_mut(working_id) {
+                Some(rect) => {
+                    rect.flag_pos_refresh((x_out, y_out));
+                }
+                None => {
+                    Err(WreckedError::NotFound(working_id))?;
+                }
+            }
+
+            match self.get_relative_offset(working_id) {
                 Some(offs) => {
                     x_out += offs.0;
                     y_out += offs.1;
@@ -2371,18 +2377,18 @@ impl RectManager {
 
             match self.get_parent_mut(working_id) {
                 Some(parent) => {
-                    parent.flag_pos_refresh((x_out, y_out));
-                    working_id = parent.rect_id;
-
-                    match parent._cached_display.remove(&(x, y)) {
+                    match parent._cached_display.remove(&(x_out, y_out)) {
                         Some(_) => {}
                         None => {}
                     }
+
+                    working_id = parent.rect_id;
                 }
                 None => {
                     break;
                 }
             }
+
         }
 
         Ok(())
