@@ -1,12 +1,12 @@
 [package]
 name = "wrecked_bindings"
-version = "1.0.7"
+version = "1.0.10"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "Bindings for the wrecked terminal graphics library"
 
 [dependencies]
-wrecked = "^1.0.7"
+wrecked = "^1.0.8"
 
 [lib]
 name = "wrecked_bindings"
