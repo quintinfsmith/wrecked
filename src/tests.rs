@@ -749,3 +749,36 @@ fn test_id_recycling() {
     assert_eq!(rectmanager.recycle_ids.as_slice(), []);
 }
 
+#[test]
+fn test_positional_refresh() {
+    let mut rectmanager = RectManager::new();
+
+    let mut working_rect = ROOT;
+    let mut rects = vec![];
+    for i in 0 .. 3 {
+        working_rect = rectmanager.new_rect(working_rect).ok().unwrap();
+        let s = (10 - (3 * i));
+        rectmanager.resize(working_rect, s, s);
+        rectmanager.set_position(working_rect, 2, 2);
+        rects.push(working_rect);
+    }
+
+    // Render and clear refresh flags
+    rectmanager.render();
+
+    // set_character to flag a single position
+    rectmanager.set_character(*rects.last().unwrap(), 0, 0, 'X');
+
+    // Check the single correct flags have been set.
+    for i in 0 .. 3 {
+        match rectmanager.get_rect(rects[i]) {
+            Some(rect) => {
+                let pos = ((2 - i) * 2) as isize;
+                assert_eq!(rect.flags_pos_refresh.len(), 1);
+                assert!(rect.flags_pos_refresh.contains(&(pos, pos)));
+            }
+            None => { assert!(false); }
+        }
+    }
+}
+
