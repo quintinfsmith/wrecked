@@ -219,7 +219,6 @@ impl RectManager {
             Some(mut new_termios) => {
                 new_termios.c_lflag &= !(ICANON | ECHO);
                 tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
-
                 RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
             }
             None => {
@@ -344,6 +343,7 @@ impl RectManager {
                 tcsetattr(0, TCSANOW, & _termios).unwrap();
 
                 RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
+                RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
             }
             None => ()
         }
