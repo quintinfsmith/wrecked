@@ -267,7 +267,7 @@ class RectManager:
 
         """)
 
-        lib_path = lib_path = __file__[0:__file__.rfind("/") + 1] + "libwrecked_manylinux2014_" + platform.machine() + ".so"
+        lib_path = __file__[0:__file__.rfind("/") + 1] + "libwrecked_manylinux2014_" + platform.machine() + ".so"
         self.lib = ffi.dlopen(lib_path)
 
         self.rectmanager = self.lib.init()
