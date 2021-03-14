@@ -6,6 +6,7 @@ import os, time
 import json
 import threading
 import logging
+import platform
 
 def get_terminal_size():
     '''return dimensions of current terminal session'''
