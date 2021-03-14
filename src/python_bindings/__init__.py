@@ -219,44 +219,45 @@ class RectManager:
             void kill(RectManager);
 
 
-            uint32_t new_rect(RectManager, uint32_t, uint32_t, uint32_t);
-            uint32_t delete_rect(RectManager, uint32_t);
+            uint64_t new_rect(RectManager, uint64_t, uint64_t, uint64_t);
+            uint64_t new_orphan(RectManager, uint64_t, uint64_t);
+            uint32_t delete_rect(RectManager, uint64_t);
 
 
-            uint32_t set_position(RectManager, uint32_t, int32_t, int32_t);
-            uint32_t resize(RectManager, uint32_t, uint32_t, uint32_t);
-            uint32_t attach(RectManager, uint32_t, uint32_t);
-            uint32_t detach(RectManager, uint32_t);
+            uint32_t set_position(RectManager, uint64_t, int64_t, int64_t);
+            uint32_t resize(RectManager, uint64_t, uint64_t, uint64_t);
+            uint32_t attach(RectManager, uint64_t, uint64_t);
+            uint32_t detach(RectManager, uint64_t);
 
-            uint32_t clear_children(RectManager, uint32_t);
-            uint32_t clear_characters(RectManager, uint32_t);
+            uint32_t clear_children(RectManager, uint64_t);
+            uint32_t clear_characters(RectManager, uint64_t);
 
 
-            uint32_t unset_color(RectManager, uint32_t);
-            uint32_t set_bg_color(RectManager, uint32_t, uint8_t);
-            uint32_t set_fg_color(RectManager, uint32_t, uint8_t);
-            uint32_t unset_bg_color(RectManager, uint32_t);
-            uint32_t unset_fg_color(RectManager, uint32_t);
+            uint32_t unset_color(RectManager, uint64_t);
+            uint32_t set_bg_color(RectManager, uint64_t, uint8_t);
+            uint32_t set_fg_color(RectManager, uint64_t, uint8_t);
+            uint32_t unset_bg_color(RectManager, uint64_t);
+            uint32_t unset_fg_color(RectManager, uint64_t);
 
-            void set_bold_flag(RectManager, uint32_t);
-            void unset_bold_flag(RectManager, uint32_t);
-            void set_underline_flag(RectManager, uint32_t);
-            void unset_underline_flag(RectManager, uint32_t);
-            void set_invert_flag(RectManager, uint32_t);
-            void unset_invert_flag(RectManager, uint32_t);
+            void set_bold_flag(RectManager, uint64_t);
+            void unset_bold_flag(RectManager, uint64_t);
+            void set_underline_flag(RectManager, uint64_t);
+            void unset_underline_flag(RectManager, uint64_t);
+            void set_invert_flag(RectManager, uint64_t);
+            void unset_invert_flag(RectManager, uint64_t);
 
-            uint32_t disable_rect(RectManager, uint32_t);
-            uint32_t enable_rect(RectManager, uint32_t);
+            uint32_t disable_rect(RectManager, uint64_t);
+            uint32_t enable_rect(RectManager, uint64_t);
 
-            uint32_t set_character(RectManager, uint32_t, int32_t, int32_t, const char*);
-            uint32_t set_string(RectManager, uint32_t, int32_t, int32_t, const char*);
-            uint32_t unset_character(RectManager, uint32_t, int32_t, int32_t);
+            uint32_t set_character(RectManager, uint64_t, int64_t, int64_t, const char*);
+            uint32_t set_string(RectManager, uint64_t, int64_t, int64_t, const char*);
+            uint32_t unset_character(RectManager, uint64_t, int64_t, int64_t);
 
-            uint32_t render(RectManager, uint32_t);
+            uint32_t render(RectManager, uint64_t);
 
-            uint32_t replace_with(RectManager, uint32_t, uint32_t);
+            uint32_t replace_with(RectManager, uint64_t, uint64_t);
 
-            uint32_t shift_contents(RectManager, uint32_t, int32_t, int32_t);
+            uint32_t shift_contents(RectManager, uint64_t, int64_t, int64_t);
 
             uint64_t get_height(RectManager, uint64_t);
             uint64_t get_width(RectManager, uint64_t);

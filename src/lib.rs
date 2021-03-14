@@ -21,10 +21,10 @@ fn cast_result(result: Result<(), WreckedError>) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn set_transparency(ptr: *mut RectManager, rect_id: usize, transparency: bool) -> u32 {
+pub extern "C" fn set_transparency(ptr: *mut RectManager, rect_id: u64, transparency: bool) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.set_transparency(rect_id, transparency);
+    let result = rectmanager.set_transparency(rect_id as usize, transparency);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -32,22 +32,10 @@ pub extern "C" fn set_transparency(ptr: *mut RectManager, rect_id: usize, transp
 }
 
 #[no_mangle]
-pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn disable_rect(ptr: *mut RectManager, rect_id: u64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.disable(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    cast_result(result)
-}
-
-
-#[no_mangle]
-pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.enable(rect_id);
+    let result = rectmanager.disable(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -56,10 +44,22 @@ pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn render(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn enable_rect(ptr: *mut RectManager, rect_id: u64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.draw(rect_id);
+    let result = rectmanager.enable(rect_id as usize);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    cast_result(result)
+}
+
+
+#[no_mangle]
+pub extern "C" fn render(ptr: *mut RectManager, rect_id: u64) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.draw(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -67,14 +67,14 @@ pub extern "C" fn render(ptr: *mut RectManager, rect_id: usize) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
+pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: u64, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let colors = [Color::BLACK, Color::RED, Color::GREEN, Color::YELLOW, Color::BLUE, Color::MAGENTA, Color::CYAN, Color::WHITE, Color::BRIGHTBLACK, Color::BRIGHTRED, Color::BRIGHTGREEN, Color::BRIGHTYELLOW, Color::BRIGHTBLUE, Color::BRIGHTMAGENTA, Color::BRIGHTCYAN, Color::BRIGHTWHITE];
 
     let result = match colors.get(color_n as usize) {
         Some(color) => {
-            rectmanager.set_fg_color(rect_id, *color)
+            rectmanager.set_fg_color(rect_id as usize, *color)
         }
         None => {
             Err(WreckedError::BadColor)
@@ -87,12 +87,12 @@ pub extern "C" fn set_fg_color(ptr: *mut RectManager, rect_id: usize, color_n: u
 }
 
 #[no_mangle]
-pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, color_n: u8) -> u32 {
+pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: u64, color_n: u8) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
     let colors = [Color::BLACK, Color::RED, Color::GREEN, Color::YELLOW, Color::BLUE, Color::MAGENTA, Color::CYAN, Color::WHITE, Color::BRIGHTBLACK, Color::BRIGHTRED, Color::BRIGHTGREEN, Color::BRIGHTYELLOW, Color::BRIGHTBLUE, Color::BRIGHTMAGENTA, Color::BRIGHTCYAN, Color::BRIGHTWHITE];
     let result = match colors.get(color_n as usize) {
         Some(color) => {
-            rectmanager.set_bg_color(rect_id, *color)
+            rectmanager.set_bg_color(rect_id as usize, *color)
         }
         None => {
             Err(WreckedError::BadColor)
@@ -105,19 +105,19 @@ pub extern "C" fn set_bg_color(ptr: *mut RectManager, rect_id: usize, color_n: u
 }
 
 #[no_mangle]
-pub extern "C" fn set_invert_flag(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn set_invert_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.set_invert_flag(rect_id);
+    rectmanager.set_invert_flag(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 }
 
 #[no_mangle]
-pub extern "C" fn set_underline_flag(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn set_underline_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.set_underline_flag(rect_id);
+    rectmanager.set_underline_flag(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -125,71 +125,48 @@ pub extern "C" fn set_underline_flag(ptr: *mut RectManager, rect_id: usize) {
 
 
 #[no_mangle]
-pub extern "C" fn set_bold_flag(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn set_bold_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.set_bold_flag(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-}
-
-
-#[no_mangle]
-pub extern "C" fn unset_invert_flag(ptr: *mut RectManager, rect_id: usize) {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    rectmanager.unset_invert_flag(rect_id);
-
-    Box::into_raw(rectmanager); // Prevent Release
-}
-
-#[no_mangle]
-pub extern "C" fn unset_underline_flag(ptr: *mut RectManager, rect_id: usize) {
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    rectmanager.unset_underline_flag(rect_id);
+    rectmanager.set_bold_flag(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 }
 
 
 #[no_mangle]
-pub extern "C" fn unset_bold_flag(ptr: *mut RectManager, rect_id: usize) {
+pub extern "C" fn unset_invert_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    rectmanager.unset_bold_flag(rect_id);
+    rectmanager.unset_invert_flag(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 }
 
 #[no_mangle]
-pub extern "C" fn resize(ptr: *mut RectManager, rect_id: usize, new_width: usize, new_height: usize) -> u32 {
+pub extern "C" fn unset_underline_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.resize(rect_id, new_width, new_height);
+    rectmanager.unset_underline_flag(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
-
-    cast_result(result)
 }
 
 
 #[no_mangle]
-pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn unset_bold_flag(ptr: *mut RectManager, rect_id: u64) {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.unset_bg_color(rect_id);
-    Box::into_raw(rectmanager); // Prevent Release
+    rectmanager.unset_bold_flag(rect_id as usize);
 
-    cast_result(result)
+    Box::into_raw(rectmanager); // Prevent Release
 }
 
-
-
 #[no_mangle]
-pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn resize(ptr: *mut RectManager, rect_id: u64, new_width: u64, new_height: u64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
-    let result = rectmanager.unset_fg_color(rect_id);
+
+    let result = rectmanager.resize(rect_id as usize, new_width as usize, new_height as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -198,10 +175,21 @@ pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn unset_bg_color(ptr: *mut RectManager, rect_id: u64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.unset_color(rect_id);
+    let result = rectmanager.unset_bg_color(rect_id as usize);
+    Box::into_raw(rectmanager); // Prevent Release
+
+    cast_result(result)
+}
+
+
+
+#[no_mangle]
+pub extern "C" fn unset_fg_color(ptr: *mut RectManager, rect_id: u64) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+    let result = rectmanager.unset_fg_color(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -210,13 +198,25 @@ pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
+pub extern "C" fn unset_color(ptr: *mut RectManager, rect_id: u64) -> u32 {
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.unset_color(rect_id as usize);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    cast_result(result)
+}
+
+
+#[no_mangle]
+pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64, c: *const c_char) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let c_str = unsafe { CStr::from_ptr(c) };
     let string_ = c_str.to_str().unwrap();
 
-    let result = rectmanager.set_string(rect_id, x, y, string_);
+    let result = rectmanager.set_string(rect_id as usize, x as isize, y as isize, string_);
 
 
     Box::into_raw(rectmanager); // Prevent Release
@@ -226,13 +226,13 @@ pub extern "C" fn set_string(ptr: *mut RectManager, rect_id: usize, x: isize, y:
 
 
 #[no_mangle]
-pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize, c: *const c_char) -> u32 {
+pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64, c: *const c_char) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let c_str = unsafe { CStr::from_ptr(c) };
     let character = c_str.to_str().unwrap().chars().next().unwrap();
 
-    let result = rectmanager.set_character(rect_id, x, y, character);
+    let result = rectmanager.set_character(rect_id as usize, x as isize, y as isize, character);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -241,10 +241,10 @@ pub extern "C" fn set_character(ptr: *mut RectManager, rect_id: usize, x: isize,
 
 
 #[no_mangle]
-pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
+pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.unset_character(rect_id, x, y);
+    let result = rectmanager.unset_character(rect_id as usize, x as isize, y as isize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -253,10 +253,10 @@ pub extern "C" fn unset_character(ptr: *mut RectManager, rect_id: usize, x: isiz
 
 
 #[no_mangle]
-pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
+pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: u64) -> u32 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.delete_rect(rect_id);
+    let result = rectmanager.delete_rect(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -265,47 +265,35 @@ pub extern "C" fn delete_rect(ptr: *mut RectManager, rect_id: usize) -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: usize, width: usize, height: usize) -> usize {
+pub extern "C" fn new_rect(ptr: *mut RectManager, parent_id: u64, width: u64, height: u64) -> u64 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let new_rect_id = rectmanager.new_rect(parent_id).ok().unwrap();
-    rectmanager.resize(new_rect_id, width, height);
+    let new_rect_id = rectmanager.new_rect(parent_id as usize).ok().unwrap();
+    rectmanager.resize(new_rect_id, width as usize, height as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    new_rect_id
+    new_rect_id as u64
 }
 
 #[no_mangle]
-pub extern "C" fn new_orphan(ptr: *mut RectManager, width: usize, height: usize) -> usize {
+pub extern "C" fn new_orphan(ptr: *mut RectManager, width: u64, height: u64) -> u64 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
     let new_rect_id = rectmanager.new_orphan().ok().unwrap();
-    rectmanager.resize(new_rect_id, width, height);
+    rectmanager.resize(new_rect_id, width as usize, height as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    new_rect_id
+    new_rect_id as u64
 }
 
 #[no_mangle]
-pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
+pub extern "C" fn set_position(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64) -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.set_position(rect_id, x, y);
-
-    Box::into_raw(rectmanager); // Prevent Release
-
-    cast_result(result)
-}
-
-#[no_mangle]
-pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize, y: isize) -> u32 {
-
-    let mut rectmanager = unsafe { Box::from_raw(ptr) };
-
-    let result = rectmanager.shift_contents(rect_id, x, y);
+    let result = rectmanager.set_position(rect_id as usize, x as isize, y as isize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -313,11 +301,11 @@ pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: usize, x: isize
 }
 
 #[no_mangle]
-pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64) -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.clear_characters(rect_id);
+    let result = rectmanager.shift_contents(rect_id as usize, x as isize, y as isize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -325,11 +313,11 @@ pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: usize)  -> u3
 }
 
 #[no_mangle]
-pub extern "C" fn clear_children(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: u64)  -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.clear_children(rect_id);
+    let result = rectmanager.clear_characters(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -337,11 +325,23 @@ pub extern "C" fn clear_children(ptr: *mut RectManager, rect_id: usize)  -> u32 
 }
 
 #[no_mangle]
-pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize)  -> u32 {
+pub extern "C" fn clear_children(ptr: *mut RectManager, rect_id: u64)  -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.detach(rect_id);
+    let result = rectmanager.clear_children(rect_id as usize);
+
+    Box::into_raw(rectmanager); // Prevent Release
+
+    cast_result(result)
+}
+
+#[no_mangle]
+pub extern "C" fn detach(ptr: *mut RectManager, rect_id: u64)  -> u32 {
+
+    let mut rectmanager = unsafe { Box::from_raw(ptr) };
+
+    let result = rectmanager.detach(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -350,11 +350,11 @@ pub extern "C" fn detach(ptr: *mut RectManager, rect_id: usize)  -> u32 {
 
 
 #[no_mangle]
-pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize) -> u32 {
+pub extern "C" fn attach(ptr: *mut RectManager, rect_id: u64, parent_id: u64) -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.attach(rect_id, parent_id);
+    let result = rectmanager.attach(rect_id as usize, parent_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -362,11 +362,11 @@ pub extern "C" fn attach(ptr: *mut RectManager, rect_id: usize, parent_id: usize
 }
 
 #[no_mangle]
-pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: usize, new_rect_id: usize) -> u32 {
+pub extern "C" fn replace_with(ptr: *mut RectManager, old_rect_id: u64, new_rect_id: u64) -> u32 {
 
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let result = rectmanager.replace_with(old_rect_id, new_rect_id);
+    let result = rectmanager.replace_with(old_rect_id as usize, new_rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
@@ -394,25 +394,25 @@ pub extern "C" fn init() -> *mut RectManager {
 }
 
 #[no_mangle]
-pub extern "C" fn get_width(ptr: *mut RectManager, rect_id: usize) -> usize {
+pub extern "C" fn get_width(ptr: *mut RectManager, rect_id: u64) -> u64 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let width = rectmanager.get_rect_width(rect_id);
+    let width = rectmanager.get_rect_width(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    width
+    width as u64
 }
 
 #[no_mangle]
-pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: usize) -> usize {
+pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: u64) -> u64 {
     let mut rectmanager = unsafe { Box::from_raw(ptr) };
 
-    let height = rectmanager.get_rect_height(rect_id);
+    let height = rectmanager.get_rect_height(rect_id as usize);
 
     Box::into_raw(rectmanager); // Prevent Release
 
-    height
+    height as u64
 }
 
 #[no_mangle]
