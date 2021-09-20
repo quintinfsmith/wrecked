@@ -4,15 +4,29 @@ use std::io::{self, Write};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::str;
-
-pub mod terminalmanager;
-#[cfg(target_os = "linux")]
-use terminalmanager::unix::TerminalManager;
-#[cfg(target_os = "windows")]
-use terminalmanager::windows::TerminalManager;
-
+use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
 pub mod tests;
+
+pub fn get_terminal_size() -> (u16, u16) {
+    use libc::{winsize, TIOCGWINSZ, ioctl};
+    let mut output = (1, 1);
+
+    let mut t = winsize {
+        ws_row: 0,
+        ws_col: 0,
+        ws_xpixel: 0,
+        ws_ypixel: 0
+    };
+
+
+    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
+        output = (t.ws_col, t.ws_row);
+    }
+
+    output
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum WreckedError {
     AllGood,
@@ -184,7 +198,7 @@ pub struct RectManager {
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, EffectsHandler)>,
-    terminalmanager: TerminalManager,
+    _termios: Option<Termios>,
     default_character: char
 }
 
@@ -199,13 +213,26 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new() -> RectManager {
+        let termios = Termios::from_fd(libc::STDOUT_FILENO).ok();
+
+        match termios.clone() {
+            Some(mut new_termios) => {
+                new_termios.c_lflag &= !(ICANON | ECHO);
+                tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
+                RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
+            }
+            None => {
+
+            }
+        }
+
 
         let mut rectmanager = RectManager {
             idgen: ROOT,
             recycle_ids: Vec::new(),
             rects: HashMap::new(),
             top_cache: HashMap::new(),
-            terminalmanager: TerminalManager::new(),
+            _termios: termios,
             default_character: ' '
         };
 
@@ -235,7 +262,7 @@ impl RectManager {
         let mut did_resize = false;
         let (current_width, current_height) = self.get_rect_size(ROOT).unwrap();
 
-        let (w, h) = TerminalManager::get_size();
+        let (w, h) = get_terminal_size();
         if w as usize != current_width || h as usize != current_height {
             self.resize(ROOT, w as usize, h as usize).expect("Unable to fit ROOT rect to terminal");
 
@@ -308,7 +335,18 @@ impl RectManager {
             Err(e) => { last_error = Err(e); }
         }
 
-        self.terminalmanager.tear_down();
+        // Even if it fails, we want to try clearing out all the rects
+        // that are drawn, and reset the screen, to try to make failure
+        // as easy to read as possible.
+        match self._termios {
+            Some(_termios) => {
+                tcsetattr(0, TCSANOW, & _termios).unwrap();
+
+                RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
+                RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
+            }
+            None => ()
+        }
 
         last_error
     }
