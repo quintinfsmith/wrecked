@@ -9,8 +9,10 @@ license = "GPL-2.0-or-later"
 categories = ["GUI", "Command-line-interface"]
 keywords = ["tui", "ui", "terminal"]
 
-[dependencies]
+[target.'cfg(unix)'.dependencies]
 termios = "0.3"
+
+[dependencies]
 libc = "0.2"
 
 [lib]

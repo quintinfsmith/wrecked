@@ -4,7 +4,13 @@ use std::io::{self, Write};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::str;
-use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+
+pub mod terminalmanager;
+#[cfg(target_os = "linux")]
+use terminalmanager::unix::TerminalManager;
+#[cfg(target_os = "windows")]
+use terminalmanager::windows::TerminalManager;
+
 
 pub mod tests;
 
@@ -198,7 +204,7 @@ pub struct RectManager {
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, EffectsHandler)>,
-    _termios: Option<Termios>,
+    terminalmanager: TerminalManager,
     default_character: char
 }
 
@@ -213,26 +219,13 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new() -> RectManager {
-        let termios = Termios::from_fd(libc::STDOUT_FILENO).ok();
-
-        match termios.clone() {
-            Some(mut new_termios) => {
-                new_termios.c_lflag &= !(ICANON | ECHO);
-                tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
-                RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
-            }
-            None => {
-
-            }
-        }
-
 
         let mut rectmanager = RectManager {
             idgen: ROOT,
             recycle_ids: Vec::new(),
             rects: HashMap::new(),
             top_cache: HashMap::new(),
-            _termios: termios,
+            terminalmanager: TerminalManager::new(),
             default_character: ' '
         };
 
@@ -335,18 +328,7 @@ impl RectManager {
             Err(e) => { last_error = Err(e); }
         }
 
-        // Even if it fails, we want to try clearing out all the rects
-        // that are drawn, and reset the screen, to try to make failure
-        // as easy to read as possible.
-        match self._termios {
-            Some(_termios) => {
-                tcsetattr(0, TCSANOW, & _termios).unwrap();
-
-                RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
-                RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
-            }
-            None => ()
-        }
+        self.terminalmanager.tear_down();
 
         last_error
     }
