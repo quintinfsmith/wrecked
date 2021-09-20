@@ -38,6 +38,24 @@ impl TerminalManager {
             None => ()
         }
     }
+
+    pub fn get_size() -> (u16, u16) {
+        use libc::{winsize, TIOCGWINSZ, ioctl};
+        let mut output = (1, 1);
+
+        let mut t = winsize {
+            ws_row: 0,
+            ws_col: 0,
+            ws_xpixel: 0,
+            ws_ypixel: 0
+        };
+
+        if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
+            output = (t.ws_col, t.ws_row);
+        }
+
+        output
+    }
 }
 
 

@@ -13,26 +13,6 @@ use terminalmanager::windows::TerminalManager;
 
 
 pub mod tests;
-
-pub fn get_terminal_size() -> (u16, u16) {
-    use libc::{winsize, TIOCGWINSZ, ioctl};
-    let mut output = (1, 1);
-
-    let mut t = winsize {
-        ws_row: 0,
-        ws_col: 0,
-        ws_xpixel: 0,
-        ws_ypixel: 0
-    };
-
-
-    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
-        output = (t.ws_col, t.ws_row);
-    }
-
-    output
-}
-
 #[derive(PartialEq, Eq, Debug)]
 pub enum WreckedError {
     AllGood,
@@ -255,7 +235,7 @@ impl RectManager {
         let mut did_resize = false;
         let (current_width, current_height) = self.get_rect_size(ROOT).unwrap();
 
-        let (w, h) = get_terminal_size();
+        let (w, h) = TerminalManager::get_size();
         if w as usize != current_width || h as usize != current_height {
             self.resize(ROOT, w as usize, h as usize).expect("Unable to fit ROOT rect to terminal");
 
