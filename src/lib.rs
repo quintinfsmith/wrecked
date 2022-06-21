@@ -2163,6 +2163,7 @@ impl RectManager {
                       If a full refresh is requested,
                       fill flags_pos_refresh with all potential coords
                     */
+                    let mut unrefreshed_pos = HashSet::new();
                     if rect.flag_full_refresh {
                         rect.flag_full_refresh = false;
 
@@ -2172,7 +2173,13 @@ impl RectManager {
                             }
                         }
 
-                        rect.flags_pos_refresh.clear();
+                        for pos in rect.flags_pos_refresh.iter() {
+                            if ! (pos.0 >= 0 && pos.1 >= 0
+                            && pos.0 < rect.width as isize
+                            && pos.1 < rect.height as isize) {
+                                unrefreshed_pos.insert(*pos);
+                            }
+                        }
                     } else {
                         /*
                             Iterate through flags_pos_refresh and update
@@ -2184,10 +2191,12 @@ impl RectManager {
                             && pos.1 < rect.height as isize {
                                 let key = (pos.0 as isize, pos.1 as isize);
                                 flags_pos_refresh.insert(key);
+                            } else {
+                                unrefreshed_pos.insert(*pos);
                             }
                         }
                     }
-                    rect.flags_pos_refresh.clear();
+                    rect.flags_pos_refresh = unrefreshed_pos;
                 }
             }
             None => {
