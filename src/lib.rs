@@ -2582,7 +2582,7 @@ impl Rect {
         let child_ranks = &self._child_ranks;
         for y in corners.1 .. corners.3 {
             for x in corners.0 .. corners.2 {
-                if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
+                //if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
                     self.child_space.entry((x, y))
                         .or_insert(Vec::new());
 
@@ -2600,7 +2600,7 @@ impl Rect {
                     self._inverse_child_space.entry(rect_id)
                         .or_insert(Vec::new())
                         .push((x, y));
-                }
+                //}
             }
         }
     }
