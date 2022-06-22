@@ -782,3 +782,74 @@ fn test_positional_refresh() {
     }
 }
 
+#[test]
+fn test_out_of_bounds_rendering_resize() {
+    let mut rectmanager = RectManager::new();
+    let rect_top = rectmanager.new_rect(ROOT).ok().unwrap();
+    let rect_mid = rectmanager.new_rect(rect_top).ok().unwrap();
+    let rect_bot = rectmanager.new_rect(rect_mid).ok().unwrap();
+
+    // Case 1: rect_bot populated outside rect_top bounds, then rect_top is resized to contain rect_bot
+    rectmanager.resize(rect_top, 2, 1);
+    rectmanager.resize(rect_mid, 2, 1);
+    rectmanager.resize(rect_bot, 1, 1);
+    rectmanager.set_position(rect_mid, 1, 0);
+    rectmanager.set_position(rect_bot, 1, 0);
+    rectmanager.set_character(rect_bot, 0, 0, 'X');
+    rectmanager.render();
+
+    for ((x, y), (c, _)) in rectmanager.get_cached_draw_map(rect_top) {
+        if x == 2 {
+            assert!(c != 'X');
+        }
+    }
+
+    rectmanager.resize(rect_top, 3, 1);
+    rectmanager.render();
+
+    for ((x, y), (c, _)) in rectmanager.get_cached_draw_map(rect_top) {
+        if x == 2 {
+            assert!(c == 'X');
+        }
+    }
+}
+
+#[test]
+fn test_out_of_bounds_rendering_set_position() {
+    let mut rectmanager = RectManager::new();
+    let rect_top = rectmanager.new_rect(ROOT).ok().unwrap();
+    let rect_mid = rectmanager.new_rect(rect_top).ok().unwrap();
+    let rect_bot = rectmanager.new_rect(rect_mid).ok().unwrap();
+
+    // Case 2: rect_bot populated outside rect_top_bounds, then rect_mid is moved so rect_top contains rect_bot
+    rectmanager.resize(rect_top, 2, 1);
+
+    rectmanager.resize(rect_mid, 2, 1);
+    rectmanager.set_position(rect_mid, -1, 0);
+
+    rectmanager.resize(rect_bot, 1, 1);
+    rectmanager.set_position(rect_bot, 1, 0);
+    rectmanager.set_character(rect_bot, 0, 0, 'Y');
+
+    rectmanager.render();
+
+    let mut found = false;
+    for ((x, y), (c, _)) in rectmanager.get_cached_draw_map(rect_top) {
+        if x == 1 {
+            assert!(c != 'Y');
+            found = true;
+        }
+    }
+    assert!(found);
+
+    rectmanager.set_position(rect_mid, 0, 0);
+    rectmanager.render();
+    found = false;
+    for ((x, y), (c, _)) in rectmanager.get_cached_draw_map(rect_top) {
+        if x == 1 {
+            assert!(c == 'Y');
+            found = true;
+        }
+    }
+    assert!(found);
+}
