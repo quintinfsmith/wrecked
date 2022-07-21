@@ -1,6 +1,5 @@
 # Wrecked
 A library for terminal-based graphics and UI.<br/>
-[![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/wrecked?style=flat-square)](https://travis-ci.com/github/quintinfsmith/wrecked)
 [![Crates.io](https://img.shields.io/crates/d/wrecked?style=flat-square)](https://crates.io/crates/wrecked)
 [![Crates.io](https://img.shields.io/crates/v/wrecked?style=flat-square)](https://crates.io/crates/wrecked)
 [![Crates.io](https://img.shields.io/crates/l/wrecked?style=flat-square)](https://burnsomni.net/project/wrecked/?branch=master&path=LICENSE)
