@@ -4,6 +4,7 @@ version = "1.0.20"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "Bindings for the wrecked terminal graphics library"
+license = "GPL-2.0-or-later"
 
 [dependencies]
 wrecked = "^1.0.12"
