@@ -1,10 +1,10 @@
 [package]
 name = "wrecked"
-version = "1.0.12"
+version = "1.1.0"
 authors = ["Quintin Smith <smith.quintin@protonmail.com>"]
 edition = "2018"
 description = "A terminal graphics library"
-repository = "https://github.com/quintinfsmith/wrecked"
+repository = "git://burnsomni.net/wrecked"
 license = "GPL-2.0-or-later"
 categories = ["GUI", "Command-line-interface"]
 keywords = ["tui", "ui", "terminal"]
