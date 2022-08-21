@@ -4,7 +4,11 @@ use std::io::{self, Write};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::str;
-use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+
+#[cfg(target_os = "windows")]
+    use rustix::termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+#[cfg(not(target_os = "windows"))]
+    use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
 pub mod tests;
 
