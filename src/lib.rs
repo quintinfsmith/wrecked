@@ -10,7 +10,9 @@ use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Console;
+#[cfg(target_os = "windows")]
 use windows::Win32::Foundation;
+#[cfg(target_os = "windows")]
 struct Termios { }
 
 pub mod tests;
