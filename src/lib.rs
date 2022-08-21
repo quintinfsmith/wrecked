@@ -4,31 +4,24 @@ use std::io::{self, Write};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::str;
+use terminal_size::{terminal_size, Width, Height};
+#[cfg(not(target_os = "windows"))]
+use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
 #[cfg(target_os = "windows")]
-    use rustix::termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
-#[cfg(not(target_os = "windows"))]
-    use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
+struct Termios { }
 
 pub mod tests;
 
 pub fn get_terminal_size() -> (u16, u16) {
-    use libc::{winsize, TIOCGWINSZ, ioctl};
-    let mut output = (1, 1);
-
-    let mut t = winsize {
-        ws_row: 0,
-        ws_col: 0,
-        ws_xpixel: 0,
-        ws_ypixel: 0
-    };
-
-
-    if unsafe { ioctl(libc::STDOUT_FILENO, TIOCGWINSZ.into(), &mut t) } != -1 {
-        output = (t.ws_col, t.ws_row);
+    match terminal_size() {
+        Some((Width(w), Height(h))) => {
+            (w as u16, h as u16)
+        }
+        None => {
+            (1, 1)
+        }
     }
-
-    output
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -202,7 +195,7 @@ pub struct RectManager {
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, EffectsHandler)>,
-    _termios: Option<Termios>,
+    _termref: Option<Termios>,
     default_character: char
 }
 
@@ -217,16 +210,26 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new() -> RectManager {
-        let termios = Termios::from_fd(libc::STDOUT_FILENO).ok();
+        let mut termref = None;
+        #[cfg(target_os = "windows")]
+        {
+            RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let stdout_fileno = libc::STDOUT_FILENO;
 
-        match termios.clone() {
-            Some(mut new_termios) => {
-                new_termios.c_lflag &= !(ICANON | ECHO);
-                tcsetattr(0, TCSANOW, &mut new_termios).unwrap();
-                RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
-            }
-            None => {
+            termref = Termios::from_fd(stdout_fileno).ok();
 
+            match termref.clone() {
+                Some(mut new_termref) => {
+                    new_termref.c_lflag &= !(ICANON | ECHO);
+                    tcsetattr(0, TCSANOW, &mut new_termref).unwrap();
+                    RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
+                }
+                None => {
+
+                }
             }
         }
 
@@ -236,7 +239,7 @@ impl RectManager {
             recycle_ids: Vec::new(),
             rects: HashMap::new(),
             top_cache: HashMap::new(),
-            _termios: termios,
+            _termref: termref,
             default_character: ' '
         };
 
@@ -342,14 +345,22 @@ impl RectManager {
         // Even if it fails, we want to try clearing out all the rects
         // that are drawn, and reset the screen, to try to make failure
         // as easy to read as possible.
-        match self._termios {
-            Some(_termios) => {
-                tcsetattr(0, TCSANOW, & _termios).unwrap();
+        #[cfg(not(target_os = "windows"))]
+        {
+            match self._termref {
+                Some(_termref) => {
+                    tcsetattr(0, TCSANOW, & _termref).unwrap();
 
-                RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
-                RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
+                    RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
+                    RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
+                }
+                None => ()
             }
-            None => ()
+        }
+        #[cfg(target_os = "windows")]
+        {
+            RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
+            RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
         }
 
         last_error
@@ -2944,3 +2955,4 @@ impl Rect {
         output
     }
 }
+
