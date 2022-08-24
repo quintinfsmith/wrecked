@@ -5,15 +5,9 @@ use std::error::Error;
 use std::fmt::{self, Display};
 use std::str;
 use terminal_size::{terminal_size, Width, Height};
-#[cfg(not(target_os = "windows"))]
-use termios::{Termios, TCSANOW, ECHO, ICANON, tcsetattr};
 
-#[cfg(target_os = "windows")]
-use windows::Win32::System::Console;
-#[cfg(target_os = "windows")]
-use windows::Win32::Foundation;
-#[cfg(target_os = "windows")]
-struct Termios { }
+mod platform;
+use platform::TermType;
 
 pub mod tests;
 
@@ -199,7 +193,7 @@ pub struct RectManager {
     // top_cache is used to prevent redrawing the same
     // characters at the same coordinate.
     top_cache: HashMap<(isize, isize), (char, EffectsHandler)>,
-    _termref: Option<Termios>,
+    _termref: Option<TermType>,
     default_character: char
 }
 
@@ -214,36 +208,7 @@ impl RectManager {
     /// rectmanager.kill();
     /// ```
     pub fn new() -> RectManager {
-        let mut termref = None;
-        #[cfg(target_os = "windows")]
-        unsafe {
-            match Console::GetStdHandle(Console::STD_INPUT_HANDLE) {
-                Ok(handle) => {
-                    let mut mode: Console::CONSOLE_MODE = Console::CONSOLE_MODE(0);
-                    Console::GetConsoleMode(handle, &mut mode);
-                    Console::SetConsoleMode(handle, mode & !Console::ENABLE_ECHO_INPUT & !Console::ENABLE_LINE_INPUT);
-                    RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
-                }
-                Err(_) => {}
-            }
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            let stdout_fileno = libc::STDOUT_FILENO;
-
-            termref = Termios::from_fd(stdout_fileno).ok();
-
-            match termref.clone() {
-                Some(mut new_termref) => {
-                    new_termref.c_lflag &= !(ICANON | ECHO);
-                    tcsetattr(0, TCSANOW, &mut new_termref).unwrap();
-                    RectManager::write("\x1B[?25l\x1B[?1049h").expect("Couldn't switch screen buffer"); // New screen
-                }
-                None => {
-
-                }
-            }
-        }
+        let termref = platform::prepare_console();
 
 
         let mut rectmanager = RectManager {
@@ -357,23 +322,11 @@ impl RectManager {
         // Even if it fails, we want to try clearing out all the rects
         // that are drawn, and reset the screen, to try to make failure
         // as easy to read as possible.
-        #[cfg(not(target_os = "windows"))]
-        {
-            match self._termref {
-                Some(_termref) => {
-                    tcsetattr(0, TCSANOW, & _termref).unwrap();
+        self.restore_console_state();
 
-                    RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
-                    RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
-                }
-                None => ()
-            }
-        }
-        #[cfg(target_os = "windows")]
-        {
-            RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
-            RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
-        }
+        RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
+        RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
+
 
         last_error
     }
