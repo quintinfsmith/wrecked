@@ -25,6 +25,7 @@ impl RectManager {
         match self._termref {
             Some(_termref) => {
                 tcsetattr(0, TCSANOW, & _termref).unwrap();
+                RectManager::write("\x1B[?25h\x1B[?1049l").ok(); // Return to previous screen
 
             }
             None => ()

@@ -324,7 +324,6 @@ impl RectManager {
         // as easy to read as possible.
         self.restore_console_state();
 
-        RectManager::write("\x1B[?25h\x1B[?1049l")?; // Return to previous screen
         RectManager::write("\x1B[2A").expect("Couldn't restore cursor position");
 
 
