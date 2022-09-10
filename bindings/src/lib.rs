@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::str;
 use std::io::prelude::*;
@@ -346,4 +346,18 @@ pub extern "C" fn fit_to_terminal(ptr: *mut RectManager) -> bool {
     let result = rectmanager.fit_to_terminal();
 
     result
+}
+
+
+#[no_mangle]
+pub extern "C" fn get_current_ansi_string(ptr: *mut RectManager) -> *mut c_char {
+    let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
+    let ansi_string = rectmanager.get_current_ansi_string();
+
+    CString::new(ansi_string).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn free_string(ptr: *mut c_char) {
+    unsafe { CString::from_raw(ptr); }
 }

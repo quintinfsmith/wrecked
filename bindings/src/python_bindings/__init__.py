@@ -211,8 +211,8 @@ class Rect(object):
 
 class RectManager:
     def __init__(self):
-        ffi = FFI()
-        ffi.cdef("""
+        self.ffi = FFI()
+        self.ffi.cdef("""
             typedef void* RectManager;
 
             RectManager init();
@@ -265,10 +265,12 @@ class RectManager:
 
             uint32_t set_transparency(RectManager, uint64_t, bool);
 
+            const char* get_current_ansi_string(RectManager);
+            void free_string(const char*);
         """)
 
         lib_path = __file__[0:__file__.rfind("/") + 1] + "libwrecked_manylinux2014_" + platform.machine() + ".so"
-        self.lib = ffi.dlopen(lib_path)
+        self.lib = self.ffi.dlopen(lib_path)
 
         self.rectmanager = self.lib.init()
         self.width = self.lib.get_width(self.rectmanager, 0)
@@ -318,14 +320,8 @@ class RectManager:
 
         # No need to move the rect to 0,0. That is the default position.
         if position != (0,0):
-            err = self.rect_move(rect_id, *position)
+            self.rect_move(rect_id, *position)
 
-        if err:
-            raise EXCEPTIONS[err](
-                rect_id=rect_id,
-                parent_id=parent_id,
-                position=position
-            )
 
     def rect_detach(self, rect_id):
         err = self.lib.detach(self.rectmanager, rect_id)
@@ -533,6 +529,12 @@ class RectManager:
     def fit_to_terminal(self):
         return self.lib.fit_to_terminal(self.rectmanager)
 
+    def get_current_ansi_string(self):
+        cstring_ptr = self.lib.get_current_ansi_string(self.rectmanager)
+        output = self.ffi.string(cstring_ptr).decode()
+        self.lib.free_string(cstring_ptr)
+
+        return output
 
 __RECTMANAGER = None
 def init():
@@ -552,4 +554,12 @@ def kill():
     global __RECTMANAGER
     if __RECTMANAGER:
         __RECTMANAGER.kill()
+
+def get_current_ansi_string():
+    global __RECTMANAGER
+    if __RECTMANAGER:
+        output = __RECTMANAGER.get_current_ansi_string()
+    else:
+        output = ""
+    return output
 
