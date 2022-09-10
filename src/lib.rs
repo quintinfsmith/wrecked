@@ -364,6 +364,11 @@ impl RectManager {
         Ok(new_id)
     }
 
+    pub fn get_current_ansi_string(&mut self) -> String {
+        let draw_map = self.get_cached_draw_map(ROOT);
+        self.build_ansi_string(draw_map)
+    }
+
     fn build_ansi_string(&mut self, display_map: Vec<((isize, isize), (char, EffectsHandler))>) -> String {
         let mut renderstring = "".to_string();
 
