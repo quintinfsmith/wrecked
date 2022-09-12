@@ -365,7 +365,8 @@ impl RectManager {
     }
 
     pub fn get_current_ansi_string(&mut self) -> String {
-        let draw_map = self.get_cached_draw_map(ROOT);
+        let mut draw_map = self.get_cached_draw_map(ROOT);
+        draw_map.sort();
         self.build_ansi_string(draw_map)
     }
 
