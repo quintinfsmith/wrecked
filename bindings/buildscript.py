@@ -55,7 +55,7 @@ name = 'wrecked'
 
 targets = [
     ("", "", "manylinux2014_x86_64"),
-    ("--target armv7-unknown-linux-gnueabihf", "armv7-unknown-linux-gnueabihf", "manylinux2014_armv7l")
+    #("--target armv7-unknown-linux-gnueabihf", "armv7-unknown-linux-gnueabihf", "manylinux2014_armv7l")
 ]
 
 os.mkdir(folder)
@@ -81,7 +81,7 @@ if "--zip" in sys.argv:
 elif "--publish" in sys.argv:
     os.system("python3 -m twine upload dist/*.gz")
     os.chdir("../")
-elif "--local" in sys.argv and target_name == "release":
+elif "--local" in sys.argv:
     os.system("python3 setup.py install --prefix ~/.local/")
     os.chdir("../")
     #os.system("cp target/%s/release/libwrecked_bindings.so ~/.local/lib/libwrecked.so" % target_name)

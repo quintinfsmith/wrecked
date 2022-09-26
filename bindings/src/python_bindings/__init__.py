@@ -80,7 +80,7 @@ BRIGHTMAGENTA = MAGENTA | BRIGHT
 BRIGHTCYAN = CYAN | BRIGHT
 BRIGHTWHITE = WHITE | BRIGHT
 
-class Rect(object):
+class Rect:
     def __init__(self, n, rectmanager, **kwargs):
         self.rectmanager  = rectmanager
         self.rect_id = n

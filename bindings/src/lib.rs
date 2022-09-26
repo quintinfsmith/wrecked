@@ -262,6 +262,16 @@ pub extern "C" fn shift_contents(ptr: *mut RectManager, rect_id: u64, x: i64, y:
 }
 
 #[no_mangle]
+pub extern "C" fn shift_contents_in_box(ptr: *mut RectManager, rect_id: u64, x: i64, y: i64, xi: i64, yi: i64, xf: i64, yf: i64) -> u32 {
+    let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
+
+    let limit = (xi as isize, yi as isize, xf as isize, yf as isize);
+    let result = rectmanager.shift_contents_in_box(rect_id as usize, x as isize, y as isize, limit);
+
+    cast_result(result)
+}
+
+#[no_mangle]
 pub extern "C" fn clear_characters(ptr: *mut RectManager, rect_id: u64)  -> u32 {
     let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
 

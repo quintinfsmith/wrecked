@@ -868,6 +868,39 @@ impl RectManager {
         Ok(())
     }
 
+    pub fn shift_contents_in_box(&mut self, rect_id: usize, x_offset: isize, y_offset: isize, limit: (isize, isize, isize, isize)) -> Result<(), WreckedError> {
+        let mut child_ids = Vec::new();
+
+        match self.get_rect_mut(rect_id) {
+            Some(rect) => {
+                rect.shift_contents_in_box(x_offset, y_offset, limit);
+                for child_id in rect.children.iter() {
+                    // Can unwrap since we are getting the child id from the rect itself
+                    let position = rect.get_child_position(*child_id).unwrap();
+                    if position.0 < limit.0
+                    || position.1 < limit.1
+                    || position.0 >= limit.2
+                    || position.1 >= limit.3 {
+                        continue;
+                    }
+
+                    child_ids.push(*child_id);
+                }
+            }
+            None => {
+                Err(WreckedError::NotFound(rect_id))?;
+            }
+        }
+
+        for child_id in child_ids.iter() {
+            self.update_child_space(*child_id)?;
+        }
+
+        self.flag_refresh(rect_id)?;
+
+        Ok(())
+    }
+
     /// Set relative offset of given rectangle.
     /// # Example
     /// ```
@@ -2550,6 +2583,22 @@ impl Rect {
 
     fn shift_contents(&mut self, x_offset: isize, y_offset: isize) {
         for (_child_id, position) in self.child_positions.iter_mut() {
+            *position = (
+                position.0 + x_offset,
+                position.1 + y_offset
+            )
+        }
+    }
+
+    fn shift_contents_in_box(&mut self, x_offset: isize, y_offset: isize, limit: (isize, isize, isize, isize)) {
+        for (_child_id, position) in self.child_positions.iter_mut() {
+            if position.0 < limit.0
+            || position.1 < limit.1
+            || position.0 >= limit.2
+            || position.1 >= limit.3 {
+                continue;
+            }
+
             *position = (
                 position.0 + x_offset,
                 position.1 + y_offset
