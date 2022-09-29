@@ -350,6 +350,40 @@ pub extern "C" fn get_height(ptr: *mut RectManager, rect_id: u64) -> u64 {
 }
 
 #[no_mangle]
+pub extern "C" fn get_x(ptr: *mut RectManager, rect_id: u64) -> i64 {
+    let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
+
+    let output;
+    match rectmanager.get_relative_offset(rect_id as usize) {
+        Some((x, _)) => {
+            output = x;
+        }
+        None => {
+            output = 0;
+        }
+    }
+
+    output as i64
+}
+
+#[no_mangle]
+pub extern "C" fn get_y(ptr: *mut RectManager, rect_id: u64) -> i64 {
+    let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
+
+    let output;
+    match rectmanager.get_relative_offset(rect_id as usize) {
+        Some((_, y)) => {
+            output = y;
+        }
+        None => {
+            output = 0;
+        }
+    }
+
+    output as i64
+}
+
+#[no_mangle]
 pub extern "C" fn fit_to_terminal(ptr: *mut RectManager) -> bool {
     let mut rectmanager = unsafe { mem::ManuallyDrop::new(Box::from_raw(ptr)) };
 

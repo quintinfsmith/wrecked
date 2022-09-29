@@ -87,8 +87,6 @@ class Rect:
         self.rects = {}
         self.parent = None
         self.enabled = True
-        self.x = 0
-        self.y = 0
         self.transparent = False
 
         self.width = 1
@@ -98,6 +96,13 @@ class Rect:
         if 'height' in kwargs.keys():
             self.height = kwargs['height']
 
+    @property
+    def x(self):
+        return self.rectmanager.rect_get_x(self.rect_id)
+
+    @property
+    def y(self):
+        return self.rectmanager.rect_get_y(self.rect_id)
 
     def attach(self, child_rect):
         self.rects[child_rect.rect_id] = child_rect
@@ -150,8 +155,6 @@ class Rect:
         self.rectmanager.rect_unset_character(self.rect_id, x, y)
 
     def move(self, new_x, new_y):
-        self.x = new_x
-        self.y = new_y
         self.rectmanager.rect_move(self.rect_id, new_x, new_y)
 
     def invert(self):
@@ -204,6 +207,9 @@ class Rect:
     def shift_contents(self, x, y):
         self.rectmanager.rect_shift_contents(self.rect_id, x, y)
 
+    def shift_contents_in_box(self, x, y, limit):
+        self.rectmanager.rect_shift_contents_in_box(self.rect_id, x, y, limit)
+
     def set_transparency(self, transparency):
         self.rectmanager.rect_set_transparency(self.rect_id, transparency)
         self.transparent = transparency
@@ -223,6 +229,9 @@ class RectManager:
             uint64_t new_rect(RectManager, uint64_t, uint64_t, uint64_t);
             uint64_t new_orphan(RectManager, uint64_t, uint64_t);
             uint32_t delete_rect(RectManager, uint64_t);
+
+            int64_t get_x(RectManager, uint64_t);
+            int64_t get_y(RectManager, uint64_t);
 
 
             uint32_t set_position(RectManager, uint64_t, int64_t, int64_t);
@@ -259,6 +268,7 @@ class RectManager:
             uint32_t replace_with(RectManager, uint64_t, uint64_t);
 
             uint32_t shift_contents(RectManager, uint64_t, int64_t, int64_t);
+            uint32_t shift_contents_in_box(RectManager, uint64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
 
             uint64_t get_height(RectManager, uint64_t);
             uint64_t get_width(RectManager, uint64_t);
@@ -457,6 +467,14 @@ class RectManager:
                 dimensions=(width, height)
             )
 
+    def rect_get_x(self, rect_id):
+        x = self.lib.get_x(self.rectmanager, rect_id)
+        return x
+
+    def rect_get_y(self, rect_id):
+        y = self.lib.get_y(self.rectmanager, rect_id)
+        return y
+
 
     # TODO: Handle Errors here
     def create_rect(self, **kwargs):
@@ -505,6 +523,24 @@ class RectManager:
 
     def rect_shift_contents(self, rect_id, x, y):
         err = self.lib.shift_contents(self.rectmanager, rect_id, x, y)
+
+        if err:
+            raise EXCEPTIONS[err](
+                rect_id=rect_id,
+                x=x,
+                y=y
+            )
+    def rect_shift_contents_in_box(self, rect_id, x, y, limit):
+        err = self.lib.shift_contents_in_box(
+            self.rectmanager,
+            rect_id,
+            x,
+            y,
+            limit[0],
+            limit[1],
+            limit[2],
+            limit[3]
+        )
 
         if err:
             raise EXCEPTIONS[err](
