@@ -47,4 +47,3 @@ thread::sleep(time::Duration::from_secs(2));
 // take down the environment, and turn echo back on.
 rectmanager.kill();
 ```
-
